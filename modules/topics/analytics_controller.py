@@ -40,7 +40,7 @@ class TopicAnalyticsController:
         # Сессии
         sessions = self._session_repo.get_by_topic(topic_id)
         session_count = len(sessions)
-        total_minutes = sum(s.get('duration_minutes', 0) for s in sessions)
+        total_minutes = sum(s.get('duration_minutes') or 0 for s in sessions)
 
         # Логи состояния
 

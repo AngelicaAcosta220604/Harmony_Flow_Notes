@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QListWidget, QListWidgetItem, QStackedWidget, QLabel,
     QPushButton, QFrame, QApplication
 )
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QTimer, Signal
 from PySide6.QtGui import QFont, QKeySequence, QShortcut
 
 from core.navigation import Navigation, NavSection
@@ -163,14 +163,10 @@ class MainWindow(QMainWindow):
         self.content_stack.addWidget(self.review_session_view)
 
     def _setup_navigation(self):
-        """Настраивает навигацию между экранами"""
+        from core.navigation import Navigation  # <-- добавить эту строку в начало метода
         self.navigation = Navigation()
         self.navigation.section_changed.connect(self._on_navigation_changed)
-
-        # Подключаем клики по сайдбару
         self.sidebar.currentRowChanged.connect(self._on_sidebar_clicked)
-
-        # Устанавливаем начальную секцию
         self.sidebar.setCurrentRow(0)
         self.navigation.navigate_to(NavSection.DASHBOARD)
 
@@ -291,6 +287,20 @@ class MainWindow(QMainWindow):
     def _connect_signals(self):
         """Подключает сигналы от вьюх к навигации"""
         c = container
+
+        # Topic view signals
+        self.topic_view.create_note_requested.connect(
+            lambda topic_id: self._open_note_editor(topic_id)
+        )
+        self.topic_view.create_task_requested.connect(
+            lambda topic_id: self._open_task_creator(topic_id)
+        )
+        self.topic_view.create_flashcard_requested.connect(
+            lambda topic_id: self._open_flashcard_creator(topic_id)
+        )
+        self.topic_view.start_session_requested.connect(
+            lambda topic_id: self._start_focus_session_from_topic(topic_id)
+        )
 
         # Dashboard
         self.dashboard_view.create_topic_requested.connect(
@@ -471,3 +481,35 @@ class MainWindow(QMainWindow):
         if isinstance(app, HFlowApp):
             app.shutdown()
         event.accept()
+
+    def _open_note_editor(self, topic_id: int):
+        from modules.notes.editor import NoteEditorView
+        self.note_editor = NoteEditorView(container.note_controller)
+        self.note_editor.create_new_note(topic_id)
+        self.content_stack.addWidget(self.note_editor)
+        self.content_stack.setCurrentWidget(self.note_editor)
+
+    def _open_task_creator(self, topic_id: int):
+        from modules.tasks.dialogs import TaskDialog
+        dialog = TaskDialog(self, topic_id=topic_id)
+        if dialog.exec():
+            self._refresh_topics()
+
+    def _open_flashcard_creator(self, topic_id: int):
+        from modules.flashcards.dialogs import CardTypeDialog
+        dialog = CardTypeDialog(self)
+        if dialog.exec():
+            data = dialog.get_card_data()
+            if data['type'] == 'free':
+                container.flashcard_controller.create_free_card(topic_id, data['content'])
+            else:
+                container.flashcard_controller.create_qa_card(topic_id, data['question'], data['answer'])
+            self._refresh_dashboard()
+
+    def _start_focus_session_from_topic(self, topic_id: int):
+        self.navigation.navigate_to(NavSection.FOCUS, {
+            'action': 'start',
+            'topic_id': topic_id,
+            'topic_name': container.topic_controller.get_topic(topic_id).name,
+            'interval': 15
+        })

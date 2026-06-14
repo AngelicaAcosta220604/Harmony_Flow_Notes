@@ -24,6 +24,8 @@ class TimeService:
     @staticmethod
     def format_time(seconds: int) -> str:
         """Форматирует секунды в ЧЧ:ММ:СС"""
+        if seconds is None:
+            return "00:00"
         hours = seconds // 3600
         minutes = (seconds % 3600) // 60
         secs = seconds % 60
@@ -32,13 +34,16 @@ class TimeService:
         return f"{minutes:02d}:{secs:02d}"
 
     @staticmethod
-    def format_duration(minutes: int) -> str:
-        """Форматирует длительность в минутах"""
-        hours = minutes // 60
-        mins = minutes % 60
-        if hours > 0:
-            return f"{hours}ч {mins}м"
-        return f"{mins}м"
+    def format_duration(minutes) -> str:
+        if minutes is None:
+            return "0м"
+        try:
+            minutes = int(minutes)
+            hours = minutes // 60
+            mins = minutes % 60
+            return f"{hours}ч {mins}м" if hours > 0 else f"{mins}м"
+        except:
+            return "0м"
 
     @staticmethod
     def parse_iso(date_str: str) -> Optional[datetime]:

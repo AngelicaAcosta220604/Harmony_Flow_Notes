@@ -1,7 +1,7 @@
 # modules/topics/topic_view.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel,
-    QPushButton, QScrollArea, QFrame, QMessageBox
+    QPushButton, QScrollArea, QFrame, QMessageBox, QTextEdit, QListWidget
 )
 from PySide6.QtCore import Signal
 from PySide6.QtCore import Qt
@@ -70,46 +70,48 @@ class TopicView(QWidget):
         self.overview_tab = self._create_overview_tab()
         self.tab_widget.addTab(self.overview_tab, "📊 Обзор")
 
-        # Вкладка "Заметки" (будет заполняться из модуля notes)
+        # Вкладка "Заметки"
         self.notes_tab = QWidget()
         notes_layout = QVBoxLayout(self.notes_tab)
-        notes_layout.addWidget(QLabel("Здесь будут заметки..."))
+        self.notes_list = QListWidget()
+        notes_layout.addWidget(self.notes_list)
         self.create_note_btn = QPushButton("➕ Создать заметку")
         notes_layout.addWidget(self.create_note_btn)
-        notes_layout.addStretch()
         self.tab_widget.addTab(self.notes_tab, "📝 Заметки")
 
         # Вкладка "Задачи"
         self.tasks_tab = QWidget()
         tasks_layout = QVBoxLayout(self.tasks_tab)
-        tasks_layout.addWidget(QLabel("Здесь будут задачи..."))
+        self.tasks_list = QListWidget()
+        tasks_layout.addWidget(self.tasks_list)
         self.create_task_btn = QPushButton("➕ Создать задачу")
         tasks_layout.addWidget(self.create_task_btn)
-        tasks_layout.addStretch()
         self.tab_widget.addTab(self.tasks_tab, "✅ Задачи")
 
         # Вкладка "Карточки"
         self.cards_tab = QWidget()
         cards_layout = QVBoxLayout(self.cards_tab)
-        cards_layout.addWidget(QLabel("Здесь будут карточки..."))
+        self.cards_list = QListWidget()
+        cards_layout.addWidget(self.cards_list)
         self.create_card_btn = QPushButton("➕ Создать карточку")
         cards_layout.addWidget(self.create_card_btn)
-        cards_layout.addStretch()
         self.tab_widget.addTab(self.cards_tab, "🃏 Карточки")
 
         # Вкладка "Сессии"
         self.sessions_tab = QWidget()
         sessions_layout = QVBoxLayout(self.sessions_tab)
-        sessions_layout.addWidget(QLabel("Здесь будут сессии..."))
+        self.sessions_list = QListWidget()
+        sessions_layout.addWidget(self.sessions_list)
         self.start_session_btn = QPushButton("▶ Начать сессию")
         sessions_layout.addWidget(self.start_session_btn)
-        sessions_layout.addStretch()
         self.tab_widget.addTab(self.sessions_tab, "⏱️ Сессии")
 
         # Вкладка "Аналитика"
         self.analytics_tab = QWidget()
         analytics_layout = QVBoxLayout(self.analytics_tab)
-        analytics_layout.addWidget(QLabel("Здесь будет аналитика..."))
+        self.analytics_text = QTextEdit()
+        self.analytics_text.setReadOnly(True)
+        analytics_layout.addWidget(self.analytics_text)
         self.tab_widget.addTab(self.analytics_tab, "📈 Аналитика")
 
         layout.addWidget(self.tab_widget)

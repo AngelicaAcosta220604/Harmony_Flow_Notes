@@ -1,7 +1,7 @@
 # modules/topics/tree_view.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QMenu
+    QMenu, QTreeWidgetItem
 )
 from widgets import SilentMessageBox, SilentInputDialog
 
@@ -192,3 +192,10 @@ class TopicsView(QWidget):
     def select_topic(self, topic_id: int):
         """Выбирает тему"""
         self.tree.select_topic(topic_id)
+
+    def _on_item_clicked(self, item: QTreeWidgetItem, column: int):
+        topic_id = item.data(0, Qt.UserRole)
+        if topic_id:
+            topic = self._controller.get_topic(topic_id)
+            if topic and topic.is_topic:  # <-- ТОЛЬКО ТЕМЫ, НЕ ПАПКИ
+                self.topic_selected.emit(topic_id)

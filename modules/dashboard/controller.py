@@ -12,6 +12,7 @@ SettingsRepository
 )
 
 from datebase.db_manager import db
+
 from models.task import Task
 from models.session import Session
 from services.time_service import TimeService
@@ -63,8 +64,6 @@ class DashboardController:
         - отработанное время (минуты)
         """
         today = date.today().isoformat()
-        today_start = f"{today}T00:00:00"
-        today_end = f"{today}T23:59:59"
 
         # Задачи, выполненные сегодня
         tasks = self._task_repo.get_all()
@@ -82,7 +81,7 @@ class DashboardController:
             if session.get('start_time'):
                 session_date = session['start_time'][:10]
                 if session_date == today and session.get('duration_minutes'):
-                    today_minutes += session['duration_minutes']
+                    today_minutes += session['duration_minutes'] or 0
 
         return {
             'completed_tasks_today': completed_today,
@@ -127,7 +126,6 @@ class DashboardController:
         last_session = sessions[0]
 
         # Получаем логи состояния для этой сессии
-
         logs = db.fetchall(
             "SELECT metric, value FROM session_state_logs WHERE session_id = ?",
             (last_session['id'],)
@@ -149,8 +147,8 @@ class DashboardController:
         return {
             'id': last_session['id'],
             'topic_name': topic_name,
-            'duration_minutes': last_session.get('duration_minutes', 0),
-            'duration_display': TimeService.format_duration(last_session.get('duration_minutes', 0)),
+            'duration_minutes': last_session.get('duration_minutes') or 0,
+            'duration_display': TimeService.format_duration(last_session.get('duration_minutes') or 0),
             'avg_concentration': round(avg_concentration, 1),
             'avg_energy': round(avg_energy, 1),
             'start_time': last_session.get('start_time')
@@ -226,8 +224,7 @@ class DashboardController:
         today_end = f"{today}T23:59:59"
 
         # Сессии за сегодня
-        sessions = db.fetchall(
-            "SELECT id FROM sessions WHERE start_time >= ? AND start_time <= ?",
+        sessions = db.fetchall("SELECT id, duration_minutes FROM sessions WHERE start_time >= ? AND start_time <= ?",
             (today_start, today_end)
         )
 
@@ -254,7 +251,7 @@ class DashboardController:
         interest_values = [log['value'] for log in logs if log['metric'] == 'interest']
 
         # Общее время
-        total_minutes = sum(s.get('duration_minutes', 0) for s in sessions)
+        total_minutes = sum(s.get('duration_minutes') or 0 for s in sessions)
 
         return {
             'total_minutes': total_minutes,
@@ -274,7 +271,7 @@ class DashboardController:
         sessions = self._session_repo.get_all()
 
         completed_tasks = sum(1 for t in tasks if t.get('status') == 'completed')
-        total_minutes = sum(s.get('duration_minutes', 0) for s in sessions)
+        total_minutes = sum(s.get('duration_minutes') or 0 for s in sessions)
 
         return {
             'total_topics': len(topics),

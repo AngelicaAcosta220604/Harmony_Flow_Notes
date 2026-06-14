@@ -46,9 +46,9 @@ class TreeWidget(QTreeWidget):
 
         # Безопасная установка стандартных системных иконок через Enum QStyle
         if topic.is_folder:
-            item.setIcon(0, self.style().standardIcon(QStyle.SP_DirIcon))  # Заместо 5
+            item.setIcon(0, self.style().standardIcon(QStyle.SP_DirIcon))
         else:
-            item.setIcon(0, self.style().standardIcon(QStyle.SP_FileIcon))  # Заместо 4
+            item.setIcon(0, self.style().standardIcon(QStyle.SP_FileIcon))
 
         for child in topic.children:
             self._add_topic_item(item, child)

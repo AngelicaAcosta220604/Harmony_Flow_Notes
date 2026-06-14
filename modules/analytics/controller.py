@@ -370,7 +370,6 @@ class AnalyticsController:
         }
 
     def get_complete_stats(self, topic_ids: List[int], include_general_tasks: bool = False) -> Dict[str, Any]:
-        """Возвращает полную статистику для заданных тем"""
         sessions = self.get_sessions_for_topics(topic_ids)
         tasks = self.get_tasks_for_topics(topic_ids, include_general_tasks)
         notes = self.get_notes_for_topics(topic_ids)
@@ -384,5 +383,8 @@ class AnalyticsController:
             "day_stats": self.get_day_of_week_stats(sessions),
             "trends": self.get_all_metrics_trend(sessions),
             "insights": self.generate_insights(sessions, tasks),
-            "sessions": sessions, "tasks": tasks, "notes": notes, "flashcards": flashcards
+            "sessions": sessions,
+            "tasks": tasks,
+            "notes": notes,
+            "flashcards": flashcards
         }

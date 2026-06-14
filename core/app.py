@@ -73,16 +73,13 @@ class HFlowApp(QApplication):
         # Автосохранение будет настроено в редакторе заметок
 
     def shutdown(self):
-        """Корректное завершение приложения"""
-        # Сохраняем все настройки
         container.settings_controller.save_all()
-
-        # Останавливаем звук
         container.music_controller.stop()
-
-        # Закрываем БД
-        from database.db_manager import db
-        db.close()
+        try:
+            from database.db_manager import db
+            db.close()
+        except ImportError:
+            pass
 
     def get_container(self):
         """Возвращает контейнер зависимостей"""

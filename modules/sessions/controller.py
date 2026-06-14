@@ -223,21 +223,18 @@ class SessionController(QObject):
         }
 
     def get_all_sessions(self) -> List[Dict[str, Any]]:
-        """Возвращает все сессии для истории"""
         rows = self._session_repo.get_all()
         sessions = []
-
         for row in rows:
             topic = self._topic_repo.get_by_id(row['topic_id'])
             sessions.append({
                 'id': row['id'],
                 'topic_name': topic['name'] if topic else "—",
                 'date': row['start_time'][:10] if row['start_time'] else "—",
-                'duration_minutes': row.get('duration_minutes', 0),
-                'duration_display': TimeService.format_duration(row.get('duration_minutes', 0)),
+                'duration_minutes': row.get('duration_minutes') or 0,
+                'duration_display': TimeService.format_duration(row.get('duration_minutes')),
                 'status': row.get('status')
             })
-
         return sessions
 
     def cleanup(self):

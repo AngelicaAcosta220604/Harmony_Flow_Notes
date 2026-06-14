@@ -33,7 +33,6 @@ class SessionRepository:
         )
 
     def create(self, topic_id: int) -> int:
-        """Создаёт новую сессию (активную)"""
         now = datetime.now().isoformat()
         return db.insert('sessions', {
             'topic_id': topic_id,
@@ -50,7 +49,6 @@ class SessionRepository:
         return db.update('sessions', data, 'id = ?', (session_id,))
 
     def end_session(self, session_id: int, duration_minutes: int, status: str = 'completed') -> int:
-        """Завершает сессию"""
         now = datetime.now().isoformat()
         return self.update(session_id, end_time=now, duration_minutes=duration_minutes, status=status)
 

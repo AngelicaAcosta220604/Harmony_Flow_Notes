@@ -108,13 +108,7 @@ class Container:
 
         self._initialized = True
 
-    def get_navigation(self):
-        """Возвращает синглтон-объект управления навигацией"""
-        # Если вдруг метод вызвали ДО вызова container.init(), создаем объект
-        if self._navigation is None:
-            from core.navigation import Navigation
-            self._navigation = Navigation()
-        return self._navigation
+
 
 
 # Глобальный экземпляр контейнера

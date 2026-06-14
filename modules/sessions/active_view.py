@@ -109,12 +109,12 @@ class FocusActiveView(QWidget):
         self._session_controller.timer_updated.connect(self.timer.set_time)
         self._session_controller.session_paused.connect(self._on_paused)
         self._session_controller.session_resumed.connect(self._on_resumed)
-        self._session_controller.state_changed.connect(self._on_state_changed)
 
         self.quick_note_btn.clicked.connect(self._on_quick_note)
         self.pause_btn.clicked.connect(self._on_pause_clicked)
         self.end_btn.clicked.connect(self._on_end_clicked)
 
+        # ПОДКЛЮЧАЕМ ПОЛЗУНКИ ПРАВИЛЬНО
         self.state_sliders.state_changed.connect(self._on_state_changed)
 
     def _setup_inactivity_timer(self):

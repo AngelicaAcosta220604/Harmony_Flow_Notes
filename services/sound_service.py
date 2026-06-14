@@ -65,12 +65,6 @@ class SoundService:
         return self._volume
 
     def play(self, sound_name: str):
-        """
-        Начинает воспроизведение звука
-
-        Args:
-            sound_name: 'white_noise', 'rain', 'forest', 'cafe', 'off'
-        """
         self.stop()
 
         if sound_name == 'off' or sound_name not in self.SOUNDS:
@@ -88,7 +82,13 @@ class SoundService:
 
         self._init_player()
         self._player.setSource(QUrl.fromLocalFile(str(sound_path)))
-        self._player.setLoopCount(QMediaPlayer.Infinite)  # Бесконечное повторение
+
+        # Бесконечное повторение (для PySide6 6.11+)
+        try:
+            self._player.setLoops(QMediaPlayer.Infinite)
+        except AttributeError:
+            pass
+
         self._player.play()
         self._current_sound = sound_name
 
