@@ -7,6 +7,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFont, QKeySequence, QShortcut
 
+from core.navigation import Navigation, NavSection
+
 from .di.container import container
 from .navigation import NavSection, Navigation
 from .event_bus import event_bus
@@ -162,7 +164,7 @@ class MainWindow(QMainWindow):
 
     def _setup_navigation(self):
         """Настраивает навигацию между экранами"""
-        self.navigation = container.get_navigation()
+        self.navigation = Navigation()
         self.navigation.section_changed.connect(self._on_navigation_changed)
 
         # Подключаем клики по сайдбару
