@@ -2,7 +2,7 @@
 from pathlib import Path
 from typing import Optional
 
-
+#
 class ThemeManager:
     """Менеджер для переключения светлой и тёмной темы"""
 
@@ -86,6 +86,7 @@ class ThemeManager:
 
         QTreeWidget::item:selected {
             background-color: #1976d2;
+            color: #FFFFFF;
         }
 
         /* Табы */
