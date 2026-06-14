@@ -60,11 +60,11 @@ class StateSliders(QWidget):
         self.conc_label = QLabel("🧠 Концентрация")
         self.conc_label.setFixedWidth(100)
         self.conc_slider = QSlider(Qt.Horizontal)
-        self.conc_slider.setRange(1, 5)
-        self.conc_slider.setValue(3)
+        self.conc_slider.setRange(0, 100)  # <-- 0-100
+        self.conc_slider.setValue(50)
         self.conc_slider.setTickPosition(QSlider.TicksBelow)
-        self.conc_slider.setTickInterval(1)
-        self.conc_value_label = QLabel("3")
+        self.conc_slider.setTickInterval(10)
+        self.conc_value_label = QLabel("50")
         self.conc_value_label.setFixedWidth(30)
 
         self.conc_layout.addWidget(self.conc_label)
@@ -77,11 +77,11 @@ class StateSliders(QWidget):
         self.energy_label = QLabel("⚡ Энергия")
         self.energy_label.setFixedWidth(100)
         self.energy_slider = QSlider(Qt.Horizontal)
-        self.energy_slider.setRange(1, 5)
-        self.energy_slider.setValue(3)
+        self.energy_slider.setRange(0, 100)  # <-- 0-100
+        self.energy_slider.setValue(50)
         self.energy_slider.setTickPosition(QSlider.TicksBelow)
-        self.energy_slider.setTickInterval(1)
-        self.energy_value_label = QLabel("3")
+        self.energy_slider.setTickInterval(10)
+        self.energy_value_label = QLabel("50")
         self.energy_value_label.setFixedWidth(30)
 
         self.energy_layout.addWidget(self.energy_label)
@@ -94,11 +94,11 @@ class StateSliders(QWidget):
         self.interest_label = QLabel("❤️ Интерес")
         self.interest_label.setFixedWidth(100)
         self.interest_slider = QSlider(Qt.Horizontal)
-        self.interest_slider.setRange(1, 5)
-        self.interest_slider.setValue(3)
+        self.interest_slider.setRange(0, 100)
+        self.interest_slider.setValue(50)
         self.interest_slider.setTickPosition(QSlider.TicksBelow)
-        self.interest_slider.setTickInterval(1)
-        self.interest_value_label = QLabel("3")
+        self.interest_slider.setTickInterval(10)
+        self.interest_value_label = QLabel("50")
         self.interest_value_label.setFixedWidth(30)
 
         self.interest_layout.addWidget(self.interest_label)
@@ -107,15 +107,9 @@ class StateSliders(QWidget):
         layout.addLayout(self.interest_layout)
 
     def _connect_signals(self):
-        self.conc_slider.valueChanged.connect(
-            lambda v: self._on_value_changed("concentration", v)
-        )
-        self.energy_slider.valueChanged.connect(
-            lambda v: self._on_value_changed("energy", v)
-        )
-        self.interest_slider.valueChanged.connect(
-            lambda v: self._on_value_changed("interest", v)
-        )
+        self.conc_slider.valueChanged.connect(lambda v: self._on_value_changed("concentration", v))
+        self.energy_slider.valueChanged.connect(lambda v: self._on_value_changed("energy", v))
+        self.interest_slider.valueChanged.connect(lambda v: self._on_value_changed("interest", v))
 
     def _on_value_changed(self, metric: str, value: int):
         if metric == "concentration":
@@ -123,21 +117,20 @@ class StateSliders(QWidget):
         elif metric == "energy":
             self.energy_value_label.setText(str(value))
         elif metric == "interest":
-            self.interest_value_label.setText(str(value))
-
+            self.interest_value_label.setText(str(value))  # <-- ДОБАВИТЬ
         self.state_changed.emit(metric, value)
 
     def get_values(self) -> dict:
         return {
             'concentration': self.conc_slider.value(),
             'energy': self.energy_slider.value(),
-            'interest': self.interest_slider.value()
+            'interest': self.interest_slider.value()  # <-- ДОБАВИТЬ
         }
 
     def reset(self):
-        self.conc_slider.setValue(3)
-        self.energy_slider.setValue(3)
-        self.interest_slider.setValue(3)
+        self.conc_slider.setValue(50)
+        self.energy_slider.setValue(50)
+        self.interest_slider.setValue(50)
 
 
 class PingDialog(QDialog):

@@ -59,7 +59,7 @@ class TopicsView(QWidget):
 
         layout.addLayout(button_layout)
 
-        # Дерево тем
+        # Дерево тем (используем улучшенный TreeWidget)
         self.tree = TreeWidget(self._controller)
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self._show_context_menu)
@@ -71,11 +71,20 @@ class TopicsView(QWidget):
         self.new_topic_btn.clicked.connect(self._on_new_topic)
         self.rename_btn.clicked.connect(self._on_rename)
         self.delete_btn.clicked.connect(self._on_delete)
-        self.tree.topic_selected.connect(self.topic_selected.emit)
+
+        # ВАЖНО: Подключаем СИГНАЛ ДВОЙНОГО КЛИКА из виджета дерева
+        self.tree.topic_double_clicked.connect(self._on_topic_double_clicked)
+
+    def _on_topic_double_clicked(self, topic_id: int):
+        """Обработчик двойного клика по элементу дерева"""
+        topic = self._controller.get_topic(topic_id)
+        if topic and topic.is_topic:
+            # Только темы отправляют сигнал, папки игнорируются
+            self.topic_selected.emit(topic_id)
 
     def _on_new_folder(self):
         """Создание новой папки"""
-        parent_id = self.tree.get_selected_topic_id()
+        parent_id = self.tree.get_selected_folder_id()
 
         name, ok = SilentInputDialog.getText(self, "Новая папка", "Введите название папки:")
         if ok and name.strip():
@@ -89,7 +98,7 @@ class TopicsView(QWidget):
 
     def _on_new_topic(self):
         """Создание новой темы"""
-        parent_id = self.tree.get_selected_topic_id()
+        parent_id = self.tree.get_selected_folder_id()
 
         name, ok = SilentInputDialog.getText(self, "Новая тема", "Введите название темы:")
         if ok and name.strip():
@@ -131,14 +140,12 @@ class TopicsView(QWidget):
         if not topic:
             return
 
-        # Предупреждение
         msg = f"Вы действительно хотите удалить «{topic.name}»?\n\n"
         msg += "Вместе с ним будут удалены все:\n"
         msg += "• заметки\n• задачи\n• карточки\n• сессии\n• аналитика"
 
         reply = SilentMessageBox.question(
-            self, "Подтверждение удаления", msg,
-            SilentMessageBox.Yes | SilentMessageBox.No, SilentMessageBox.No
+            self, "Подтверждение удаления", msg
         )
 
         if reply == SilentMessageBox.Yes:
@@ -150,7 +157,7 @@ class TopicsView(QWidget):
 
     def _show_context_menu(self, position):
         """Показывает контекстное меню"""
-        item = self.tree.itemAt(position)
+        item = self.tree.itemAt(position)  # <-- ИСПРАВЛЕНО
         if not item:
             return
 
@@ -174,28 +181,20 @@ class TopicsView(QWidget):
         delete_action.triggered.connect(self._on_delete)
         menu.addAction(delete_action)
 
-        menu.exec(self.tree.viewport().mapToGlobal(position))
+        menu.exec(self.tree.viewport().mapToGlobal(position))  # <-- ИСПРАВЛЕНО (убрали .tree)
 
     def refresh(self):
         """Обновляет дерево"""
         self.tree.load_topics()
 
-        # Обновляем состояние кнопок
         has_selection = self.tree.get_selected_topic_id() is not None
         self.rename_btn.setEnabled(has_selection)
         self.delete_btn.setEnabled(has_selection)
 
-    def get_selected_topic_id(self) -> int:
+    def get_selected_topic_id(self):
         """Возвращает ID выбранной темы"""
         return self.tree.get_selected_topic_id()
 
     def select_topic(self, topic_id: int):
         """Выбирает тему"""
         self.tree.select_topic(topic_id)
-
-    def _on_item_clicked(self, item: QTreeWidgetItem, column: int):
-        topic_id = item.data(0, Qt.UserRole)
-        if topic_id:
-            topic = self._controller.get_topic(topic_id)
-            if topic and topic.is_topic:  # <-- ТОЛЬКО ТЕМЫ, НЕ ПАПКИ
-                self.topic_selected.emit(topic_id)

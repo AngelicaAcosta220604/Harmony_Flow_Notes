@@ -151,8 +151,9 @@ class TopicView(QWidget):
 
         self.sessions_card = self._create_stat_card("⏱️ Сессии", "0")
         self.time_card = self._create_stat_card("⏰ Время", "0 ч")
-        self.conc_card = self._create_stat_card("🧠 Концентрация", "0/5")
-        self.energy_card = self._create_stat_card("⚡ Энергия", "0/5")
+        self.conc_card = self._create_stat_card("🧠 Концентрация", "0%")
+        self.energy_card = self._create_stat_card("⚡ Энергия", "0%")
+        self.interest_card = self._create_stat_card("❤️ Интерес", "0%")
 
         stats_layout.addWidget(self.sessions_card)
         stats_layout.addWidget(self.time_card)
@@ -269,22 +270,23 @@ class TopicView(QWidget):
         self._load_stats(topic_id)
 
     def _load_stats(self, topic_id: int):
-        """Загружает статистику для вкладки обзора"""
         stats = self._analytics_controller.get_topic_stats(topic_id)
 
-        # Обновляем карточки
         self._update_stat_card(self.sessions_card, str(stats['session_count']))
         self._update_stat_card(self.time_card, f"{stats['total_hours']} ч")
-        self._update_stat_card(self.conc_card, f"{stats['avg_concentration']}/5")
-        self._update_stat_card(self.energy_card, f"{stats['avg_energy']}/5")
 
-        # Прогресс задач
+        # Конвертируем 0-5 в 0-100 для отображения
+        conc_percent = int(stats.get('avg_concentration', 0) * 20)
+        energy_percent = int(stats.get('avg_energy', 0) * 20)
+        interest_percent = int(stats.get('avg_interest', 0) * 20)
+
+        self._update_stat_card(self.conc_card, f"{conc_percent}%")
+        self._update_stat_card(self.energy_card, f"{energy_percent}%")
+        self._update_stat_card(self.interest_card, f"{interest_percent}%")  # <-- ДОБАВИТЬ
+
         self.tasks_progress_label.setText(
-            f"{stats['completed_tasks']} / {stats['task_count']} выполнено "
-            f"({stats['completion_rate']}%)"
+            f"{stats['completed_tasks']} / {stats['task_count']} выполнено ({stats['completion_rate']}%)"
         )
-
-        # Количество материалов
         self.notes_count_label.setText(f"📝 Заметок: {stats['note_count']}")
         self.cards_count_label.setText(f"🃏 Карточек: {stats['flashcard_count']}")
 

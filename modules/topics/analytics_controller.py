@@ -29,26 +29,16 @@ class TopicAnalyticsController:
         self._flashcard_repo = flashcard_repo
 
     def get_topic_stats(self, topic_id: int) -> Dict[str, Any]:
-        """
-        Возвращает статистику по теме:
-        - количество сессий
-        - суммарное время
-        - средняя концентрация/энергия/интерес
-        - количество задач/выполненных
-        - количество заметок/карточек
-        """
-        # Сессии
         sessions = self._session_repo.get_by_topic(topic_id)
         session_count = len(sessions)
         total_minutes = sum(s.get('duration_minutes') or 0 for s in sessions)
 
         # Логи состояния
-
         session_ids = [s['id'] for s in sessions]
 
         avg_concentration = 0
         avg_energy = 0
-        avg_interest = 0
+        avg_interest = 0  # <-- Убедись, что есть
 
         if session_ids:
             placeholders = ','.join('?' * len(session_ids))
@@ -59,7 +49,7 @@ class TopicAnalyticsController:
 
             conc_vals = [log['value'] for log in logs if log['metric'] == 'concentration']
             energy_vals = [log['value'] for log in logs if log['metric'] == 'energy']
-            interest_vals = [log['value'] for log in logs if log['metric'] == 'interest']
+            interest_vals = [log['value'] for log in logs if log['metric'] == 'interest']  # <-- ДОБАВИТЬ
 
             avg_concentration = round(sum(conc_vals) / len(conc_vals), 1) if conc_vals else 0
             avg_energy = round(sum(energy_vals) / len(energy_vals), 1) if energy_vals else 0

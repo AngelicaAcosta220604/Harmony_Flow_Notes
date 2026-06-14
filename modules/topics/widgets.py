@@ -17,6 +17,8 @@ class TreeWidget(QTreeWidget):
     """
 
     topic_selected = Signal(int)  # Сигнал при выборе темы
+    topics_changed = Signal()
+    topic_double_clicked = Signal(int)
 
     def __init__(self, controller: TopicController, parent=None):
         super().__init__(parent)
@@ -29,6 +31,7 @@ class TreeWidget(QTreeWidget):
         self.setIndentation(20)
         self.setSelectionMode(QTreeWidget.SingleSelection)
         self.itemClicked.connect(self._on_item_clicked)
+        self.itemDoubleClicked.connect(self._on_item_double_clicked)
 
     def load_topics(self):
         """Загружает все темы из БД"""
@@ -64,8 +67,49 @@ class TreeWidget(QTreeWidget):
         if topic_id:
             self.topic_selected.emit(topic_id)
 
+    def _on_item_double_clicked(self, item: QTreeWidgetItem, column: int):
+        topic_id = item.data(0, Qt.UserRole)
+        if not topic_id:
+            return
+
+        topic = self._controller.get_topic(topic_id)
+        if not topic:
+            return
+
+        if topic.type == "topic":
+            # ОТПРАВЛЯЕМ СИГНАЛ ТОЛЬКО ДЛЯ ТЕМ
+            self.topic_double_clicked.emit(topic_id)
+        else:
+            # Для папки — раскрываем/схлопываем
+            if item.isExpanded():
+                item.setExpanded(False)
+            else:
+                item.setExpanded(True)
+
     def get_selected_topic_id(self) -> Optional[int]:
         """Возвращает ID выбранной темы"""
+        current = self.currentItem()
+        if current:
+            return current.data(0, Qt.UserRole)
+        return None
+
+    def get_selected_folder_id(self) -> Optional[int]:
+        """Возвращает ID выбранной папки или None, если выбрана тема или ничего."""
+        current = self.currentItem()
+        if not current:
+            return None
+
+        topic_id = current.data(0, Qt.UserRole)
+        if not topic_id:
+            return None
+
+        topic = self._controller.get_topic(topic_id)
+        if topic and topic.is_folder:
+            return topic_id
+        return None
+
+    def get_selected_item_id(self) -> Optional[int]:
+        """Возвращает ID любого выбранного элемента (и папки, и темы)"""
         current = self.currentItem()
         if current:
             return current.data(0, Qt.UserRole)
