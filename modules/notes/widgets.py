@@ -1,26 +1,24 @@
 # modules/notes/widgets.py
 from PySide6.QtWidgets import (
     QTextEdit, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QComboBox, QToolBar, QColorDialog, QFontComboBox, QLabel
+    QComboBox, QToolBar, QColorDialog, QFontComboBox, QLabel, QMenu
 )
+from widgets import SilentMessageBox
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import (
     QTextCursor, QTextCharFormat, QFont, QColor, QAction,
-    QKeySequence
+    QKeySequence, QTextListFormat
 )
 
 
 class RichTextEditor(QTextEdit):
     """
     Богатый текстовый редактор с поддержкой форматирования.
-    Поддерживает:
-    - жирный, курсив, подчёркивание, зачёркивание
-    - заголовки 3 уровней
-    - списки (маркированные, нумерованные)
-    - чек-листы
-    - цвет текста и фона
-    - выравнивание
     """
+
+    # Сигналы для создания задач и карточек из выделенного текста
+    create_task_from_selection = Signal(str)
+    create_card_from_selection = Signal(str)
 
     # Сигнал при изменении содержимого
     content_changed = Signal()
@@ -35,44 +33,79 @@ class RichTextEditor(QTextEdit):
         self.setAcceptRichText(True)
         self.setPlaceholderText("Начните писать здесь...")
 
-        # Настройка шрифта по умолчанию
+        # Включаем контекстное меню
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
+
         font = QFont("Segoe UI", 11)
         self.setFont(font)
 
+    def _show_context_menu(self, position):
+        """Показывает контекстное меню при выделении текста"""
+        cursor = self.textCursor()
+        if not cursor.hasSelection():
+            self._show_standard_context_menu(position)
+            return
+
+        selected_text = cursor.selectedText()
+        if not selected_text:
+            return
+
+        # Создаём кастомное меню
+        menu = QMenu(self)
+
+        copy_action = QAction("📋 Копировать", self)
+        copy_action.triggered.connect(self.copy)
+        menu.addAction(copy_action)
+
+        cut_action = QAction("✂️ Вырезать", self)
+        cut_action.triggered.connect(self.cut)
+        menu.addAction(cut_action)
+
+        menu.addSeparator()
+
+        card_action = QAction("🃏 Создать карточку", self)
+        card_action.triggered.connect(lambda: self.create_card_from_selection.emit(selected_text))
+        menu.addAction(card_action)
+
+        task_action = QAction("✅ Создать задачу", self)
+        task_action.triggered.connect(lambda: self.create_task_from_selection.emit(selected_text))
+        menu.addAction(task_action)
+
+        menu.exec(self.viewport().mapToGlobal(position))
+
+    def _show_standard_context_menu(self, position):
+        """Показывает стандартное контекстное меню (без выделения)"""
+        menu = self.createStandardContextMenu()
+        menu.exec(self.viewport().mapToGlobal(position))
+
     def _connect_signals(self):
-        """Подключает сигналы"""
         self.textChanged.connect(self.content_changed.emit)
 
     # ========== Форматирование ==========
 
     def toggle_bold(self):
-        """Жирный текст"""
         fmt = self.currentCharFormat()
         fmt.setFontWeight(QFont.Bold if fmt.fontWeight() != QFont.Bold else QFont.Normal)
         self.mergeCurrentCharFormat(fmt)
 
     def toggle_italic(self):
-        """Курсив"""
         fmt = self.currentCharFormat()
         fmt.setFontItalic(not fmt.fontItalic())
         self.mergeCurrentCharFormat(fmt)
 
     def toggle_underline(self):
-        """Подчёркивание"""
         fmt = self.currentCharFormat()
         fmt.setFontUnderline(not fmt.fontUnderline())
         self.mergeCurrentCharFormat(fmt)
 
     def toggle_strikeout(self):
-        """Зачёркивание"""
         fmt = self.currentCharFormat()
         fmt.setFontStrikeOut(not fmt.fontStrikeOut())
         self.mergeCurrentCharFormat(fmt)
 
     def set_heading(self, level: int):
-        """Устанавливает заголовок (1-3)"""
         fmt = QTextCharFormat()
-
         if level == 1:
             font = QFont("Segoe UI", 20, QFont.Bold)
             fmt.setFont(font)
@@ -83,126 +116,81 @@ class RichTextEditor(QTextEdit):
             font = QFont("Segoe UI", 14, QFont.Bold)
             fmt.setFont(font)
         else:
-            # Обычный текст
             font = QFont("Segoe UI", 11)
             fmt.setFont(font)
-
         self.mergeCurrentCharFormat(fmt)
 
     def set_text_color(self, color: QColor):
-        """Устанавливает цвет текста"""
         fmt = self.currentCharFormat()
         fmt.setForeground(color)
         self.mergeCurrentCharFormat(fmt)
 
     def set_background_color(self, color: QColor):
-        """Устанавливает цвет фона"""
         fmt = self.currentCharFormat()
         fmt.setBackground(color)
         self.mergeCurrentCharFormat(fmt)
 
     def set_alignment(self, alignment: Qt.AlignmentFlag):
-        """Устанавливает выравнивание"""
         self.setAlignment(alignment)
 
     # ========== Списки ==========
 
     def insert_bullet_list(self):
-        """Вставляет маркированный список"""
         cursor = self.textCursor()
-
         if cursor.currentList() and cursor.currentList().format().style() == QTextListFormat.ListDisc:
-            # Если уже в маркированном списке, выходим из него
             cursor.insertBlock()
             cursor.currentList().remove(cursor.block())
         else:
-            # Создаём новый список
             list_format = QTextListFormat()
             list_format.setStyle(QTextListFormat.ListDisc)
             cursor.createList(list_format)
 
     def insert_numbered_list(self):
-        """Вставляет нумерованный список"""
         cursor = self.textCursor()
-
         if cursor.currentList() and cursor.currentList().format().style() == QTextListFormat.ListDecimal:
-            # Если уже в нумерованном списке, выходим из него
             cursor.insertBlock()
             cursor.currentList().remove(cursor.block())
         else:
-            # Создаём новый список
             list_format = QTextListFormat()
             list_format.setStyle(QTextListFormat.ListDecimal)
             cursor.createList(list_format)
 
     def insert_checklist(self):
-        """Вставляет чек-лист"""
         cursor = self.textCursor()
-
-        # Вставляем чекбокс как символ
         cursor.insertText("[ ] ")
 
     # ========== Работа с выделением ==========
 
     def get_selected_text(self) -> str:
-        """Возвращает выделенный текст"""
         cursor = self.textCursor()
         return cursor.selectedText()
-
-    def get_selected_text_with_format(self) -> tuple:
-        """
-        Возвращает выделенный текст и его формат
-        Returns:
-            (текст, формат)
-        """
-        cursor = self.textCursor()
-        if cursor.hasSelection():
-            text = cursor.selectedText()
-            fmt = cursor.charFormat()
-            return text, fmt
-        return "", None
-
-    def replace_selected_text(self, new_text: str):
-        """Заменяет выделенный текст"""
-        cursor = self.textCursor()
-        if cursor.hasSelection():
-            cursor.insertText(new_text)
 
     # ========== Работа с содержимым ==========
 
     def get_html(self) -> str:
-        """Возвращает содержимое в HTML формате"""
         return self.toHtml()
 
     def set_html(self, html: str):
-        """Устанавливает содержимое из HTML"""
         self.setHtml(html)
 
     def get_plain_text(self) -> str:
-        """Возвращает простой текст без форматирования"""
         return self.toPlainText()
 
     def set_plain_text(self, text: str):
-        """Устанавливает простой текст"""
         self.setPlainText(text)
 
     def clear_content(self):
-        """Очищает содержимое"""
         self.clear()
 
     def word_count(self) -> int:
-        """Возвращает количество слов"""
         return len(self.toPlainText().split())
 
     def character_count(self) -> int:
-        """Возвращает количество символов"""
         return len(self.toPlainText())
 
 
 class EditorToolbar(QToolBar):
-    """
-    Панель инструментов для RichTextEditor
-    """
+    """Панель инструментов для RichTextEditor"""
 
     def __init__(self, editor: RichTextEditor, parent=None):
         super().__init__(parent)
@@ -210,7 +198,6 @@ class EditorToolbar(QToolBar):
         self._setup_ui()
 
     def _setup_ui(self):
-        """Настраивает панель инструментов"""
         self.setMovable(False)
         self.setFloatable(False)
 
@@ -259,8 +246,25 @@ class EditorToolbar(QToolBar):
         self.bg_color_btn.clicked.connect(self._on_bg_color)
         self.addWidget(self.bg_color_btn)
 
+        self.addSeparator()
+
+        # ===== КНОПКИ ДЛЯ СОЗДАНИЯ ИЗ ВЫДЕЛЕННОГО ТЕКСТА =====
+        self.create_task_btn = QPushButton("✅ Создать задачу")
+        self.create_task_btn.setToolTip("Создать задачу из выделенного текста")
+        self.create_task_btn.clicked.connect(self._on_create_task)
+        self.addWidget(self.create_task_btn)
+
+        self.create_card_btn = QPushButton("🃏 Создать карточку")
+        self.create_card_btn.setToolTip("Создать карточку из выделенного текста")
+        self.create_card_btn.clicked.connect(self._on_create_card)
+        self.addWidget(self.create_card_btn)
+
+        # Подсказка пользователю
+        self.hint_label = QLabel("💡 Выделите текст → нажмите кнопку")
+        self.hint_label.setStyleSheet("color: #888888; font-size: 10px; margin-left: 10px;")
+        self.addWidget(self.hint_label)
+
     def add_action(self, text: str, tooltip: str, callback) -> QAction:
-        """Добавляет действие на панель"""
         action = QAction(text, self)
         action.setToolTip(tooltip)
         action.triggered.connect(callback)
@@ -268,22 +272,38 @@ class EditorToolbar(QToolBar):
         return action
 
     def _on_heading_changed(self, index: int):
-        """Обработчик изменения заголовка"""
         level = self.heading_combo.currentData()
         if level:
             self._editor.set_heading(level)
         else:
-            # Возвращаем обычный текст
             self._editor.set_heading(0)
 
     def _on_text_color(self):
-        """Выбор цвета текста"""
         color = QColorDialog.getColor()
         if color.isValid():
             self._editor.set_text_color(color)
 
     def _on_bg_color(self):
-        """Выбор цвета фона"""
         color = QColorDialog.getColor()
         if color.isValid():
             self._editor.set_background_color(color)
+
+    def _on_create_task(self):
+        selected = self._editor.get_selected_text()
+        if not selected:
+            SilentMessageBox.information(
+                self, "Нет выделения",
+                "Сначала выделите текст в заметке, из которого хотите создать задачу"
+            )
+            return
+        self._editor.create_task_from_selection.emit(selected)
+
+    def _on_create_card(self):
+        selected = self._editor.get_selected_text()
+        if not selected:
+            SilentMessageBox.information(
+                self, "Нет выделения",
+                "Сначала выделите текст в заметке, из которого хотите создать карточку"
+            )
+            return
+        self._editor.create_card_from_selection.emit(selected)

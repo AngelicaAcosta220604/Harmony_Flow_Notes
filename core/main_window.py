@@ -484,8 +484,9 @@ class MainWindow(QMainWindow):
 
     def _open_note_editor(self, topic_id: int):
         from modules.notes.editor import NoteEditorView
-        self.note_editor = NoteEditorView(container.note_controller)
+        self.note_editor = NoteEditorView(container.note_controller, self)
         self.note_editor.create_new_note(topic_id)
+        self.note_editor.note_saved.connect(self._refresh_topics)
         self.content_stack.addWidget(self.note_editor)
         self.content_stack.setCurrentWidget(self.note_editor)
 
