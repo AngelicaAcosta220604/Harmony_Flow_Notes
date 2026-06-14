@@ -42,14 +42,6 @@ from modules.music.controller import MusicController
 from modules.settings.controller import SettingsController
 from modules.dashboard.controller import DashboardController
 
-    def get_navigation(self):
-        """Возвращает синглтон-объект управления навигацией"""
-        # Если вдруг метод вызвали ДО вызова container.init(), создаем объект
-        if self._navigation is None:
-            from core.navigation import Navigation
-            self._navigation = Navigation()
-        return self._navigation
-
 
 class Container:
     """Контейнер для dependency injection."""
@@ -117,8 +109,13 @@ class Container:
         self._initialized = True
 
     def get_navigation(self):
-        """Возвращает менеджер навигации"""
-        from core.navigation import Navigation
-        return Navigation()
+        """Возвращает синглтон-объект управления навигацией"""
+        # Если вдруг метод вызвали ДО вызова container.init(), создаем объект
+        if self._navigation is None:
+            from core.navigation import Navigation
+            self._navigation = Navigation()
+        return self._navigation
+
+
 # Глобальный экземпляр контейнера
 container = Container()
