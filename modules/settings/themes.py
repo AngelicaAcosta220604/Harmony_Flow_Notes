@@ -2,7 +2,7 @@
 from pathlib import Path
 from typing import Optional
 
-
+#
 class ThemeManager:
     """Менеджер для переключения светлой и тёмной темы"""
 
