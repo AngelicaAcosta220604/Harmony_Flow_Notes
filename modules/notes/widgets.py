@@ -16,7 +16,7 @@ class RichTextEditor(QTextEdit):
     Богатый текстовый редактор с поддержкой форматирования.
     """
 
-    # Сигналы для создания задач и карточек из выделенного текста
+    # Сигналы для создания задач и карточек из выделенного текста.
     create_task_from_selection = Signal(str)
     create_card_from_selection = Signal(str)
 

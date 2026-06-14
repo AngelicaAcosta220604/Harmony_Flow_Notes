@@ -47,7 +47,7 @@ class AnalyticsView(QWidget):
 
         header_layout.addStretch()
 
-        # Выбор тем
+        # Выбор тем.
         self.topic_selector = QComboBox()
         self.topic_selector.addItem("📚 Все темы", None)
         self.topic_selector.addItem("📁 Выбрать темы...", "select")

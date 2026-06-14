@@ -29,7 +29,7 @@ class SoundService:
     def __init__(self, sounds_dir: Optional[str] = None):
         """
         Args:
-            sounds_dir: Директория со звуковыми файлами
+            sounds_dir: Директория со звуковыми файлами.
         """
         if sounds_dir:
             self.sounds_dir = Path(sounds_dir)

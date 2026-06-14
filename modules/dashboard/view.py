@@ -20,7 +20,7 @@ class DashboardView(QWidget):
     create_note_requested = Signal()
     start_session_requested = Signal()
     open_topic_requested = Signal(int)  # topic_id
-    open_task_requested = Signal(int)  # task_id
+    open_task_requested = Signal(int)  # task_id.
     open_analytics_requested = Signal()
     open_tasks_requested = Signal()
 

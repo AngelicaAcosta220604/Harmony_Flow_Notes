@@ -105,7 +105,7 @@ class FocusActiveView(QWidget):
         layout.addWidget(self.status_label)
 
     def _connect_signals(self):
-        """Подключает сигналы"""
+        """Подключает сигналы."""
         self._session_controller.timer_updated.connect(self.timer.set_time)
         self._session_controller.session_paused.connect(self._on_paused)
         self._session_controller.session_resumed.connect(self._on_resumed)

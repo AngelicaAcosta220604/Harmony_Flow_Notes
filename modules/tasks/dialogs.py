@@ -11,7 +11,7 @@ from widgets import SilentMessageBox
 
 
 class TaskDialog(QDialog):
-    """Диалог создания/редактирования задачи."""
+    """Диалог создания/редактирования задачи"""
 
     def __init__(self, parent=None, task: Task = None, topic_id: int = None):
         super().__init__(parent)

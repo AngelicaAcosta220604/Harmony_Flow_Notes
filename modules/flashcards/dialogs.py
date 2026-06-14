@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, Signal
 
 
 class CardTypeDialog(QDialog):
-    """Диалог выбора типа карточки и создания."""
+    """Диалог выбора типа карточки и создания"""
 
     card_saved = Signal(dict)  # сигнал при сохранении
 

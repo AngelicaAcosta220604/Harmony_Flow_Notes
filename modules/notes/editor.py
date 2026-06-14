@@ -11,7 +11,7 @@ from widgets import SilentMessageBox
 
 
 class NoteEditorView(QWidget):
-    """Редактор заметок с полноценным текстовым редактором."""
+    """Редактор заметок с полноценным текстовым редактором"""
 
     note_saved = Signal(int)
     note_deleted = Signal(int)

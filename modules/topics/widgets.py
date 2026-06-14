@@ -13,7 +13,7 @@ from models.topic import Topic
 
 class TreeWidget(QTreeWidget):
     """
-    Кастомное дерево для отображения тем и папок.
+    Кастомное дерево для отображения тем и папок
     """
 
     topic_selected = Signal(int)  # Сигнал при выборе темы

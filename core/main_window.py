@@ -130,7 +130,7 @@ class MainWindow(QMainWindow):
         )
         self.content_stack.addWidget(self.focus_active_view)
 
-        # Tasks (глобальные)
+        # Tasks (глобальные).
         self.tasks_view = GlobalTasksView(c.task_controller)
         self.content_stack.addWidget(self.tasks_view)
 

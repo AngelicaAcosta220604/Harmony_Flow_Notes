@@ -12,8 +12,8 @@ from models.flashcard import Flashcard
 
 class GlobalCardsView(QWidget):
     """
-    Экран для просмотра карточек из всех тем.
-    """
+    Экран для просмотра карточек из всех тем
+        """
 
     card_selected = Signal(int)  # (card_id)
 

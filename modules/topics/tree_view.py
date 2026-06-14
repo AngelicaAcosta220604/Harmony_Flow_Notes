@@ -18,7 +18,7 @@ class TopicsView(QWidget):
     """
 
     # Сигналы
-    topic_selected = Signal(int)  # (topic_id)
+    topic_selected = Signal(int)  # (topic_id).
     topic_created = Signal(int)  # (topic_id)
     topic_deleted = Signal(int)  # (topic_id)
 

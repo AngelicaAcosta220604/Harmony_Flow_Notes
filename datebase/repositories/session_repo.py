@@ -5,7 +5,7 @@ from datebase.db_manager import db
 
 
 class SessionRepository:
-    """Репозиторий для работы с сессиями"""
+    """Репозиторий для работы с сессиями."""
 
     def get_all(self) -> List[Dict[str, Any]]:
         """Возвращает все сессии"""

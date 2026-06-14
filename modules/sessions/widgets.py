@@ -42,7 +42,7 @@ class CustomTimer(QWidget):
 
 
 class StateSliders(QWidget):
-    """Виджет ползунков для отслеживания состояния."""
+    """Виджет ползунков для отслеживания состояния"""
 
     state_changed = Signal(str, int)  # (metric, value)
 

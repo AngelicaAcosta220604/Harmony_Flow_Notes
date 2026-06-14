@@ -13,7 +13,7 @@ from services.time_service import TimeService
 
 class TopicAnalyticsController:
     """
-    Контроллер для аналитики по конкретной теме.
+    Контроллер для аналитики по конкретной теме
     """
 
     def __init__(
