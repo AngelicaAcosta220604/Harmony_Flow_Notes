@@ -21,7 +21,7 @@ class ThemeManager:
 
         /* Сайдбар */
         QListWidget {
-            background-color: #ffffff;
+            background-color: #5CA1F5;
             border: none;
             outline: none;
         }
