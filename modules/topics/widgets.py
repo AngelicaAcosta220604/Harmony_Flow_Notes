@@ -1,7 +1,8 @@
 # modules/topics/widgets.py
 from PySide6.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QDialog, QDialogButtonBox, QLabel, QComboBox, QLineEdit
+    QPushButton, QDialog, QDialogButtonBox, QLabel, QComboBox, QLineEdit,
+    QStyle  # Импортируем QStyle для использования стандартных иконок Qt
 )
 from PySide6.QtCore import Qt, Signal
 from typing import List, Optional, Callable
@@ -43,11 +44,11 @@ class TreeWidget(QTreeWidget):
         item.setText(0, topic.display_name)
         item.setData(0, Qt.UserRole, topic.id)
 
-        # Иконка (можно добавить позже)
+        # Безопасная установка стандартных системных иконок через Enum QStyle
         if topic.is_folder:
-            item.setIcon(0, self.style().standardIcon(5))  # SP_DirIcon
+            item.setIcon(0, self.style().standardIcon(QStyle.SP_DirIcon))  # Заместо 5
         else:
-            item.setIcon(0, self.style().standardIcon(4))  # SP_FileIcon
+            item.setIcon(0, self.style().standardIcon(QStyle.SP_FileIcon))  # Заместо 4
 
         for child in topic.children:
             self._add_topic_item(item, child)

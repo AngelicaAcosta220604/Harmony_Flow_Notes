@@ -42,17 +42,31 @@ from modules.music.controller import MusicController
 from modules.settings.controller import SettingsController
 from modules.dashboard.controller import DashboardController
 
+    def get_navigation(self):
+        """Возвращает синглтон-объект управления навигацией"""
+        # Если вдруг метод вызвали ДО вызова container.init(), создаем объект
+        if self._navigation is None:
+            from core.navigation import Navigation
+            self._navigation = Navigation()
+        return self._navigation
+
 
 class Container:
     """Контейнер для dependency injection."""
 
     def __init__(self):
         self._initialized = False
+        self._navigation = None  # Слот для хранения синглтона навигации
 
     def init(self):
         """Инициализирует все зависимости"""
         if self._initialized:
             return
+
+        # ==================== НАВИГАЦИЯ ====================
+        # Используем отложенный импорт для предотвращения циклических зависимостей
+        from core.navigation import Navigation
+        self._navigation = Navigation()
 
         # ==================== РЕПОЗИТОРИИ ====================
         self.topic_repo = TopicRepository()
