@@ -213,34 +213,56 @@ class AnalyticsView(QWidget):
         self._update_insights(stats)
 
     def _update_overview(self, stats: dict):
-        """Обновляет вкладку обзора"""
-        session_stats = stats['session_stats']
-        task_stats = stats['task_stats']
-        content_stats = stats['content_stats']
+        """Обновляет вкладку обзора с защитой от пустых данных"""
+        # Гарантируем, что stats и его вложенные структуры являются словарями
+        stats = stats if isinstance(stats, dict) else {}
+        session_stats = stats.get('session_stats', {}) if stats.get('session_stats') else {}
+        task_stats = stats.get('task_stats', {}) if stats.get('task_stats') else {}
+        content_stats = stats.get('content_stats', {}) if stats.get('content_stats') else {}
 
-        # Очищаем KPI
+        # Очищаем KPI контейнер
         while self.kpi_layout.count():
             child = self.kpi_layout.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
 
-        # Создаём карточки KPI
-        self.kpi_layout.addWidget(self._create_kpi_card("🎯 Сессии", str(session_stats['total_sessions'])))
-        self.kpi_layout.addWidget(self._create_kpi_card("⏱️ Время", session_stats['total_hours_display']))
-        self.kpi_layout.addWidget(self._create_kpi_card("🧠 Концентрация", f"{session_stats['avg_concentration']}/5"))
-        self.kpi_layout.addWidget(self._create_kpi_card("⚡ Энергия", f"{session_stats['avg_energy']}/5"))
-        self.kpi_layout.addWidget(self._create_kpi_card("❤️ Интерес", f"{session_stats['avg_interest']}/5"))
-        self.kpi_layout.addWidget(self._create_kpi_card("✅ Задачи", f"{task_stats['completion_rate']}%"))
+        # Безопасное извлечение значений метрик
+        total_sessions = str(session_stats.get('total_sessions', 0))
+        total_hours = session_stats.get('total_hours_display', '0.0 ч')
+        avg_concentration = session_stats.get('avg_concentration', '0.0')
+        avg_energy = session_stats.get('avg_energy', '0.0')
+        avg_interest = session_stats.get('avg_interest', '0.0')
+        completion_rate = task_stats.get('completion_rate', 0)
 
-        # Дополнительная статистика
+        tasks_completed = task_stats.get('completed', 0)
+        tasks_total = task_stats.get('total', 0)
+
+        total_notes = content_stats.get('total_notes', 0)
+        total_flashcards = content_stats.get('total_flashcards', 0)
+        free_cards = content_stats.get('free_cards', 0)
+        qa_cards = content_stats.get('qa_cards', 0)
+
+        first_session = session_stats.get('first_session', '—')
+        last_session = session_stats.get('last_session', '—')
+        unique_days = session_stats.get('unique_days', 0)
+
+        # Создаём карточки KPI
+        self.kpi_layout.addWidget(self._create_kpi_card("🎯 Сессии", total_sessions))
+        self.kpi_layout.addWidget(self._create_kpi_card("⏱️ Время", total_hours))
+        self.kpi_layout.addWidget(self._create_kpi_card("🧠 Концентрация", f"{avg_concentration}/5"))
+        self.kpi_layout.addWidget(self._create_kpi_card("⚡ Энергия", f"{avg_energy}/5"))
+        self.kpi_layout.addWidget(self._create_kpi_card("❤️ Интерес", f"{avg_interest}/5"))
+        self.kpi_layout.addWidget(self._create_kpi_card("✅ Задачи", f"{completion_rate}%"))
+
+        # Формирование детальной статистики
         stats_text = f"""
         <b>📊 Детальная статистика</b><br><br>
-        <b>Сессии:</b> {session_stats['total_sessions']} сессий, {session_stats['total_hours_display']}<br>
-        <b>Задачи:</b> {task_stats['completed']}/{task_stats['total']} выполнено ({task_stats['completion_rate']}%)<br>
-        <b>Заметки:</b> {content_stats['total_notes']} шт.<br>
-        <b>Карточки:</b> {content_stats['total_flashcards']} шт. (свободных: {content_stats['free_cards']}, Q&A: {content_stats['qa_cards']})<br>
-        <b>Период:</b> с {session_stats['first_session']} по {session_stats['last_session']}<br>
-        <b>Дней с активностью:</b> {session_stats['unique_days']}<br>
+        <b>Сессии:</b> {total_sessions} сессий, {total_hours}<br>
+        <b>Задачи:</b> {tasks_completed}/{tasks_total} выполнено ({completion_rate}%)<br>
+        <b>Заметки:</b> {total_notes} шт.<br>
+        <b>Карточки:</b> {total_flashcards} шт. (свободных: {free_cards}, Q&A: {qa_cards})<br>
+        <b>Период:</b> с {first_session} по {last_session}<br>
+        <b>Дней с активностью:</b> {unique_days}<br>
         """
 
         self.stats_label.setText(stats_text)
@@ -267,38 +289,44 @@ class AnalyticsView(QWidget):
         return card
 
     def _update_chart(self):
-        """Обновляет текущий график"""
-        if not hasattr(self, '_current_stats'):
+        """Обновляет текущий график с валидацией ключей трендов"""
+        if not hasattr(self, '_current_stats') or not self._current_stats:
             return
 
-        chart_type = self.chart_type_combo.currentData()
         stats = self._current_stats
+        chart_type = self.chart_type_combo.currentData()
 
-        if chart_type == 'concentration':
-            dates, values = stats['trends']['concentration']
-            self.charts_widget.plot_metric_trend(dates, values, "Динамика концентрации", "Концентрация (1-5)",
-                                                 '#1976d2')
+        # Безопасная проверка наличия базовых ключей графиков
+        if not isinstance(stats, dict) or 'trends' not in stats:
+            return
 
-        elif chart_type == 'energy':
-            dates, values = stats['trends']['energy']
+        trends = stats.get('trends', {})
+
+        if chart_type == 'concentration' and 'concentration' in trends:
+            dates, values = trends['concentration']
+            self.charts_widget.plot_metric_trend(dates, values, "Динамика концентрации", "Концентрация (1-5)", '#1976d2')
+
+        elif chart_type == 'energy' and 'energy' in trends:
+            dates, values = trends['energy']
             self.charts_widget.plot_metric_trend(dates, values, "Динамика энергии", "Энергия (1-5)", '#ff9800')
 
-        elif chart_type == 'interest':
-            dates, values = stats['trends']['interest']
+        elif chart_type == 'interest' and 'interest' in trends:
+            dates, values = trends['interest']
             self.charts_widget.plot_metric_trend(dates, values, "Динамика интереса", "Интерес (1-5)", '#4caf50')
 
         elif chart_type == 'comparison':
-            self.charts_widget.plot_comparison_trend(stats['trends'])
+            self.charts_widget.plot_comparison_trend(trends)
 
-        elif chart_type == 'hours':
+        elif chart_type == 'hours' and 'hour_stats' in stats:
             self.charts_widget.plot_hour_stats(stats['hour_stats'])
 
-        elif chart_type == 'days':
+        elif chart_type == 'days' and 'day_stats' in stats:
             self.charts_widget.plot_day_stats(stats['day_stats'])
 
     def _update_insights(self, stats: dict):
         """Обновляет инсайты"""
-        self.insights_widget.set_insights(stats['insights'])
+        if isinstance(stats, dict) and 'insights' in stats:
+            self.insights_widget.set_insights(stats['insights'])
 
     def refresh(self):
         """Обновляет данные"""
