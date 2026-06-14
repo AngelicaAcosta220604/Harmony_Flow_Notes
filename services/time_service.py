@@ -23,7 +23,7 @@ class TimeService:
 
     @staticmethod
     def format_time(seconds: int) -> str:
-        """Форматирует секунды в ЧЧ:ММ:СС"""
+        """Форматирует секунды в ЧЧ:ММ:СС."""
         if seconds is None:
             return "00:00"
         hours = seconds // 3600

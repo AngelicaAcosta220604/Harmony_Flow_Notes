@@ -1,7 +1,7 @@
 # modules/notes/editor.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton,
-    QFileDialog, QLabel
+    QFileDialog, QLabel, QDialog
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 
@@ -11,7 +11,7 @@ from widgets import SilentMessageBox
 
 
 class NoteEditorView(QWidget):
-    """Редактор заметок с полноценным текстовым редактором."""
+    """Редактор заметок с полноценным текстовым редактором"""
 
     note_saved = Signal(int)
     note_deleted = Signal(int)
@@ -33,16 +33,12 @@ class NoteEditorView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Сначала создаём редактор
         self.editor = RichTextEditor()
-
-        # Потом панель инструментов (передаём редактор)
         self.toolbar = EditorToolbar(self.editor)
 
         layout.addWidget(self.toolbar)
         layout.addWidget(self.editor)
 
-        # Нижняя панель
         bottom_layout = QHBoxLayout()
         bottom_layout.setContentsMargins(10, 5, 10, 5)
 
@@ -64,7 +60,6 @@ class NoteEditorView(QWidget):
 
         layout.addLayout(bottom_layout)
 
-        # Статус бар
         self.status_label = QLabel("Готов к работе")
         self.status_label.setStyleSheet("color: #888888; font-size: 10px; padding: 2px 5px;")
         layout.addWidget(self.status_label)
@@ -75,6 +70,9 @@ class NoteEditorView(QWidget):
         self.import_btn.clicked.connect(self.import_from_file)
         self.editor.content_changed.connect(self._on_content_changed)
         self.title_edit.textChanged.connect(self._on_content_changed)
+
+        self.editor.create_task_from_selection.connect(self._create_task_from_selection)
+        self.editor.create_card_from_selection.connect(self._create_card_from_selection)
 
     def _setup_auto_save(self):
         self._auto_save_timer.timeout.connect(self._auto_save)
@@ -188,3 +186,94 @@ class NoteEditorView(QWidget):
 
     def has_unsaved_changes(self) -> bool:
         return self._is_modified
+
+    def _create_task_from_selection(self, selected_text: str):
+        """Создаёт задачу из выделенного текста"""
+        if not self._current_topic_id:
+            SilentMessageBox.warning(self, "Ошибка", "Сначала выберите тему для задачи")
+            return
+
+        from modules.tasks.dialogs import TaskDialog
+        from core.di.container import container
+
+        dialog = TaskDialog(parent=None, topic_id=self._current_topic_id)
+        dialog.setWindowFlags(Qt.WindowStaysOnTopHint)
+        dialog.title_edit.setText(selected_text[:200])
+
+        if dialog.exec() == QDialog.Accepted:
+            data = dialog.get_task_data()
+            if data:
+                task_id = container.task_controller.create_task(
+                    title=data['title'],
+                    description=data['description'],
+                    topic_id=self._current_topic_id,
+                    deadline=data['deadline']
+                )
+                if task_id:
+                    SilentMessageBox.information(self, "Успех", "Задача создана из заметки")
+
+    def _create_card_from_selection(self, selected_text: str):
+        """Создаёт карточку из выделенного текста"""
+        if not self._current_topic_id:
+            SilentMessageBox.warning(self, "Ошибка", "Сначала выберите тему для карточки")
+            return
+
+        from modules.flashcards.dialogs import CardTypeDialog
+        from core.di.container import container
+
+        dialog = CardTypeDialog(parent=None, selected_text=selected_text)
+        dialog.setWindowFlags(Qt.WindowStaysOnTopHint)
+
+        if dialog.exec() == QDialog.Accepted:
+            data = dialog.get_card_data()
+            if data['type'] == 'free':
+                if data.get('content'):
+                    container.flashcard_controller.create_free_card(
+                        self._current_topic_id, data['content']
+                    )
+                    SilentMessageBox.information(self, "Успех", "Карточка создана")
+            else:
+                if data.get('question') and data.get('answer'):
+                    container.flashcard_controller.create_qa_card(
+                        self._current_topic_id, data['question'], data['answer']
+                    )
+                    SilentMessageBox.information(self, "Успех", "Карточка создана")
+
+        def on_accepted():
+            data = dialog.get_card_data()
+            if data['type'] == 'free':
+                if not data.get('content'):
+                    SilentMessageBox.warning(self, "Ошибка", "Введите содержимое карточки")
+                    return
+                container.flashcard_controller.create_free_card(
+                    self._current_topic_id, data['content']
+                )
+            else:
+                if not data.get('question') or not data.get('answer'):
+                    SilentMessageBox.warning(self, "Ошибка", "Заполните вопрос и ответ")
+                    return
+                container.flashcard_controller.create_qa_card(
+                    self._current_topic_id, data['question'], data['answer']
+                )
+            SilentMessageBox.information(self, "Успех", "Карточка создана из заметки")
+            dialog.close()
+
+        dialog.accepted.connect(on_accepted)
+        dialog.show()
+
+    def _save_task_from_dialog(self, dialog):
+        """Сохраняет задачу из немодального диалога"""
+        try:
+            data = dialog.get_task_data()
+            from core.di.container import container
+            task_id = container.task_controller.create_task(
+                title=data['title'],
+                description=data['description'],
+                topic_id=self._current_topic_id,
+                deadline=data['deadline']
+            )
+            if task_id:
+                dialog.close()
+                SilentMessageBox.information(self, "Успех", "Задача создана из заметки")
+        except ValueError as e:
+            SilentMessageBox.warning(self, "Ошибка", str(e))

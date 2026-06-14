@@ -292,7 +292,7 @@ class AnalyticsController:
             "avg_overdue_days": avg_overdue_days
         }
 
-    # ==================== СТАТИСТИКА ПО КОНТЕНТУ ====================
+    # ==================== СТАТИСТИКА ПО КОНТЕНТУ .====================
 
     def get_content_stats(self, notes: List[Note], flashcards: List[Flashcard]) -> Dict[str, int]:
         """Статистика по заметкам и карточкам"""

@@ -8,7 +8,7 @@
       <sourceFolder url="file://$MODULE_DIR$" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.14 (Harmony_Flow_Notes) (2)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.11 (Harmony&amp;Flow_Notes)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

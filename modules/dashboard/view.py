@@ -20,7 +20,7 @@ class DashboardView(QWidget):
     create_note_requested = Signal()
     start_session_requested = Signal()
     open_topic_requested = Signal(int)  # topic_id
-    open_task_requested = Signal(int)  # task_id
+    open_task_requested = Signal(int)  # task_id.
     open_analytics_requested = Signal()
     open_tasks_requested = Signal()
 
@@ -407,28 +407,36 @@ class DashboardView(QWidget):
 
     def _update_urgent_tasks(self, tasks: list):
         """Обновляет список срочных задач"""
-        # Очищаем старые кнопки
-        for btn in self._urgent_task_buttons.values():
-            btn.deleteLater()
-        self._urgent_task_buttons.clear()
+        try:
+            # Очищаем старые кнопки
+            for btn in self._urgent_task_buttons.values():
+                btn.deleteLater()
+            self._urgent_task_buttons.clear()
 
-        # Очищаем layout
-        while self.tasks_layout.count():
-            child = self.tasks_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+            # Очищаем layout
+            while self.tasks_layout.count():
+                child = self.tasks_layout.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
 
-        if not tasks:
-            self.no_tasks_label.show()
-            self.urgent_tasks_widget.hide()
-            return
+            if not tasks:
+                if hasattr(self, 'no_tasks_label') and self.no_tasks_label:
+                    self.no_tasks_label.show()
+                if self.urgent_tasks_widget:
+                    self.urgent_tasks_widget.hide()
+                return
 
-        self.no_tasks_label.hide()
-        self.urgent_tasks_widget.show()
+            if hasattr(self, 'no_tasks_label') and self.no_tasks_label:
+                self.no_tasks_label.hide()
+            if self.urgent_tasks_widget:
+                self.urgent_tasks_widget.show()
 
-        for task in tasks:
-            task_widget = self._create_task_widget(task)
-            self.tasks_layout.addWidget(task_widget)
+            for task in tasks:
+                task_widget = self._create_task_widget(task)
+                self.tasks_layout.addWidget(task_widget)
+        except RuntimeError:
+            # Виджет уже удалён, просто игнорируем
+            pass
 
     def _create_task_widget(self, task: dict) -> QWidget:
         """Создаёт виджет для одной задачи"""

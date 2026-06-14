@@ -20,7 +20,7 @@ from services.time_service import TimeService
 
 class DashboardController:
     """
-    Контроллер для главного экрана (Dashboard).
+    Контроллер для главного экрана (Dashboard)
     Собирает данные из разных репозиториев.
     """
 

@@ -132,7 +132,7 @@ class SessionController(QObject):
         return duration_minutes
 
     def get_elapsed_seconds(self) -> int:
-        """Возвращает прошедшее время в секундах"""
+        """Возвращает прошедшее время в секундах."""
         return self._elapsed_seconds
 
     def get_elapsed_display(self) -> str:

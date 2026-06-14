@@ -130,7 +130,7 @@ class MainWindow(QMainWindow):
         )
         self.content_stack.addWidget(self.focus_active_view)
 
-        # Tasks (глобальные)
+        # Tasks (глобальные).
         self.tasks_view = GlobalTasksView(c.task_controller)
         self.content_stack.addWidget(self.tasks_view)
 
@@ -358,6 +358,11 @@ class MainWindow(QMainWindow):
         # Settings
         self.settings_view.theme_changed.connect(self._on_theme_changed)
         self.settings_view.settings_changed.connect(self._on_settings_changed)
+
+        # ===== Кнопка назад =====
+        self.topic_view.back_requested.connect(
+            lambda: self.navigation.navigate_to(NavSection.TOPICS)
+        )
 
         # Event bus
         event_bus.topic_created.connect(lambda tid: self._refresh_topics())
