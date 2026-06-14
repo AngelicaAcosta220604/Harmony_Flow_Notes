@@ -29,6 +29,7 @@ class TopicView(QWidget):
     show_all_notes_requested = Signal(int)  # topic_id
     show_all_cards_requested = Signal(int)  # topic_id
 
+    back_requested = Signal()  # возврат к дереву тем
     def __init__(
             self,
             topic_controller: TopicController,
@@ -46,16 +47,20 @@ class TopicView(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Верхняя панель с названием темы
+        # Верхняя панель с названием темы и кнопкой "Назад"
         self.header_widget = QWidget()
         header_layout = QHBoxLayout(self.header_widget)
         header_layout.setContentsMargins(15, 10, 15, 10)
 
+        # Кнопка "Назад"
+        self.back_btn = QPushButton("← Назад")
+        self.back_btn.setFixedWidth(80)
+        self.back_btn.setToolTip("Вернуться к списку тем")
+        header_layout.addWidget(self.back_btn)
+
         self.topic_name_label = QLabel()
         self.topic_name_label.setStyleSheet("font-size: 20px; font-weight: bold;")
-        header_layout.addWidget(self.topic_name_label)
-
-        header_layout.addStretch()
+        header_layout.addWidget(self.topic_name_label, 1)
 
         self.path_label = QLabel()
         self.path_label.setStyleSheet("color: #888888;")
@@ -129,6 +134,9 @@ class TopicView(QWidget):
         self.start_session_btn.clicked.connect(
             lambda: self.start_session_requested.emit(self._current_topic_id)
         )
+
+        # Кнопка "Назад"
+        self.back_btn.clicked.connect(self.back_requested.emit)
 
     def _create_overview_tab(self) -> QWidget:
         """Создаёт вкладку обзора"""

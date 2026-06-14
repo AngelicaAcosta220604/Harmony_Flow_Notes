@@ -85,7 +85,7 @@ class ThemeManager:
         }
 
         QTreeWidget::item:selected {
-            background-color: #e3f2fd;
+            background-color: #1976d2;
         }
 
         /* Табы */

@@ -188,6 +188,7 @@ class NoteEditorView(QWidget):
         return self._is_modified
 
     def _create_task_from_selection(self, selected_text: str):
+        """Создаёт задачу из выделенного текста"""
         if not self._current_topic_id:
             SilentMessageBox.warning(self, "Ошибка", "Сначала выберите тему для задачи")
             return
@@ -196,12 +197,23 @@ class NoteEditorView(QWidget):
         from core.di.container import container
 
         dialog = TaskDialog(parent=None, topic_id=self._current_topic_id)
-        dialog.setWindowFlags(Qt.WindowStaysOnTopHint)  # <-- ПОВЕРХ, НО НЕ МОДАЛЬНЫЙ
+        dialog.setWindowFlags(Qt.WindowStaysOnTopHint)
         dialog.title_edit.setText(selected_text[:200])
-        dialog.save_btn.clicked.connect(lambda: self._save_task_from_dialog(dialog))
-        dialog.show()
+
+        if dialog.exec() == QDialog.Accepted:
+            data = dialog.get_task_data()
+            if data:
+                task_id = container.task_controller.create_task(
+                    title=data['title'],
+                    description=data['description'],
+                    topic_id=self._current_topic_id,
+                    deadline=data['deadline']
+                )
+                if task_id:
+                    SilentMessageBox.information(self, "Успех", "Задача создана из заметки")
 
     def _create_card_from_selection(self, selected_text: str):
+        """Создаёт карточку из выделенного текста"""
         if not self._current_topic_id:
             SilentMessageBox.warning(self, "Ошибка", "Сначала выберите тему для карточки")
             return
@@ -210,7 +222,22 @@ class NoteEditorView(QWidget):
         from core.di.container import container
 
         dialog = CardTypeDialog(parent=None, selected_text=selected_text)
-        dialog.setWindowFlags(Qt.WindowStaysOnTopHint)  # <-- ПОВЕРХ, НО НЕ МОДАЛЬНЫЙ
+        dialog.setWindowFlags(Qt.WindowStaysOnTopHint)
+
+        if dialog.exec() == QDialog.Accepted:
+            data = dialog.get_card_data()
+            if data['type'] == 'free':
+                if data.get('content'):
+                    container.flashcard_controller.create_free_card(
+                        self._current_topic_id, data['content']
+                    )
+                    SilentMessageBox.information(self, "Успех", "Карточка создана")
+            else:
+                if data.get('question') and data.get('answer'):
+                    container.flashcard_controller.create_qa_card(
+                        self._current_topic_id, data['question'], data['answer']
+                    )
+                    SilentMessageBox.information(self, "Успех", "Карточка создана")
 
         def on_accepted():
             data = dialog.get_card_data()

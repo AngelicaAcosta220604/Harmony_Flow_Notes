@@ -359,6 +359,11 @@ class MainWindow(QMainWindow):
         self.settings_view.theme_changed.connect(self._on_theme_changed)
         self.settings_view.settings_changed.connect(self._on_settings_changed)
 
+        # ===== Кнопка назад =====
+        self.topic_view.back_requested.connect(
+            lambda: self.navigation.navigate_to(NavSection.TOPICS)
+        )
+
         # Event bus
         event_bus.topic_created.connect(lambda tid: self._refresh_topics())
         event_bus.topic_deleted.connect(lambda tid: self._refresh_topics())
@@ -484,9 +489,8 @@ class MainWindow(QMainWindow):
 
     def _open_note_editor(self, topic_id: int):
         from modules.notes.editor import NoteEditorView
-        self.note_editor = NoteEditorView(container.note_controller, self)
+        self.note_editor = NoteEditorView(container.note_controller)
         self.note_editor.create_new_note(topic_id)
-        self.note_editor.note_saved.connect(self._refresh_topics)
         self.content_stack.addWidget(self.note_editor)
         self.content_stack.setCurrentWidget(self.note_editor)
 

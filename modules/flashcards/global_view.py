@@ -95,7 +95,7 @@ class GlobalCardsView(QWidget):
             item = QListWidgetItem()
 
             # Получаем название темы
-            from database.repositories.topic_repo import TopicRepository
+            from datebase.repositories.topic_repo import TopicRepository
             topic_repo = TopicRepository()
             topic = topic_repo.get_by_id(card.topic_id)
             topic_name = topic['name'] if topic else "—"

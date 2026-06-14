@@ -1,9 +1,9 @@
 # modules/tasks/dialogs.py
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QTextEdit, QPushButton, QDateTimeEdit, QMessageBox
+    QTextEdit, QPushButton, QComboBox, QCalendarWidget, QWidget
 )
-from PySide6.QtCore import Qt, QDateTime
+from PySide6.QtCore import Qt, QDate, QTime
 from datetime import datetime
 
 from models.task import Task
@@ -11,29 +11,29 @@ from widgets import SilentMessageBox
 
 
 class TaskDialog(QDialog):
-    """Диалог создания/редактирования задачи (НЕМОДАЛЬНЫЙ)."""
+    """Диалог создания/редактирования задачи."""
 
     def __init__(self, parent=None, task: Task = None, topic_id: int = None):
         super().__init__(parent)
-        self.setModal(False)  # <--- НЕ БЛОКИРУЕТ ОСНОВНОЕ ОКНО
-        self.setWindowFlags(Qt.WindowStaysOnTopHint)  # <-- ПОВЕРХ ОКНА
+        self.setModal(False)
+        self.setWindowFlags(Qt.WindowStaysOnTopHint)
         self._task = task
         self._topic_id = topic_id
         self._setup_ui()
+        self._connect_signals()
 
         if task:
             self._load_task()
 
-        self._connect_signals()
-
     def _setup_ui(self):
         self.setWindowTitle("Задача" if not self._task else "Редактирование задачи")
         self.setMinimumWidth(500)
-        self.setMinimumHeight(400)
+        self.setMinimumHeight(500)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
+        # Название
         title_label = QLabel("Название *")
         layout.addWidget(title_label)
 
@@ -41,73 +41,131 @@ class TaskDialog(QDialog):
         self.title_edit.setPlaceholderText("Введите название задачи...")
         layout.addWidget(self.title_edit)
 
+        # Описание
         desc_label = QLabel("Описание")
         layout.addWidget(desc_label)
 
         self.desc_edit = QTextEdit()
         self.desc_edit.setPlaceholderText("Введите описание (необязательно)...")
-        self.desc_edit.setMaximumHeight(150)
+        self.desc_edit.setMaximumHeight(120)
         layout.addWidget(self.desc_edit)
 
+        # Дедлайн
         deadline_label = QLabel("Дедлайн")
+        deadline_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
         layout.addWidget(deadline_label)
 
-        deadline_layout = QHBoxLayout()
-        self.deadline_check = QPushButton("📅 Установить дедлайн")
-        self.deadline_check.setCheckable(True)
-        deadline_layout.addWidget(self.deadline_check)
+        # Чекбокс "установить дедлайн"
+        self.has_deadline_check = QPushButton("📅 Установить дедлайн")
+        self.has_deadline_check.setCheckable(True)
+        self.has_deadline_check.setChecked(True)
+        self.has_deadline_check.toggled.connect(self._on_deadline_toggled)
+        layout.addWidget(self.has_deadline_check)
 
-        self.datetime_edit = QDateTimeEdit()
-        self.datetime_edit.setCalendarPopup(True)
-        self.datetime_edit.setDateTime(QDateTime.currentDateTime())
-        self.datetime_edit.setEnabled(False)
-        deadline_layout.addWidget(self.datetime_edit)
-        deadline_layout.addStretch()
-        layout.addLayout(deadline_layout)
+        # Блок выбора даты и времени
+        self.datetime_widget = QWidget()
+        datetime_layout = QVBoxLayout(self.datetime_widget)
+        datetime_layout.setContentsMargins(0, 5, 0, 0)
+        datetime_layout.setSpacing(10)
 
+        # Календарь
+        self.calendar = QCalendarWidget()
+        self.calendar.setMinimumDate(QDate.currentDate())
+        datetime_layout.addWidget(self.calendar)
+
+        # Выбор времени (часы и минуты отдельно)
+        time_layout = QHBoxLayout()
+        time_layout.setSpacing(10)
+
+        time_label = QLabel("Время:")
+        time_layout.addWidget(time_label)
+
+        # Часы (00-23)
+        self.hour_combo = QComboBox()
+        for h in range(24):
+            self.hour_combo.addItem(f"{h:02d}", h)
+        self.hour_combo.setCurrentIndex(datetime.now().hour)
+        time_layout.addWidget(self.hour_combo)
+
+        time_layout.addWidget(QLabel(":"))
+
+        # Минуты (00-59)
+        self.minute_combo = QComboBox()
+        for m in range(0, 60, 5):  # шаг 5 минут
+            self.minute_combo.addItem(f"{m:02d}", m)
+        self.minute_combo.setCurrentIndex(datetime.now().minute // 5)
+        time_layout.addWidget(self.minute_combo)
+
+        time_layout.addStretch()
+        datetime_layout.addLayout(time_layout)
+
+        layout.addWidget(self.datetime_widget)
+
+        layout.addStretch()
+
+        # Кнопки
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
         self.save_btn = QPushButton("💾 Сохранить")
-        self.cancel_btn = QPushButton("Отмена")
-
         button_layout.addWidget(self.save_btn)
+
+        self.cancel_btn = QPushButton("Отмена")
         button_layout.addWidget(self.cancel_btn)
 
         layout.addLayout(button_layout)
 
     def _connect_signals(self):
-        self.save_btn.clicked.connect(self.accept)
+        self.save_btn.clicked.connect(self._on_save)
         self.cancel_btn.clicked.connect(self.reject)
-        self.deadline_check.toggled.connect(self.datetime_edit.setEnabled)
+
+    def _on_deadline_toggled(self, checked: bool):
+        self.datetime_widget.setEnabled(checked)
+        if not checked:
+            self.datetime_widget.setStyleSheet("QWidget { opacity: 0.5; }")
+        else:
+            self.datetime_widget.setStyleSheet("")
 
     def _load_task(self):
         self.title_edit.setText(self._task.title)
         self.desc_edit.setPlainText(self._task.description)
-        if self._task.deadline:
-            self.deadline_check.setChecked(True)
-            dt = datetime.fromisoformat(self._task.deadline)
-            self.datetime_edit.setDateTime(QDateTime(dt))
 
-    def get_task_data(self) -> dict:
+        if self._task.deadline:
+            self.has_deadline_check.setChecked(True)
+            dt = datetime.fromisoformat(self._task.deadline)
+            self.calendar.setSelectedDate(QDate(dt.year, dt.month, dt.day))
+            self.hour_combo.setCurrentIndex(self.hour_combo.findData(dt.hour))
+            # минуты с шагом 5
+            minute_val = (dt.minute // 5) * 5
+            self.minute_combo.setCurrentIndex(self.minute_combo.findData(minute_val))
+
+    def _on_save(self):
         title = self.title_edit.text().strip()
         if not title:
-            raise ValueError("Название задачи не может быть пустым")
+            SilentMessageBox.warning(self, "Ошибка", "Введите название задачи")
+            return
 
         deadline = None
-        if self.deadline_check.isChecked():
-            deadline = self.datetime_edit.dateTime().toString("yyyy-MM-ddTHH:mm:ss")
+        if self.has_deadline_check.isChecked():
+            date = self.calendar.selectedDate()
+            hour = self.hour_combo.currentData()
+            minute = self.minute_combo.currentData()
+            deadline = f"{date.toString('yyyy-MM-dd')}T{hour:02d}:{minute:02d}:00"
 
-        return {
+        self._result = {
             'title': title,
             'description': self.desc_edit.toPlainText(),
             'deadline': deadline,
             'topic_id': self._topic_id if not self._task else self._task.topic_id
         }
+        self.accept()
+
+    def get_task_data(self) -> dict:
+        return getattr(self, '_result', {})
 
 
 class TaskViewDialog(QDialog):
-    """Диалог просмотра задачи (только чтение)."""
+    """Диалог просмотра задачи."""
 
     def __init__(self, task: Task, parent=None):
         super().__init__(parent)
@@ -116,10 +174,9 @@ class TaskViewDialog(QDialog):
 
     def _setup_ui(self):
         self.setWindowTitle(f"Задача: {self._task.title}")
-        self.setMinimumSize(500, 400)
+        self.setMinimumSize(450, 350)
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(12)
 
         status_layout = QHBoxLayout()
         status_label = QLabel("Статус:")
@@ -156,12 +213,12 @@ class TaskViewDialog(QDialog):
 
         dates_layout = QHBoxLayout()
         created_label = QLabel(f"Создана: {self._task.created_at[:16]}")
-        created_label.setStyleSheet("color: #888888; font-size: 10px;")
+        created_label.setStyleSheet("color: #888; font-size: 10px;")
         dates_layout.addWidget(created_label)
 
         if self._task.completed_at:
             completed_label = QLabel(f"Выполнена: {self._task.completed_at[:16]}")
-            completed_label.setStyleSheet("color: #888888; font-size: 10px;")
+            completed_label.setStyleSheet("color: #888; font-size: 10px;")
             dates_layout.addWidget(completed_label)
 
         dates_layout.addStretch()
