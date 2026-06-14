@@ -113,7 +113,7 @@ class AnalyticsController:
             "total_minutes": total_minutes,
             "total_hours": total_hours,
             "total_minutes_remain": total_remain_minutes,
-            "total_hours_display": f"{total_hours}ч {total_remain_minutes}м",
+            "total_hours_display": f"{total_hours}ч {total_remain_minutes}м",  # <--- ДОБАВЛЯЕМ ЭТУ СТРОКУ
             "avg_duration": round(avg_duration, 1),
             "avg_concentration": round(avg_concentration, 2),
             "avg_energy": round(avg_energy, 2),
@@ -354,9 +354,19 @@ class AnalyticsController:
 
     def _empty_session_stats(self) -> Dict[str, Any]:
         return {
-            "total_sessions": 0, "total_minutes": 0, "total_hours": 0,
-            "avg_duration": 0, "avg_concentration": 0, "avg_energy": 0, "avg_interest": 0,
-            "first_session": "—", "last_session": "—", "unique_days": 0, "avg_sessions_per_day": 0
+            "total_sessions": 0,
+            "total_minutes": 0,
+            "total_hours": 0,
+            "total_minutes_remain": 0,
+            "total_hours_display": "0ч 0м",  # <--- ДОБАВЛЯЕМ
+            "avg_duration": 0,
+            "avg_concentration": 0,
+            "avg_energy": 0,
+            "avg_interest": 0,
+            "first_session": "—",
+            "last_session": "—",
+            "unique_days": 0,
+            "avg_sessions_per_day": 0
         }
 
     def get_complete_stats(self, topic_ids: List[int], include_general_tasks: bool = False) -> Dict[str, Any]:

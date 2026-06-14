@@ -102,6 +102,9 @@ class Container:
 
         self._initialized = True
 
-
+    def get_navigation(self):
+        """Возвращает менеджер навигации"""
+        from core.navigation import Navigation
+        return Navigation()
 # Глобальный экземпляр контейнера
 container = Container()
