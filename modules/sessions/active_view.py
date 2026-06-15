@@ -385,8 +385,9 @@ class FocusActiveView(QWidget):
         session_id = self._session_controller.get_current_session_id()
         if session_id:
             values = self.state_sliders.get_values()
+            # Маппинг: concentration -> focus (в БД колонка focus)
             self._session_controller.save_slider_values(
-                values.get('focus', 50),
+                values.get('concentration', 50),  # conc_slider -> focus
                 values.get('energy', 50),
                 values.get('interest', 50)
             )
@@ -414,12 +415,27 @@ class FocusActiveView(QWidget):
 
         # Восстанавливаем ползунки через контроллер
         slider_values = self._session_controller.get_slider_values(session_id)
-        self.state_sliders.focus_slider.setValue(slider_values.get('focus', 50))
+        # Маппинг: focus (из БД) -> conc_slider (в UI)
+        self.state_sliders.conc_slider.setValue(slider_values.get('focus', 50))
         self.state_sliders.energy_slider.setValue(slider_values.get('energy', 50))
         self.state_sliders.interest_slider.setValue(slider_values.get('interest', 50))
+
+        # 🆕 Устанавливаем текущую сессию в контроллере
+        self._session_controller._current_session = self._session_controller.get_session(session_id)
+        self._session_controller._current_topic_id = topic_id
+        self._session_controller._elapsed_seconds = total_seconds
+        self._session_controller._is_paused = (row['status'] == 'paused')
 
         # Если сессия была активна — продолжаем
         if row['status'] == 'active':
             self._session_controller.resume_session()
+            self.status_label.setText("Сессия активна")
+            self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
+            self.pause_btn.setText("Пауза")
+            self.pause_btn.setIcon(QIcon("resources/icons/pause.png"))
         else:
-            self.timer.pause()
+            # Сессия на паузе - таймер не запускается
+            self.status_label.setText("Сессия на паузе")
+            self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
+            self.pause_btn.setText("Возобновить")
+            self.pause_btn.setIcon(QIcon("resources/icons/play.png"))

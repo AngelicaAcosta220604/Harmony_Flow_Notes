@@ -1,7 +1,6 @@
-# modules/sessions/setup_view.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
-    QPushButton, QFrame, QScrollArea, QSlider, QCheckBox, QSizePolicy
+    QPushButton, QFrame, QScrollArea, QSizePolicy
 )
 from PySide6.QtCore import Signal, Qt, QSize
 from PySide6.QtGui import QIcon, QPixmap
@@ -24,6 +23,12 @@ class FocusSetupView(QWidget):
         self._settings_controller = settings_controller
         self._setup_ui()
         self._load_settings()
+
+        # 🆕 Подписываемся на создание/удаление тем для обновления списка
+        from core.event_bus import event_bus
+        event_bus.topic_created.connect(lambda tid: self.topic_selector.refresh())
+        event_bus.topic_deleted.connect(lambda tid: self.topic_selector.refresh())
+        event_bus.topic_updated.connect(lambda tid: self.topic_selector.refresh())
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -55,7 +60,6 @@ class FocusSetupView(QWidget):
         header_layout.setSpacing(12)
         header_layout.setAlignment(Qt.AlignCenter)
 
-        # Иконка
         header_icon = QLabel()
         header_pixmap = QPixmap("resources/icons/session.png")
         if not header_pixmap.isNull():
@@ -63,7 +67,6 @@ class FocusSetupView(QWidget):
             header_icon.setPixmap(header_pixmap)
         header_layout.addWidget(header_icon)
 
-        # Заголовок
         header_title = QLabel("Подготовка к фокус-сессии")
         header_title.setStyleSheet("font-size: 20px; font-weight: bold; color: #1F2937;")
         header_layout.addWidget(header_title)
@@ -85,7 +88,6 @@ class FocusSetupView(QWidget):
         topic_layout.setContentsMargins(20, 16, 20, 16)
         topic_layout.setSpacing(12)
 
-        # Заголовок с иконкой
         topic_title_layout = QHBoxLayout()
         topic_icon = QLabel()
         topic_icon_pixmap = QPixmap("resources/icons/topic.png")
@@ -200,56 +202,57 @@ class FocusSetupView(QWidget):
         row2_layout.addWidget(sound_widget, 1)
         content_layout.addLayout(row2_layout)
 
-        # ========== КНОПКА НАЧАТЬ СЕССИЮ ==========
+        # ========== КНОПКИ ==========
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        # 🆕 Кнопка "Продолжить сессию" (скрыта по умолчанию)
+        # Кнопка "Продолжить сессию" (скрыта по умолчанию)
         self.resume_btn = QPushButton("Продолжить сессию")
         self.resume_btn.setIcon(QIcon("resources/icons/play.png"))
         self.resume_btn.setIconSize(QSize(20, 20))
         self.resume_btn.setFixedWidth(200)
         self.resume_btn.setFixedHeight(48)
         self.resume_btn.setStyleSheet("""
-                   QPushButton {
-                       background-color: rgba(59, 130, 246, 0.15);
-                       color: #3B82F6;
-                       border: 1px solid #3B82F6;
-                       border-radius: 12px;
-                       padding: 10px 20px;
-                       font-weight: 600;
-                       font-size: 14px;
-                   }
-                   QPushButton:hover {
-                       background-color: rgba(59, 130, 246, 0.25);
-                       border: 1px solid #2563EB;
-                       color: #2563EB;
-                   }
-               """)
-        self.resume_btn.setVisible(False)  # Скрыта по умолчанию
+            QPushButton {
+                background-color: rgba(59, 130, 246, 0.15);
+                color: #3B82F6;
+                border: 1px solid #3B82F6;
+                border-radius: 12px;
+                padding: 10px 20px;
+                font-weight: 600;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: rgba(59, 130, 246, 0.25);
+                border: 1px solid #2563EB;
+                color: #2563EB;
+            }
+        """)
+        self.resume_btn.setVisible(False)
         button_layout.addWidget(self.resume_btn)
 
+        # Кнопка "Начать сессию"
         self.start_btn = QPushButton("Начать сессию")
         self.start_btn.setIcon(QIcon("resources/icons/rocket.png"))
         self.start_btn.setIconSize(QSize(20, 20))
         self.start_btn.setFixedWidth(200)
         self.start_btn.setFixedHeight(48)
         self.start_btn.setStyleSheet("""
-                   QPushButton {
-                       background-color: rgba(16, 185, 129, 0.15);
-                       color: #059669;
-                       border: 1px solid #10B981;
-                       border-radius: 12px;
-                       padding: 10px 20px;
-                       font-weight: 600;
-                       font-size: 14px;
-                   }
-                   QPushButton:hover {
-                       background-color: rgba(16, 185, 129, 0.25);
-                       border: 1px solid #059669;
-                       color: #047857;
-                   }
-               """)
+            QPushButton {
+                background-color: rgba(16, 185, 129, 0.15);
+                color: #059669;
+                border: 1px solid #10B981;
+                border-radius: 12px;
+                padding: 10px 20px;
+                font-weight: 600;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: rgba(16, 185, 129, 0.25);
+                border: 1px solid #059669;
+                color: #047857;
+            }
+        """)
         button_layout.addWidget(self.start_btn)
         button_layout.addStretch()
 
@@ -259,48 +262,48 @@ class FocusSetupView(QWidget):
         scroll.setWidget(content)
         layout.addWidget(scroll)
 
+        # Подключаем сигналы
         self.start_btn.clicked.connect(self._on_start)
         self.resume_btn.clicked.connect(self._on_resume)
-
-        # Проверяем активные сессии при изменении темы
         self.topic_selector.topic_changed.connect(self._check_active_session)
 
-        def _check_active_session(self, topic_id: int):
-            """Проверяет, есть ли активная/пауза сессия для выбранной темы"""
-            if not topic_id:
-                self.resume_btn.setVisible(False)
-                return
+    def _check_active_session(self, topic_id: int):
+        """Проверяет, есть ли активная/пауза сессия для выбранной темы"""
+        if not topic_id:
+            self.resume_btn.setVisible(False)
+            return
 
-            from core.di.container import container
-            has_session, session_id, status, existing_topic_id = container.session_controller.has_active_or_paused_session(
-                topic_id)
+        from core.di.container import container
+        has_session, session_id, status, existing_topic_id = container.session_controller.has_active_or_paused_session(
+            topic_id)
 
-            if has_session:
-                self.resume_btn.setVisible(True)
-                self.resume_btn.setText(f"Продолжить сессию ({status})")
-            else:
-                self.resume_btn.setVisible(False)
+        if has_session:
+            self.resume_btn.setVisible(True)
+            self.resume_btn.setText(f"Продолжить сессию ({status})")
+        else:
+            self.resume_btn.setVisible(False)
 
-        def _on_resume(self):
-            """Возобновляет существующую сессию"""
-            topic_id = self.topic_selector.get_selected_topic_id()
-            if not topic_id:
-                return
+    def _on_resume(self):
+        """Возобновляет существующую сессию"""
+        topic_id = self.topic_selector.get_selected_topic_id()
+        if not topic_id:
+            SilentMessageBox.warning(self, "Ошибка", "Выберите тему")
+            return
 
-            from core.di.container import container
-            has_session, session_id, status, existing_topic_id = container.session_controller.has_active_or_paused_session(
-                topic_id)
+        from core.di.container import container
+        has_session, session_id, status, existing_topic_id = container.session_controller.has_active_or_paused_session(
+            topic_id)
 
-            if has_session:
-                from core.main_window import MainWindow
-                main_window = self.window()
-                if isinstance(main_window, MainWindow):
-                    topic = self._topic_controller.get_topic(topic_id)
-                    if topic:
-                        main_window.focus_active_view.resume_existing_session(
-                            session_id, topic_id, topic.name
-                        )
-                        main_window.content_stack.setCurrentWidget(main_window.focus_active_view)
+        if has_session:
+            from core.main_window import MainWindow
+            main_window = self.window()
+            if isinstance(main_window, MainWindow):
+                topic = self._topic_controller.get_topic(topic_id)
+                if topic:
+                    main_window.focus_active_view.resume_existing_session(
+                        session_id, topic_id, topic.name
+                    )
+                    main_window.content_stack.setCurrentWidget(main_window.focus_active_view)
 
     def _load_settings(self):
         default_interval = self._settings_controller.get_activity_check_interval()
@@ -320,7 +323,8 @@ class FocusSetupView(QWidget):
 
         # Проверяем, есть ли активная/пауза сессия для этой темы
         from core.di.container import container
-        has_session, session_id, status, existing_topic_id = container.session_controller.has_active_or_paused_session(topic_id)
+        has_session, session_id, status, existing_topic_id = container.session_controller.has_active_or_paused_session(
+            topic_id)
 
         if has_session:
             # Показываем диалог: продолжить или начать новую

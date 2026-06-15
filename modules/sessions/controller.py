@@ -102,6 +102,12 @@ class SessionController(QObject):
             # 🆕 Начинаем новый интервал работы
             self.start_interval(self._current_session.id)
 
+            # 🆕 Запускаем таймер, если он не запущен
+            if self._timer is None or not self._timer.isActive():
+                self._timer = QTimer()
+                self._timer.timeout.connect(self._on_timer_tick)
+                self._timer.start(1000)
+
             self.session_resumed.emit()
 
     def end_session(self, auto: bool = False) -> int:
