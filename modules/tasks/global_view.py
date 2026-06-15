@@ -27,6 +27,7 @@ class GlobalTasksView(QWidget):
         self._controller = controller
         self._topic_repo = TopicRepository()
         self._current_task = None
+        self._period_offset = 0
         self._setup_ui()
         self._connect_signals()
         self._load_tasks()
@@ -154,6 +155,7 @@ class GlobalTasksView(QWidget):
         self.period_filter.addItem("Эта неделя", "week")
         self.period_filter.addItem("Этот месяц", "month")
         self.period_filter.addItem("Просроченные", "overdue_only")
+        self.period_filter.addItem("Без дедлайна", "no_deadline")
         self.period_filter.setStyleSheet("""
             QComboBox {
                 background-color: #F0F4F8;
@@ -169,6 +171,59 @@ class GlobalTasksView(QWidget):
         """)
         period_layout.addWidget(period_label)
         period_layout.addWidget(self.period_filter)
+
+        # 🆕 Кнопки навигации по периоду
+        self.prev_period_btn = QPushButton("←")
+        self.prev_period_btn.setFixedSize(32, 32)
+        self.prev_period_btn.setToolTip("Предыдущий период")
+        self.prev_period_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(59, 130, 246, 0.15);
+                        color: #3B82F6;
+                        border: 1px solid #3B82F6;
+                        border-radius: 8px;
+                        font-weight: bold;
+                        font-size: 16px;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(59, 130, 246, 0.25);
+                    }
+                    QPushButton:disabled {
+                        background-color: #F0F4F8;
+                        color: #9CA3AF;
+                        border: 1px solid #E6EEF6;
+                    }
+                """)
+        period_layout.addWidget(self.prev_period_btn)
+
+        self.next_period_btn = QPushButton("→")
+        self.next_period_btn.setFixedSize(32, 32)
+        self.next_period_btn.setToolTip("Следующий период")
+        self.next_period_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(59, 130, 246, 0.15);
+                        color: #3B82F6;
+                        border: 1px solid #3B82F6;
+                        border-radius: 8px;
+                        font-weight: bold;
+                        font-size: 16px;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(59, 130, 246, 0.25);
+                    }
+                    QPushButton:disabled {
+                        background-color: #F0F4F8;
+                        color: #9CA3AF;
+                        border: 1px solid #E6EEF6;
+                    }
+                """)
+        period_layout.addWidget(self.next_period_btn)
+
+        # 🆕 Метка текущего периода
+        self.period_label = QLabel("Текущий")
+        self.period_label.setStyleSheet("color: #3B82F6; font-size: 12px; font-weight: 500; min-width: 100px;")
+        period_layout.addWidget(self.period_label)
+
         filters_layout.addLayout(period_layout)
 
         filters_layout.addStretch()
@@ -395,6 +450,9 @@ class GlobalTasksView(QWidget):
         self.complete_btn.clicked.connect(self._on_complete_task)
         self.edit_btn.clicked.connect(self._on_edit_task)
         self.delete_btn.clicked.connect(self._on_delete_task)
+        # 🆕 Навигация по периодам
+        self.prev_period_btn.clicked.connect(self._navigate_previous)
+        self.next_period_btn.clicked.connect(self._navigate_next)
 
     def _load_topics_to_filter(self):
         topics = self._topic_repo.get_all()
@@ -402,8 +460,83 @@ class GlobalTasksView(QWidget):
             if topic['type'] == 'topic':
                 self.topic_filter.addItem(topic['name'], topic['id'])
 
+    def _on_period_changed(self):
+        """Обработчик изменения фильтра периода"""
+        self._period_offset = 0  # Сбрасываем смещение при смене периода
+        self._update_period_label()
+        self._update_navigation_buttons()
+        self._load_tasks()
+
+    def _navigate_previous(self):
+        """Переход к предыдущему периоду"""
+        self._period_offset -= 1
+        self._update_period_label()
+        self._load_tasks()
+
+    def _navigate_next(self):
+        """Переход к следующему периоду"""
+        self._period_offset += 1
+        self._update_period_label()
+        self._load_tasks()
+
+    def _update_period_label(self):
+        """Обновляет метку текущего периода"""
+        period = self.period_filter.currentData()
+
+        if period == 'all' or period == 'overdue_only' or period == 'no_deadline':
+            self.period_label.setText("")
+            return
+
+        if self._period_offset == 0:
+            if period == 'today':
+                self.period_label.setText("Сегодня")
+            elif period == 'tomorrow':
+                self.period_label.setText("Завтра")
+            elif period == 'week':
+                self.period_label.setText("Эта неделя")
+            elif period == 'month':
+                self.period_label.setText("Этот месяц")
+        else:
+            from datetime import timedelta
+            today = date.today()
+
+            if period == 'today':
+                target_date = today + timedelta(days=self._period_offset)
+                self.period_label.setText(target_date.strftime("%d.%m.%Y"))
+            elif period == 'tomorrow':
+                target_date = today + timedelta(days=1 + self._period_offset)
+                self.period_label.setText(target_date.strftime("%d.%m.%Y"))
+            elif period == 'week':
+                start_date = today + timedelta(weeks=self._period_offset)
+                end_date = start_date + timedelta(days=6)
+                self.period_label.setText(f"{start_date.strftime('%d.%m')} - {end_date.strftime('%d.%m')}")
+            elif period == 'month':
+                target_month = today.month + self._period_offset
+                target_year = today.year
+
+                while target_month > 12:
+                    target_month -= 12
+                    target_year += 1
+                while target_month < 1:
+                    target_month += 12
+                    target_year -= 1
+
+                months = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                          "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+                self.period_label.setText(f"{months[target_month - 1]} {target_year}")
+
+    def _update_navigation_buttons(self):
+        """Обновляет состояние кнопок навигации"""
+        period = self.period_filter.currentData()
+
+        # Кнопки активны только для периодов с навигацией
+        can_navigate = period in ('today', 'tomorrow', 'week', 'month')
+        self.prev_period_btn.setEnabled(can_navigate)
+        self.next_period_btn.setEnabled(can_navigate)
+
     def _load_tasks(self):
         self.task_list.clear()
+        self._update_navigation_buttons()
 
         tasks = self._controller.get_all_tasks()
 
@@ -458,20 +591,43 @@ class GlobalTasksView(QWidget):
     def _filter_by_period(self, tasks, period):
         today = date.today()
 
+        # 🆕 Фильтр "без дедлайна"
+        if period == 'no_deadline':
+            return [t for t in tasks if not t.deadline]
+
+        # 🆕 Применяем смещение
+        offset = self._period_offset
+
         if period == 'today':
-            return [t for t in tasks if t.deadline and t.deadline[:10] == today.isoformat()]
+            target_date = today + timedelta(days=offset)
+            return [t for t in tasks if t.deadline and t.deadline[:10] == target_date.isoformat()]
         elif period == 'tomorrow':
-            tomorrow = today + timedelta(days=1)
-            return [t for t in tasks if t.deadline and t.deadline[:10] == tomorrow.isoformat()]
+            target_date = today + timedelta(days=1 + offset)
+            return [t for t in tasks if t.deadline and t.deadline[:10] == target_date.isoformat()]
         elif period == 'week':
-            end_week = today + timedelta(days=7)
-            return [t for t in tasks if t.deadline and today.isoformat() <= t.deadline[:10] <= end_week.isoformat()]
+            start_date = today + timedelta(weeks=offset)
+            end_date = start_date + timedelta(days=6)
+            return [t for t in tasks if t.deadline and
+                    start_date.isoformat() <= t.deadline[:10] <= end_date.isoformat()]
         elif period == 'month':
-            if today.month == 12:
-                end_month = today.replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
+            target_month = today.month + offset
+            target_year = today.year
+
+            while target_month > 12:
+                target_month -= 12
+                target_year += 1
+            while target_month < 1:
+                target_month += 12
+                target_year -= 1
+
+            if target_month == 12:
+                end_date = date(target_year + 1, 1, 1) - timedelta(days=1)
             else:
-                end_month = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
-            return [t for t in tasks if t.deadline and today.isoformat() <= t.deadline[:10] <= end_month.isoformat()]
+                end_date = date(target_year, target_month + 1, 1) - timedelta(days=1)
+
+            start_date = date(target_year, target_month, 1)
+            return [t for t in tasks if t.deadline and
+                    start_date.isoformat() <= t.deadline[:10] <= end_date.isoformat()]
         elif period == 'overdue_only':
             return [t for t in tasks if t.is_overdue()]
         return tasks
