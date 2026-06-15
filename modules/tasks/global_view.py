@@ -63,7 +63,7 @@ class GlobalTasksView(QWidget):
         header_layout.setAlignment(Qt.AlignCenter)
 
         header_icon = QLabel()
-        header_pixmap = QPixmap("resources/icons/tack.png")
+        header_pixmap = QPixmap("resources/icons/task1.png")
         if not header_pixmap.isNull():
             header_pixmap = header_pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             header_icon.setPixmap(header_pixmap)
@@ -212,7 +212,7 @@ class GlobalTasksView(QWidget):
 
         # Новая задача
         self.new_btn = QPushButton("Новая задача")
-        self.new_btn.setIcon(QIcon("resources/icons/notes.png"))
+        self.new_btn.setIcon(QIcon("resources/icons/task1.png"))
         self.new_btn.setIconSize(QSize(18, 18))
         self.new_btn.setStyleSheet("""
             QPushButton {
@@ -331,7 +331,7 @@ class GlobalTasksView(QWidget):
         btn_layout.addWidget(self.complete_btn)
 
         self.edit_btn = QPushButton("Редактировать")
-        self.edit_btn.setIcon(QIcon("resources/icons/pen.png"))
+        self.edit_btn.setIcon(QIcon("resources/icons/rename1.png"))
         self.edit_btn.setIconSize(QSize(16, 16))
         self.edit_btn.setStyleSheet("""
             QPushButton {
@@ -351,7 +351,7 @@ class GlobalTasksView(QWidget):
         btn_layout.addWidget(self.edit_btn)
 
         self.delete_btn = QPushButton("Удалить")
-        self.delete_btn.setIcon(QIcon("resources/icons/urna.png"))
+        self.delete_btn.setIcon(QIcon("resources/icons/delete1.png"))
         self.delete_btn.setIconSize(QSize(16, 16))
         self.delete_btn.setStyleSheet("""
             QPushButton {

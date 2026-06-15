@@ -58,7 +58,7 @@ class CalendarView(QWidget):
         header_layout.setAlignment(Qt.AlignCenter)
 
         header_icon = QLabel()
-        header_pixmap = QPixmap("resources/icons/calendar.png")
+        header_pixmap = QPixmap("resources/icons/calendar1.png")
         if not header_pixmap.isNull():
             header_pixmap = header_pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             header_icon.setPixmap(header_pixmap)
@@ -183,7 +183,7 @@ class CalendarView(QWidget):
 
         # Кнопка новой задачи
         self.new_task_btn = QPushButton("Новая задача")
-        self.new_task_btn.setIcon(QIcon("resources/icons/notes.png"))
+        self.new_task_btn.setIcon(QIcon("resources/icons/task1.png"))
         self.new_task_btn.setIconSize(QSize(18, 18))
         self.new_task_btn.setStyleSheet("""
             QPushButton {
@@ -229,7 +229,7 @@ class CalendarView(QWidget):
 
         tasks_title_layout = QHBoxLayout()
         tasks_icon = QLabel()
-        tasks_icon_pixmap = QPixmap("resources/icons/tack.png")
+        tasks_icon_pixmap = QPixmap("resources/icons/task1.png")
         if not tasks_icon_pixmap.isNull():
             tasks_icon_pixmap = tasks_icon_pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             tasks_icon.setPixmap(tasks_icon_pixmap)
