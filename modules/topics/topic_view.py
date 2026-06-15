@@ -9,6 +9,7 @@ from PySide6.QtGui import QIcon, QPixmap, QColor
 from widgets import SilentMessageBox
 from .controller import TopicController
 from .analytics_controller import TopicAnalyticsController
+from services.time_service import TimeService
 import re
 
 
@@ -27,6 +28,216 @@ def remove_emojis(text: str) -> str:
                                u"\U000024C2-\U0001F251"
                                "]+", flags=re.UNICODE)
     return emoji_pattern.sub(r'', text).strip()
+
+
+class TopicSessionCard(QFrame):
+    """Карточка сессии внутри темы"""
+
+    resume_clicked = Signal(int)
+    delete_clicked = Signal(int)
+    analytics_clicked = Signal(int)
+
+    def __init__(self, session_data: dict, parent=None):
+        super().__init__(parent)
+        self.session_id = session_data['id']
+        self.session_data = session_data
+        self._is_expanded = False
+        self._setup_ui()
+
+    def _setup_ui(self):
+        self.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border-radius: 12px;
+                border: 1px solid #E6EEF6;
+            }
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(6)
+
+        # Верхняя строка: статус + длительность
+        top_layout = QHBoxLayout()
+        top_layout.setSpacing(10)
+
+        status = self.session_data.get('status', 'completed')
+        if status == 'active':
+            status_text = "🟢 Активна"
+            status_color = "#10B981"
+        elif status == 'paused':
+            status_text = "🟡 Пауза"
+            status_color = "#F59E0B"
+        elif status == 'completed':
+            status_text = "✅ Завершена"
+            status_color = "#3B82F6"
+        else:
+            status_text = "⚪ Авто"
+            status_color = "#6B7280"
+
+        status_label = QLabel(status_text)
+        status_label.setStyleSheet(f"color: {status_color}; font-weight: 600; font-size: 13px;")
+        top_layout.addWidget(status_label)
+
+        duration_label = QLabel(self.session_data.get('duration_display', '—'))
+        duration_label.setStyleSheet("color: #6B7280; font-size: 13px; font-weight: 500;")
+        top_layout.addWidget(duration_label)
+
+        top_layout.addStretch()
+        layout.addLayout(top_layout)
+
+        # Время начала/конца + статистика
+        middle_layout = QHBoxLayout()
+        middle_layout.setSpacing(14)
+
+        start_time = self.session_data.get('start_time', '')[:16] if self.session_data.get('start_time') else '—'
+        end_time = self.session_data.get('end_time', '')[:16] if self.session_data.get('end_time') else '—'
+        time_label = QLabel(f"🕐 {start_time} → {end_time}")
+        time_label.setStyleSheet("color: #6B7280; font-size: 12px;")
+        middle_layout.addWidget(time_label)
+
+        avg_focus = self.session_data.get('avg_focus', 0)
+        avg_energy = self.session_data.get('avg_energy', 0)
+        avg_interest = self.session_data.get('avg_interest', 0)
+
+        if avg_focus or avg_energy or avg_interest:
+            stats_label = QLabel(f"🧠 {avg_focus} | ⚡ {avg_energy} | ❤️ {avg_interest}")
+            stats_label.setStyleSheet("color: #6B7280; font-size: 12px;")
+            middle_layout.addWidget(stats_label)
+
+        middle_layout.addStretch()
+        layout.addLayout(middle_layout)
+
+        # Кнопки
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(6)
+
+        intervals_count = self.session_data.get('intervals_count', 0)
+        if intervals_count > 0:
+            self.intervals_btn = QPushButton(f"📋 Интервалы ({intervals_count})")
+            self.intervals_btn.setFixedHeight(30)
+            self.intervals_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(107, 114, 128, 0.1);
+                    color: #6B7280;
+                    border: 1px solid #E6EEF6;
+                    border-radius: 6px;
+                    padding: 4px 10px;
+                    font-size: 11px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(107, 114, 128, 0.2);
+                }
+            """)
+            self.intervals_btn.clicked.connect(self._toggle_intervals)
+            buttons_layout.addWidget(self.intervals_btn)
+
+        if status in ('active', 'paused'):
+            resume_btn = QPushButton("▶ Продолжить")
+            resume_btn.setFixedHeight(30)
+            resume_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(16, 185, 129, 0.15);
+                    color: #059669;
+                    border: 1px solid #10B981;
+                    border-radius: 6px;
+                    padding: 4px 10px;
+                    font-size: 11px;
+                    font-weight: 500;
+                }
+                QPushButton:hover {
+                    background-color: rgba(16, 185, 129, 0.25);
+                }
+            """)
+            resume_btn.clicked.connect(lambda: self.resume_clicked.emit(self.session_id))
+            buttons_layout.addWidget(resume_btn)
+
+        analytics_btn = QPushButton("📊 Аналитика")
+        analytics_btn.setFixedHeight(30)
+        analytics_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(59, 130, 246, 0.15);
+                color: #3B82F6;
+                border: 1px solid #3B82F6;
+                border-radius: 6px;
+                padding: 4px 10px;
+                font-size: 11px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: rgba(59, 130, 246, 0.25);
+            }
+        """)
+        analytics_btn.clicked.connect(lambda: self.analytics_clicked.emit(self.session_id))
+        buttons_layout.addWidget(analytics_btn)
+
+        buttons_layout.addStretch()
+
+        delete_btn = QPushButton("🗑")
+        delete_btn.setFixedSize(30, 30)
+        delete_btn.setToolTip("Удалить сессию")
+        delete_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(239, 68, 68, 0.15);
+                color: #EF4444;
+                border: 1px solid #EF4444;
+                border-radius: 6px;
+                padding: 4px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: rgba(239, 68, 68, 0.25);
+            }
+        """)
+        delete_btn.clicked.connect(self._on_delete_clicked)
+        buttons_layout.addWidget(delete_btn)
+
+        layout.addLayout(buttons_layout)
+
+        # Контейнер для интервалов
+        self.intervals_container = QFrame()
+        self.intervals_container.setVisible(False)
+        self.intervals_container.setStyleSheet("""
+            QFrame {
+                background-color: #F9FAFB;
+                border-radius: 8px;
+                border: 1px solid #E6EEF6;
+            }
+        """)
+        intervals_layout = QVBoxLayout(self.intervals_container)
+        intervals_layout.setContentsMargins(10, 6, 10, 6)
+        intervals_layout.setSpacing(3)
+
+        intervals = self.session_data.get('intervals', [])
+        if intervals:
+            for i, interval in enumerate(intervals):
+                start = interval.get('start_time', '')[:16] if interval.get('start_time') else '—'
+                end = interval.get('end_time', '')[:16] if interval.get('end_time') else '—'
+                duration = interval.get('duration_seconds', 0)
+                duration_min = duration // 60
+                duration_sec = duration % 60
+
+                interval_label = QLabel(f"  #{i + 1}: {start} → {end} ({duration_min}м {duration_sec}с)")
+                interval_label.setStyleSheet("color: #4B5563; font-size: 11px;")
+                intervals_layout.addWidget(interval_label)
+        else:
+            no_intervals_label = QLabel("  Нет данных об интервалах")
+            no_intervals_label.setStyleSheet("color: #9CA3AF; font-size: 11px; font-style: italic;")
+            intervals_layout.addWidget(no_intervals_label)
+
+        layout.addWidget(self.intervals_container)
+
+    def _toggle_intervals(self):
+        self._is_expanded = not self._is_expanded
+        self.intervals_container.setVisible(self._is_expanded)
+
+    def _on_delete_clicked(self):
+        reply = SilentMessageBox.question(
+            self, "Удалить сессию?",
+            "Вы действительно хотите удалить эту сессию?\nЭто действие нельзя отменить."
+        )
+        if reply == SilentMessageBox.Yes:
+            self.delete_clicked.emit(self.session_id)
 
 
 class NoteListItemWidget(QWidget):
@@ -108,13 +319,11 @@ class TaskListItemWidget(QWidget):
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(10)
 
-        # Чекбокс для выполнения
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(status == 'completed')
         self.checkbox.stateChanged.connect(self._on_checkbox_changed)
         layout.addWidget(self.checkbox)
 
-        # Название
         self.title_label = QLabel(title)
         if status == 'completed':
             self.title_label.setStyleSheet("text-decoration: line-through; color: #9CA3AF;")
@@ -124,12 +333,10 @@ class TaskListItemWidget(QWidget):
             self.title_label.setStyleSheet("color: #1F2937;")
         layout.addWidget(self.title_label, 1)
 
-        # Дедлайн
         self.deadline_label = QLabel(deadline)
         self.deadline_label.setStyleSheet("color: #6B7280; font-size: 10px;")
         layout.addWidget(self.deadline_label)
 
-        # Кнопки
         self.edit_btn = QPushButton()
         self.edit_btn.setIcon(QIcon("resources/icons/pen.png"))
         self.edit_btn.setIconSize(QSize(16, 16))
@@ -185,7 +392,6 @@ class FlashcardListItemWidget(QWidget):
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(10)
 
-        # Тип карточки (иконка)
         type_icon = QLabel()
         if card_type == 'free':
             type_icon.setText("📝")
@@ -194,18 +400,15 @@ class FlashcardListItemWidget(QWidget):
         type_icon.setStyleSheet("font-size: 16px;")
         layout.addWidget(type_icon)
 
-        # Превью текста
         self.preview_label = QLabel(preview)
         self.preview_label.setStyleSheet("color: #1F2937; font-weight: 500;")
         self.preview_label.setWordWrap(True)
         layout.addWidget(self.preview_label, 1)
 
-        # Дата
         self.date_label = QLabel(date_str)
         self.date_label.setStyleSheet("color: #6B7280; font-size: 11px;")
         layout.addWidget(self.date_label)
 
-        # Кнопка просмотра
         self.view_btn = QPushButton()
         self.view_btn.setIcon(QIcon("resources/icons/open.png"))
         self.view_btn.setIconSize(QSize(16, 16))
@@ -214,7 +417,6 @@ class FlashcardListItemWidget(QWidget):
         self.view_btn.clicked.connect(lambda: self.view_clicked.emit(self.card_id))
         layout.addWidget(self.view_btn)
 
-        # Кнопка редактирования
         self.edit_btn = QPushButton()
         self.edit_btn.setIcon(QIcon("resources/icons/pen.png"))
         self.edit_btn.setIconSize(QSize(16, 16))
@@ -223,7 +425,6 @@ class FlashcardListItemWidget(QWidget):
         self.edit_btn.clicked.connect(lambda: self.edit_clicked.emit(self.card_id))
         layout.addWidget(self.edit_btn)
 
-        # Кнопка удаления
         self.delete_btn = QPushButton()
         self.delete_btn.setIcon(QIcon("resources/icons/urna.png"))
         self.delete_btn.setIconSize(QSize(16, 16))
@@ -232,7 +433,6 @@ class FlashcardListItemWidget(QWidget):
         self.delete_btn.clicked.connect(lambda: self.delete_clicked.emit(self.card_id))
         layout.addWidget(self.delete_btn)
 
-        # ✅ УБРАНЫ все фоновые стили (подложки)
         self.setFixedHeight(45)
 
 
@@ -252,7 +452,6 @@ class FlashcardViewDialog(QDialog):
         layout = QVBoxLayout(self)
 
         if self.card.is_free:
-            # Свободная карточка
             label = QLabel("📝 Свободная карточка")
             label.setStyleSheet("font-size: 16px; font-weight: bold;")
             layout.addWidget(label)
@@ -263,7 +462,6 @@ class FlashcardViewDialog(QDialog):
                 self.content_edit.setReadOnly(True)
             layout.addWidget(self.content_edit)
         else:
-            # Карточка вопрос-ответ
             label = QLabel("❓ Карточка вопрос-ответ")
             label.setStyleSheet("font-size: 16px; font-weight: bold;")
             layout.addWidget(label)
@@ -282,9 +480,7 @@ class FlashcardViewDialog(QDialog):
                 self.answer_edit.setReadOnly(True)
             layout.addWidget(self.answer_edit)
 
-        # ✅ ИСПРАВЛЕНО: используем getattr для безопасного доступа
         date_text = f"Создано: {self.card.created_at[:16] if self.card.created_at else '—'}"
-        # updated_at может не существовать в модели
         updated_at = getattr(self.card, 'updated_at', None)
         if updated_at and updated_at != self.card.created_at:
             date_text += f"\nИзменено: {updated_at[:16]}"
@@ -293,7 +489,6 @@ class FlashcardViewDialog(QDialog):
         date_label.setStyleSheet("color: #6B7280; font-size: 11px;")
         layout.addWidget(date_label)
 
-        # Кнопки
         if self.is_edit_mode:
             button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
             button_box.accepted.connect(self.accept)
@@ -305,7 +500,6 @@ class FlashcardViewDialog(QDialog):
         layout.addWidget(button_box)
 
     def get_card_data(self):
-        """Возвращает обновлённые данные карточки"""
         if self.card.is_free:
             return {
                 'content': self.content_edit.toPlainText()
@@ -318,17 +512,9 @@ class FlashcardViewDialog(QDialog):
 
 
 class TopicView(QWidget):
-    """
-    Экран темы с вкладками:
-    - Обзор
-    - Записи
-    - Задачи
-    - Карточки
-    - Сессии
-    - Аналитика.
-    """
+    """Экран темы с вкладками"""
 
-    # Сигналы для навигации к другим модулям
+    # Сигналы
     create_note_requested = Signal(int)
     create_task_requested = Signal(int)
     create_flashcard_requested = Signal(int)
@@ -340,10 +526,13 @@ class TopicView(QWidget):
     edit_task_requested = Signal(int)
     delete_task_requested = Signal(int)
     complete_task_requested = Signal(int)
-
-    # Новые сигналы для карточек
     edit_flashcard_requested = Signal(int)
     delete_flashcard_requested = Signal(int)
+
+    # Новые сигналы для сессий
+    session_resumed_in_topic = Signal(int)
+    session_deleted_in_topic = Signal()
+    session_analytics_requested = Signal(int)
 
     back_requested = Signal()
 
@@ -361,12 +550,11 @@ class TopicView(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
-        """Настраивает интерфейс"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(16)
 
-        # ========== ЗАГОЛОВОК (белая плашка без обводки) ==========
+        # Заголовок
         header_widget = QWidget()
         header_widget.setStyleSheet("""
             QWidget {
@@ -381,7 +569,6 @@ class TopicView(QWidget):
         header_layout.setContentsMargins(20, 0, 20, 0)
         header_layout.setSpacing(16)
 
-        # Кнопка "Назад"
         self.back_btn = QPushButton("← Назад")
         self.back_btn.setFixedWidth(80)
         self.back_btn.setStyleSheet("""
@@ -404,7 +591,6 @@ class TopicView(QWidget):
 
         header_layout.addStretch()
 
-        # Иконка темы
         topic_icon = QLabel()
         topic_pixmap = QPixmap("resources/icons/notes.png")
         if not topic_pixmap.isNull():
@@ -412,21 +598,19 @@ class TopicView(QWidget):
             topic_icon.setPixmap(topic_pixmap)
         header_layout.addWidget(topic_icon)
 
-        # Название
         self.topic_name_label = QLabel()
         self.topic_name_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #1F2937;")
         header_layout.addWidget(self.topic_name_label)
 
         header_layout.addStretch()
 
-        # Путь
         self.path_label = QLabel()
         self.path_label.setStyleSheet("color: #6B7280; font-size: 11px;")
         header_layout.addWidget(self.path_label)
 
         layout.addWidget(header_widget)
 
-        # ========== ВКЛАДКИ ==========
+        # Вкладки
         self.tab_widget = QTabWidget()
         self.tab_widget.setStyleSheet("""
             QTabWidget::pane {
@@ -536,13 +720,51 @@ class TopicView(QWidget):
         cards_layout.addWidget(self.create_card_btn)
         self.tab_widget.addTab(self.cards_tab, "Карточки")
 
-        # Вкладка "Сессии"
+        # Вкладка "Сессии" - НОВАЯ РЕАЛИЗАЦИЯ
         self.sessions_tab = QWidget()
         sessions_layout = QVBoxLayout(self.sessions_tab)
         sessions_layout.setContentsMargins(16, 16, 16, 16)
-        self.sessions_list = QListWidget()
-        self.sessions_list.setStyleSheet("border: none;")
-        sessions_layout.addWidget(self.sessions_list)
+        sessions_layout.setSpacing(12)
+
+        sessions_header = QHBoxLayout()
+        sessions_title = QLabel("📋 История сессий темы")
+        sessions_title.setStyleSheet("font-size: 14px; font-weight: 600; color: #1F2937;")
+        sessions_header.addWidget(sessions_title)
+        sessions_header.addStretch()
+
+        self.refresh_sessions_btn = QPushButton("🔄 Обновить")
+        self.refresh_sessions_btn.setFixedWidth(120)
+        self.refresh_sessions_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(59, 130, 246, 0.15);
+                color: #3B82F6;
+                border: 1px solid #3B82F6;
+                border-radius: 8px;
+                padding: 6px 12px;
+                font-size: 12px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: rgba(59, 130, 246, 0.25);
+            }
+        """)
+        sessions_header.addWidget(self.refresh_sessions_btn)
+        sessions_layout.addLayout(sessions_header)
+
+        self.sessions_scroll = QScrollArea()
+        self.sessions_scroll.setWidgetResizable(True)
+        self.sessions_scroll.setFrameShape(QFrame.NoFrame)
+        self.sessions_scroll.setStyleSheet("background-color: transparent; border: none;")
+
+        self.sessions_cards_container = QWidget()
+        self.sessions_cards_layout = QVBoxLayout(self.sessions_cards_container)
+        self.sessions_cards_layout.setContentsMargins(0, 0, 0, 0)
+        self.sessions_cards_layout.setSpacing(10)
+        self.sessions_cards_layout.addStretch()
+
+        self.sessions_scroll.setWidget(self.sessions_cards_container)
+        sessions_layout.addWidget(self.sessions_scroll, 1)
+
         self.start_session_btn = QPushButton("Начать сессию")
         self.start_session_btn.setIcon(QIcon("resources/icons/play.png"))
         self.start_session_btn.setIconSize(QSize(18, 18))
@@ -575,7 +797,7 @@ class TopicView(QWidget):
 
         layout.addWidget(self.tab_widget)
 
-        # Подключаем сигналы
+        # Сигналы
         self.create_note_btn.clicked.connect(
             lambda: self.create_note_requested.emit(self._current_topic_id)
         )
@@ -588,16 +810,17 @@ class TopicView(QWidget):
         self.start_session_btn.clicked.connect(
             lambda: self.start_session_requested.emit(self._current_topic_id)
         )
+        self.refresh_sessions_btn.clicked.connect(
+            lambda: self._load_topic_sessions(self._current_topic_id) if self._current_topic_id else None
+        )
 
         self.back_btn.clicked.connect(self.back_requested.emit)
 
         self.notes_list.itemDoubleClicked.connect(self._on_note_double_clicked)
         self.tasks_list.itemDoubleClicked.connect(self._on_task_double_clicked)
         self.cards_list.itemDoubleClicked.connect(self._on_card_double_clicked)
-        self.sessions_list.itemDoubleClicked.connect(self._on_session_double_clicked)
 
     def _create_overview_tab(self) -> QWidget:
-        """Создаёт вкладку обзора"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -612,7 +835,6 @@ class TopicView(QWidget):
         content_layout = QVBoxLayout(content)
         content_layout.setSpacing(20)
 
-        # Ряд 1: Карточки статистики
         stats_layout = QHBoxLayout()
         stats_layout.setSpacing(16)
 
@@ -627,7 +849,6 @@ class TopicView(QWidget):
         stats_layout.addWidget(self.energy_card)
         content_layout.addLayout(stats_layout)
 
-        # Ряд 2: Прогресс задач
         tasks_progress_widget = QFrame()
         tasks_progress_widget.setStyleSheet("""
             QFrame {
@@ -678,7 +899,6 @@ class TopicView(QWidget):
 
         content_layout.addWidget(tasks_progress_widget)
 
-        # Ряд 3: Заметки и карточки
         materials_widget = QFrame()
         materials_widget.setStyleSheet("""
             QFrame {
@@ -717,7 +937,6 @@ class TopicView(QWidget):
         materials_layout.addStretch()
         content_layout.addWidget(materials_widget)
 
-        # Ряд 4: Кнопки действий
         actions_layout = QHBoxLayout()
         actions_layout.setSpacing(12)
 
@@ -814,7 +1033,6 @@ class TopicView(QWidget):
         return widget
 
     def _create_stat_card(self, icon_path: str, title: str, value: str, color: str = "#3B82F6") -> QFrame:
-        """Создаёт карточку статистики с цветным кругом для иконки"""
         card = QFrame()
         card.setStyleSheet("""
             QFrame {
@@ -831,12 +1049,10 @@ class TopicView(QWidget):
         layout.setAlignment(Qt.AlignCenter)
         layout.setSpacing(8)
 
-        # Цветной круг с иконкой
         icon_container = QLabel()
         icon_container.setFixedSize(52, 52)
         icon_container.setAlignment(Qt.AlignCenter)
 
-        # Парсим цвет для прозрачного фона
         r = int(color[1:3], 16)
         g = int(color[3:5], 16)
         b = int(color[5:7], 16)
@@ -859,13 +1075,11 @@ class TopicView(QWidget):
 
         layout.addWidget(icon_container)
 
-        # Название
         title_label = QLabel(title)
         title_label.setStyleSheet("color: #6B7280; font-size: 13px;")
         title_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(title_label)
 
-        # Значение
         value_label = QLabel(value)
         value_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #1F2937;")
         value_label.setAlignment(Qt.AlignCenter)
@@ -876,7 +1090,6 @@ class TopicView(QWidget):
         return card
 
     def _update_stat_card_value(self, title: str, new_value: str):
-        """Обновляет значение в карточке статистики"""
         if title in self._stat_value_labels:
             self._stat_value_labels[title].setText(new_value)
 
@@ -896,7 +1109,7 @@ class TopicView(QWidget):
         self._load_notes(topic_id)
         self._load_tasks(topic_id)
         self._load_cards(topic_id)
-        self._load_sessions(topic_id)
+        self._load_topic_sessions(topic_id)
         self._load_analytics(topic_id)
 
     def _load_notes(self, topic_id: int):
@@ -969,7 +1182,6 @@ class TopicView(QWidget):
                 preview = card.question[:50] + "..." if len(card.question) > 50 else card.question
                 card_type = 'qa'
 
-            # Форматируем дату
             updated_at = getattr(card, 'updated_at', '')
             created_at = getattr(card, 'created_at', '')
             date_str = updated_at[:16] if updated_at else (created_at[:16] if created_at else "")
@@ -985,7 +1197,6 @@ class TopicView(QWidget):
             self.cards_list.setItemWidget(item, item_widget)
 
     def _view_card(self, card_id: int):
-        """Просмотр карточки (read-only)"""
         from core.di.container import container
         card = container.flashcard_controller.get_card(card_id)
         if not card:
@@ -995,7 +1206,6 @@ class TopicView(QWidget):
         dialog.exec()
 
     def _edit_card(self, card_id: int):
-        """Редактирование карточки"""
         from core.di.container import container
         card = container.flashcard_controller.get_card(card_id)
         if not card:
@@ -1003,14 +1213,12 @@ class TopicView(QWidget):
 
         dialog = FlashcardViewDialog(card, is_edit_mode=True)
         if dialog.exec() == QDialog.Accepted:
-            # Сохраняем изменения
             data = dialog.get_card_data()
             if container.flashcard_controller.update_card(card_id, **data):
                 self._load_cards(self._current_topic_id)
                 SilentMessageBox.information(self, "Успех", "Карточка обновлена")
 
     def _delete_card(self, card_id: int):
-        """Удаление карточки"""
         from core.di.container import container
         card = container.flashcard_controller.get_card(card_id)
         if not card:
@@ -1026,23 +1234,67 @@ class TopicView(QWidget):
                 self._load_cards(self._current_topic_id)
                 SilentMessageBox.information(self, "Успех", "Карточка удалена")
 
-    def _load_sessions(self, topic_id: int):
+    def _load_topic_sessions(self, topic_id: int):
+        """Загружает сессии темы в виде карточек"""
+        while self.sessions_cards_layout.count() > 1:
+            item = self.sessions_cards_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
         sessions = self._topic_controller.get_sessions_by_topic(topic_id)
-        self.sessions_list.clear()
 
         if not sessions:
-            item = QListWidgetItem("⏱️ Нет сессий. Начните первую сессию!")
-            item.setForeground(Qt.gray)
-            self.sessions_list.addItem(item)
+            no_sessions_label = QLabel("📭 Нет сессий. Начните первую сессию!")
+            no_sessions_label.setAlignment(Qt.AlignCenter)
+            no_sessions_label.setStyleSheet("color: #6B7280; font-size: 13px; padding: 30px;")
+            self.sessions_cards_layout.insertWidget(0, no_sessions_label)
             return
 
+        def sort_key(s):
+            if s.status in ('active', 'paused'):
+                return (0, s.start_time or '')
+            return (1, s.start_time or '')
+
+        sessions.sort(key=sort_key, reverse=True)
+
         for session in sessions:
-            item = QListWidgetItem()
-            date_str = session.start_time[:10] if session.start_time else "—"
-            duration = session.duration_display if session.duration_minutes else "—"
-            item.setText(f"📅 {date_str} | ⏱️ {duration}")
-            item.setData(Qt.UserRole, session.id)
-            self.sessions_list.addItem(item)
+            from core.di.container import container
+            stats = container.session_controller.get_session_stats(session.id)
+            intervals = container.session_controller.get_session_intervals(session.id)
+
+            session_data = {
+                'id': session.id,
+                'status': session.status or 'completed',
+                'duration_display': TimeService.format_duration(
+                    session.duration_minutes) if session.duration_minutes else '—',
+                'start_time': session.start_time,
+                'end_time': session.end_time,
+                'avg_focus': stats.get('avg_focus', 0),
+                'avg_energy': stats.get('avg_energy', 0),
+                'avg_interest': stats.get('avg_interest', 0),
+                'intervals_count': len(intervals),
+                'intervals': intervals
+            }
+
+            card = TopicSessionCard(session_data)
+            card.resume_clicked.connect(self._on_session_resume_clicked)
+            card.delete_clicked.connect(self._on_session_delete_clicked)
+            card.analytics_clicked.connect(self._on_session_analytics_clicked)
+
+            self.sessions_cards_layout.insertWidget(self.sessions_cards_layout.count() - 1, card)
+
+    def _on_session_resume_clicked(self, session_id: int):
+        self.session_resumed_in_topic.emit(session_id)
+
+    def _on_session_delete_clicked(self, session_id: int):
+        from core.di.container import container
+        container.session_controller.delete_session(session_id)
+        if self._current_topic_id:
+            self._load_topic_sessions(self._current_topic_id)
+        self.session_deleted_in_topic.emit()
+
+    def _on_session_analytics_clicked(self, session_id: int):
+        self.session_analytics_requested.emit(session_id)
 
     def _load_analytics(self, topic_id: int):
         stats = self._analytics_controller.get_topic_stats(topic_id)
@@ -1071,7 +1323,6 @@ class TopicView(QWidget):
         self._update_stat_card_value("Концентрация", f"{stats['avg_concentration']}/5")
         self._update_stat_card_value("Энергия", f"{stats['avg_energy']}/5")
 
-        # Обновляем прогресс-бар
         completed = stats.get('completed_tasks', 0)
         total = stats.get('task_count', 1)
         if total == 0:
@@ -1086,6 +1337,7 @@ class TopicView(QWidget):
     def refresh(self):
         if self._current_topic_id:
             self._load_stats(self._current_topic_id)
+            self._load_topic_sessions(self._current_topic_id)
 
     def get_current_topic_id(self) -> int:
         return self._current_topic_id
@@ -1104,10 +1356,6 @@ class TopicView(QWidget):
         card_id = item.data(Qt.UserRole)
         if card_id:
             self._view_card(card_id)
-
-    def _on_session_double_clicked(self, item):
-        session_id = item.data(Qt.UserRole)
-        pass
 
     def _delete_note_by_id(self, note_id: int):
         note = self._topic_controller.get_note_by_id(note_id)

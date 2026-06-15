@@ -443,10 +443,14 @@ class MainWindow(QMainWindow):
         event_bus.task_created.connect(lambda tid: self._refresh_dashboard())
         event_bus.task_completed.connect(lambda tid: self._refresh_dashboard())
 
-        # 🆕 Sessions History
+        # Sessions History
         self.sessions_history_view.session_resumed.connect(self._resume_session_from_history)
         self.sessions_history_view.session_selected.connect(self._show_session_analytics)
         self.sessions_history_view.session_deleted.connect(self._on_session_deleted)
+        # Topic view - сессии
+        self.topic_view.session_resumed_in_topic.connect(self._resume_session_from_topic)
+        self.topic_view.session_deleted_in_topic.connect(self._on_session_deleted_in_topic)
+        self.topic_view.session_analytics_requested.connect(self._show_session_analytics_from_topic)
 
     def _start_focus_session(self, topic_id: int, interval: int):
         topic = container.topic_controller.get_topic(topic_id)
@@ -766,19 +770,17 @@ class MainWindow(QMainWindow):
     def _on_review_session_completed(self, completed: int, total: int):
         """Обработчик завершения сессии повторения"""
         self.statusBar().showMessage(f"Повторение завершено: {completed} из {total} карточек", 3000)
-        # Возвращаемся к карточкам
         self.navigation.navigate_to(NavSection.FLASHCARDS)
 
     def _on_review_session_cancelled(self):
         """Обработчик отмены сессии повторения"""
         self.statusBar().showMessage("Сессия повторения отменена", 2000)
-        # Возвращаемся к карточкам
         self.navigation.navigate_to(NavSection.FLASHCARDS)
 
-        # ==================== ИСТОРИЯ СЕССИЙ ====================
+    # ==================== ИСТОРИЯ СЕССИЙ ====================
 
     def _resume_session_from_history(self, session_id: int):
-        """Возобновляет сессию из истории"""
+        """Возобновляет сессию из глобальной истории"""
         session = container.session_controller.get_session(session_id)
         if not session:
             SilentMessageBox.warning(self, "Ошибка", "Сессия не найдена")
@@ -789,57 +791,105 @@ class MainWindow(QMainWindow):
             SilentMessageBox.warning(self, "Ошибка", "Тема не найдена")
             return
 
-        # Загружаем сессию в active_view
         self.focus_active_view.resume_existing_session(session_id, session.topic_id, topic.name)
         self.content_stack.setCurrentWidget(self.focus_active_view)
         self.statusBar().showMessage(f"Сессия возобновлена: {topic.name}", 2000)
 
     def _show_session_analytics(self, session_id: int):
-        """Показывает аналитику сессии"""
-        # Получаем статистику
+        """Показывает аналитику сессии из глобальной истории"""
         stats = container.session_controller.get_session_stats(session_id)
         if not stats:
             SilentMessageBox.warning(self, "Ошибка", "Не удалось загрузить статистику")
             return
 
-        # Получаем интервалы
         intervals = container.session_controller.get_session_intervals(session_id)
-
-        # Получаем быстрые записи
         quick_notes = container.session_controller._quick_note_repo.get_by_session(session_id)
 
-        # Формируем текст аналитики
         topic = container.topic_controller.get_topic(stats['topic_id'])
         topic_name = topic.name if topic else "Неизвестная тема"
 
+        analytics_text = self._build_analytics_text(stats, intervals, quick_notes, topic_name)
+
+        self._show_analytics_dialog(analytics_text)
+
+    def _on_session_deleted(self):
+        """После удаления сессии из глобальной истории"""
+        self.dashboard_view.refresh()
+        self.analytics_view.refresh()
+        self.statusBar().showMessage("Сессия удалена", 2000)
+
+    # ==================== СЕССИИ ВНУТРИ ТЕМЫ ====================
+
+    def _resume_session_from_topic(self, session_id: int):
+        """Возобновляет сессию из вкладки темы"""
+        session = container.session_controller.get_session(session_id)
+        if not session:
+            SilentMessageBox.warning(self, "Ошибка", "Сессия не найдена")
+            return
+
+        topic = container.topic_controller.get_topic(session.topic_id)
+        if not topic:
+            SilentMessageBox.warning(self, "Ошибка", "Тема не найдена")
+            return
+
+        self.focus_active_view.resume_existing_session(session_id, session.topic_id, topic.name)
+        self.content_stack.setCurrentWidget(self.focus_active_view)
+        self.statusBar().showMessage(f"Сессия возобновлена: {topic.name}", 2000)
+
+    def _on_session_deleted_in_topic(self):
+        """После удаления сессии из вкладки темы"""
+        self.dashboard_view.refresh()
+        self.analytics_view.refresh()
+        self.statusBar().showMessage("Сессия удалена", 2000)
+
+    def _show_session_analytics_from_topic(self, session_id: int):
+        """Показывает аналитику сессии из вкладки темы"""
+        stats = container.session_controller.get_session_stats(session_id)
+        if not stats:
+            SilentMessageBox.warning(self, "Ошибка", "Не удалось загрузить статистику")
+            return
+
+        intervals = container.session_controller.get_session_intervals(session_id)
+        quick_notes = container.session_controller._quick_note_repo.get_by_session(session_id)
+
+        topic = container.topic_controller.get_topic(stats['topic_id'])
+        topic_name = topic.name if topic else "Неизвестная тема"
+
+        analytics_text = self._build_analytics_text(stats, intervals, quick_notes, topic_name)
+        self._show_analytics_dialog(analytics_text)
+
+    # ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ДЛЯ АНАЛИТИКИ ====================
+
+    def _build_analytics_text(self, stats: dict, intervals: list, quick_notes: list, topic_name: str) -> str:
+        """Формирует HTML-текст аналитики сессии"""
         analytics_text = f"""
-           <style>
-               body {{ font-family: Arial, sans-serif; }}
-               h2 {{ color: #1F2937; margin-bottom: 16px; }}
-               h3 {{ color: #3B82F6; margin-top: 20px; margin-bottom: 12px; }}
-               .stat {{ margin: 8px 0; padding: 8px; background-color: #F9FAFB; border-radius: 8px; }}
-               .interval {{ margin: 4px 0; padding: 6px; background-color: #F0F4F8; border-radius: 6px; font-size: 13px; }}
-               .note {{ margin: 8px 0; padding: 10px; background-color: #FEF3C7; border-radius: 8px; }}
-           </style>
+        <style>
+            body {{ font-family: Arial, sans-serif; }}
+            h2 {{ color: #1F2937; margin-bottom: 16px; }}
+            h3 {{ color: #3B82F6; margin-top: 20px; margin-bottom: 12px; }}
+            .stat {{ margin: 8px 0; padding: 8px; background-color: #F9FAFB; border-radius: 8px; }}
+            .interval {{ margin: 4px 0; padding: 6px; background-color: #F0F4F8; border-radius: 6px; font-size: 13px; }}
+            .note {{ margin: 8px 0; padding: 10px; background-color: #FEF3C7; border-radius: 8px; }}
+        </style>
 
-           <h2>📊 Аналитика сессии</h2>
+        <h2>📊 Аналитика сессии</h2>
 
-           <div class="stat">
-               <b>Тема:</b> {topic_name}<br>
-               <b>Дата:</b> {stats.get('start_time', '—')[:16]}<br>
-               <b>Длительность:</b> {stats.get('duration_display', '—')}<br>
-               <b>Статус:</b> {stats.get('status', '—')}
-           </div>
+        <div class="stat">
+            <b>Тема:</b> {topic_name}<br>
+            <b>Дата:</b> {stats.get('start_time', '—')[:16]}<br>
+            <b>Длительность:</b> {stats.get('duration_display', '—')}<br>
+            <b>Статус:</b> {stats.get('status', '—')}
+        </div>
 
-           <h3>📈 Средние показатели</h3>
-           <div class="stat">
-               🧠 <b>Концентрация:</b> {stats.get('avg_focus', 0)}/100<br>
-                <b>Энергия:</b> {stats.get('avg_energy', 0)}/100<br>
-               ❤️ <b>Интерес:</b> {stats.get('avg_interest', 0)}/100
-           </div>
+        <h3>📈 Средние показатели</h3>
+        <div class="stat">
+            🧠 <b>Концентрация:</b> {stats.get('avg_focus', 0)}/100<br>
+            ⚡ <b>Энергия:</b> {stats.get('avg_energy', 0)}/100<br>
+            ❤️ <b>Интерес:</b> {stats.get('avg_interest', 0)}/100
+        </div>
 
-           <h3>📋 Интервалы работы ({len(intervals)})</h3>
-           """
+        <h3>📋 Интервалы работы ({len(intervals)})</h3>
+        """
 
         if intervals:
             for i, interval in enumerate(intervals):
@@ -849,10 +899,10 @@ class MainWindow(QMainWindow):
                 duration_min = duration // 60
                 duration_sec = duration % 60
                 analytics_text += f"""
-                   <div class="interval">
-                       #{i + 1}: {start} → {end} ({duration_min}м {duration_sec}с)
-                   </div>
-                   """
+                <div class="interval">
+                    #{i + 1}: {start} → {end} ({duration_min}м {duration_sec}с)
+                </div>
+                """
         else:
             analytics_text += "<p style='color: #9CA3AF;'>Нет данных об интервалах</p>"
 
@@ -863,15 +913,18 @@ class MainWindow(QMainWindow):
                 time = note.get('created_at', '')[:16] if note.get('created_at') else '—'
                 content = note.get('content', '')
                 analytics_text += f"""
-                   <div class="note">
-                       <b>{time}</b><br>
-                       {content}
-                   </div>
-                   """
+                <div class="note">
+                    <b>{time}</b><br>
+                    {content}
+                </div>
+                """
         else:
             analytics_text += "<p style='color: #9CA3AF;'>Нет быстрых записей</p>"
 
-        # Показываем диалог с аналитикой
+        return analytics_text
+
+    def _show_analytics_dialog(self, analytics_text: str):
+        """Показывает диалог с аналитикой"""
         from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextBrowser, QDialogButtonBox
         dialog = QDialog(self)
         dialog.setWindowTitle("Аналитика сессии")
@@ -889,9 +942,3 @@ class MainWindow(QMainWindow):
         layout.addWidget(button_box)
 
         dialog.exec()
-
-    def _on_session_deleted(self):
-        """Обновляет другие виджеты после удаления сессии"""
-        self.dashboard_view.refresh()
-        self.analytics_view.refresh()
-        self.statusBar().showMessage("Сессия удалена", 2000)

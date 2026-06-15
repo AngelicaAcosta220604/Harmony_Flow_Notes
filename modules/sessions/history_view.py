@@ -12,10 +12,9 @@ from .controller import SessionController
 class SessionCard(QFrame):
     """Карточка одной сессии"""
 
-    resume_clicked = Signal(int)  # session_id
-    delete_clicked = Signal(int)  # session_id
-    analytics_clicked = Signal(int)  # session_id
-    intervals_toggled = Signal(int, bool)  # session_id, is_expanded
+    resume_clicked = Signal(int)
+    delete_clicked = Signal(int)
+    analytics_clicked = Signal(int)
 
     def __init__(self, session_data: dict, parent=None):
         super().__init__(parent)
@@ -41,7 +40,6 @@ class SessionCard(QFrame):
         top_layout = QHBoxLayout()
         top_layout.setSpacing(12)
 
-        # Статус (цветной бейдж)
         status = self.session_data.get('status', 'completed')
         if status == 'active':
             status_text = " Активна"
@@ -60,12 +58,10 @@ class SessionCard(QFrame):
         status_label.setStyleSheet(f"color: {status_color}; font-weight: 600; font-size: 13px;")
         top_layout.addWidget(status_label)
 
-        # Тема
         topic_label = QLabel(self.session_data.get('topic_name', '—'))
         topic_label.setStyleSheet("font-weight: 600; color: #1F2937; font-size: 14px;")
         top_layout.addWidget(topic_label, 1)
 
-        # Длительность
         duration_label = QLabel(self.session_data.get('duration_display', '—'))
         duration_label.setStyleSheet("color: #6B7280; font-size: 13px;")
         top_layout.addWidget(duration_label)
@@ -76,14 +72,12 @@ class SessionCard(QFrame):
         middle_layout = QHBoxLayout()
         middle_layout.setSpacing(16)
 
-        # Время
         start_time = self.session_data.get('start_time', '')[:16] if self.session_data.get('start_time') else '—'
         end_time = self.session_data.get('end_time', '')[:16] if self.session_data.get('end_time') else '—'
         time_label = QLabel(f"🕐 {start_time} → {end_time}")
         time_label.setStyleSheet("color: #6B7280; font-size: 12px;")
         middle_layout.addWidget(time_label)
 
-        # Статистика ползунков (если есть)
         avg_focus = self.session_data.get('avg_focus', 0)
         avg_energy = self.session_data.get('avg_energy', 0)
         avg_interest = self.session_data.get('avg_interest', 0)
@@ -100,7 +94,6 @@ class SessionCard(QFrame):
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(8)
 
-        # Кнопка "Интервалы" (раскрывающаяся)
         intervals_count = self.session_data.get('intervals_count', 0)
         if intervals_count > 0:
             self.intervals_btn = QPushButton(f"📋 Интервалы ({intervals_count})")
@@ -119,10 +112,9 @@ class SessionCard(QFrame):
                     background-color: rgba(107, 114, 128, 0.2);
                 }
             """)
-            self.intervals_btn.clicked.connect(self._on_intervals_clicked)
+            self.intervals_btn.clicked.connect(self._toggle_intervals)
             buttons_layout.addWidget(self.intervals_btn)
 
-        # Кнопка "Продолжить" (только для active/paused)
         if status in ('active', 'paused'):
             resume_btn = QPushButton("▶ Продолжить")
             resume_btn.setIconSize(QSize(14, 14))
@@ -144,7 +136,6 @@ class SessionCard(QFrame):
             resume_btn.clicked.connect(lambda: self.resume_clicked.emit(self.session_id))
             buttons_layout.addWidget(resume_btn)
 
-        # Кнопка "Аналитика"
         analytics_btn = QPushButton("📊 Аналитика")
         analytics_btn.setIconSize(QSize(14, 14))
         analytics_btn.setFixedHeight(32)
@@ -167,8 +158,7 @@ class SessionCard(QFrame):
 
         buttons_layout.addStretch()
 
-        # Кнопка "Удалить"
-        delete_btn = QPushButton("🗑")
+        delete_btn = QPushButton("")
         delete_btn.setIconSize(QSize(14, 14))
         delete_btn.setFixedSize(32, 32)
         delete_btn.setToolTip("Удалить сессию")
@@ -203,7 +193,6 @@ class SessionCard(QFrame):
         intervals_layout.setContentsMargins(12, 8, 12, 8)
         intervals_layout.setSpacing(4)
 
-        # Загружаем интервалы
         intervals = self.session_data.get('intervals', [])
         if intervals:
             for i, interval in enumerate(intervals):
@@ -223,11 +212,10 @@ class SessionCard(QFrame):
 
         layout.addWidget(self.intervals_container)
 
-    def _on_intervals_clicked(self):
+    def _toggle_intervals(self):
         """Переключает видимость интервалов"""
         self._is_expanded = not self._is_expanded
         self.intervals_container.setVisible(self._is_expanded)
-        self.intervals_toggled.emit(self.session_id, self._is_expanded)
 
     def _on_delete_clicked(self):
         """Удаление сессии"""
@@ -240,13 +228,10 @@ class SessionCard(QFrame):
 
 
 class SessionsView(QWidget):
-    """
-    Экран истории сессий.
-    Показывает все сессии (активные, пауза, завершённые) в виде карточек.
-    """
+    """Экран истории сессий"""
 
-    session_selected = Signal(int)  # session_id
-    session_resumed = Signal(int)  # session_id
+    session_selected = Signal(int)
+    session_resumed = Signal(int)
     session_deleted = Signal()
 
     def __init__(self, controller: SessionController, parent=None):
@@ -257,12 +242,10 @@ class SessionsView(QWidget):
         self._load_sessions()
 
     def _setup_ui(self):
-        """Настраивает интерфейс"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(16)
 
-        # Заголовок
         header_widget = QWidget()
         header_widget.setStyleSheet("""
             QWidget {
@@ -310,7 +293,6 @@ class SessionsView(QWidget):
 
         layout.addWidget(header_widget)
 
-        # Скроллируемая область с карточками
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
@@ -326,18 +308,14 @@ class SessionsView(QWidget):
         layout.addWidget(scroll)
 
     def _connect_signals(self):
-        """Подключает сигналы"""
         self.refresh_btn.clicked.connect(self._load_sessions)
 
     def _load_sessions(self):
-        """Загружает все сессии в виде карточек"""
-        # Очищаем старые карточки
-        while self.cards_layout.count() > 1:  # 1 = stretch
+        while self.cards_layout.count() > 1:
             item = self.cards_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
-        # Получаем все сессии
         all_sessions = self._controller.get_all_sessions()
 
         if not all_sessions:
@@ -347,7 +325,6 @@ class SessionsView(QWidget):
             self.cards_layout.insertWidget(0, no_sessions_label)
             return
 
-        # Сортируем: сначала active/paused, потом completed по дате
         def sort_key(s):
             if s['status'] in ('active', 'paused'):
                 return (0, s['date'])
@@ -356,15 +333,12 @@ class SessionsView(QWidget):
         all_sessions.sort(key=sort_key, reverse=True)
 
         for session_data in all_sessions:
-            # Получаем расширенную статистику
             stats = self._controller.get_session_stats(session_data['id'])
             session_data.update(stats)
 
-            # Получаем интервалы
             intervals = self._controller.get_session_intervals(session_data['id'])
             session_data['intervals'] = intervals
 
-            # Создаём карточку
             card = SessionCard(session_data)
             card.resume_clicked.connect(self._on_resume_clicked)
             card.delete_clicked.connect(self._on_delete_clicked)
@@ -373,19 +347,15 @@ class SessionsView(QWidget):
             self.cards_layout.insertWidget(self.cards_layout.count() - 1, card)
 
     def _on_resume_clicked(self, session_id: int):
-        """Возобновление сессии"""
         self.session_resumed.emit(session_id)
 
     def _on_delete_clicked(self, session_id: int):
-        """Удаление сессии"""
         self._controller.delete_session(session_id)
         self._load_sessions()
         self.session_deleted.emit()
 
     def _on_analytics_clicked(self, session_id: int):
-        """Показать аналитику сессии"""
         self.session_selected.emit(session_id)
 
     def refresh(self):
-        """Обновляет список"""
         self._load_sessions()
