@@ -1,10 +1,11 @@
 # modules/sessions/active_view.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QFrame
+    QFrame, QScrollArea, QSizePolicy
 )
 from widgets import SilentMessageBox
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, QTimer, Signal, QSize
+from PySide6.QtGui import QIcon, QPixmap, QFont
 
 from .controller import SessionController
 from .widgets import CustomTimer, StateSliders, PingDialog
@@ -40,69 +41,194 @@ class FocusActiveView(QWidget):
         """Настраивает интерфейс"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        layout.setSpacing(20)
 
-        # Верхняя панель с названием темы
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet("background-color: transparent; border: none;")
+
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setSpacing(20)
+
+        # ========== НАЗВАНИЕ ТЕМЫ ==========
         self.topic_label = QLabel()
-        self.topic_label.setStyleSheet("font-size: 16px; color: #888888;")
+        self.topic_label.setStyleSheet("font-size: 16px; color: #6B7280;")
         self.topic_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.topic_label)
+        content_layout.addWidget(self.topic_label)
 
-        # Таймер (центр)
-        timer_container = QFrame()
-        timer_container.setFrameShape(QFrame.NoFrame)
-        timer_layout = QVBoxLayout(timer_container)
+        # ========== ПЛАШКА ТАЙМЕРА ==========
+        timer_widget = QFrame()
+        timer_widget.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border-radius: 24px;
+                border: none;
+            }
+        """)
+        timer_widget.setMinimumHeight(220)
+        timer_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        timer_layout = QVBoxLayout(timer_widget)
+        timer_layout.setContentsMargins(20, 20, 20, 20)
         timer_layout.setAlignment(Qt.AlignCenter)
 
         self.timer = CustomTimer()
         timer_layout.addWidget(self.timer)
 
-        layout.addWidget(timer_container, 1)
+        content_layout.addWidget(timer_widget)
 
-        # Ползунки состояния
-        sliders_container = QFrame()
-        sliders_container.setFrameShape(QFrame.StyledPanel)
-        sliders_layout = QVBoxLayout(sliders_container)
+        # ========== ПЛАШКА ОТСЛЕЖИВАНИЯ СОСТОЯНИЯ ==========
+        state_widget = QFrame()
+        state_widget.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border-radius: 16px;
+                border: none;
+            }
+        """)
+        state_widget.setMinimumHeight(180)
 
-        sliders_label = QLabel("Отслеживание состояния")
-        sliders_label.setStyleSheet("font-weight: bold;")
-        sliders_layout.addWidget(sliders_label)
+        state_layout = QVBoxLayout(state_widget)
+        state_layout.setContentsMargins(20, 16, 20, 16)
+        state_layout.setSpacing(12)
+
+        # Заголовок с иконкой
+        state_title_layout = QHBoxLayout()
+        state_icon = QLabel()
+        state_icon_pixmap = QPixmap("resources/icons/brain.png")
+        if not state_icon_pixmap.isNull():
+            state_icon_pixmap = state_icon_pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            state_icon.setPixmap(state_icon_pixmap)
+        state_title = QLabel("Отслеживание состояния")
+        state_title.setStyleSheet("font-weight: 600; color: #1F2937; font-size: 14px;")
+        state_title_layout.addWidget(state_icon)
+        state_title_layout.addWidget(state_title)
+        state_title_layout.addStretch()
+        state_layout.addLayout(state_title_layout)
 
         self.state_sliders = StateSliders()
-        sliders_layout.addWidget(self.state_sliders)
+        state_layout.addWidget(self.state_sliders)
 
-        layout.addWidget(sliders_container)
+        content_layout.addWidget(state_widget)
 
-        # Нижняя панель с кнопками
-        bottom_layout = QHBoxLayout()
-        bottom_layout.setSpacing(10)
+        # ========== ПЛАШКА МУЗЫКИ ==========
+        music_widget_frame = QFrame()
+        music_widget_frame.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border-radius: 16px;
+                border: none;
+            }
+        """)
 
-        # Музыка
+        music_layout = QVBoxLayout(music_widget_frame)
+        music_layout.setContentsMargins(20, 16, 20, 16)
+        music_layout.setSpacing(12)
+
+        # Заголовок с иконкой
+        music_title_layout = QHBoxLayout()
+        music_icon = QLabel()
+        music_icon_pixmap = QPixmap("resources/icons/music.png")
+        if not music_icon_pixmap.isNull():
+            music_icon_pixmap = music_icon_pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            music_icon.setPixmap(music_icon_pixmap)
+        else:
+            music_icon.setText("🎵")
+            music_icon.setStyleSheet("font-size: 16px;")
+        music_title = QLabel("Фоновые звуки")
+        music_title.setStyleSheet("font-weight: 600; color: #1F2937; font-size: 14px;")
+        music_title_layout.addWidget(music_icon)
+        music_title_layout.addWidget(music_title)
+        music_title_layout.addStretch()
+        music_layout.addLayout(music_title_layout)
+
         self.music_widget = MusicWidget(self._music_controller)
-        bottom_layout.addWidget(self.music_widget)
+        music_layout.addWidget(self.music_widget)
 
-        bottom_layout.addStretch()
+        content_layout.addWidget(music_widget_frame)
 
-        # Кнопки управления
-        self.quick_note_btn = QPushButton("✏️ Быстрая запись")
-        self.pause_btn = QPushButton("⏸ Пауза")
-        self.end_btn = QPushButton("⏹ Завершить")
+        # ========== КНОПКИ УПРАВЛЕНИЯ ==========
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(12)
 
-        self.quick_note_btn.setFixedHeight(40)
-        self.pause_btn.setFixedHeight(40)
-        self.end_btn.setFixedHeight(40)
+        # Быстрая запись (жёлтая)
+        self.quick_note_btn = QPushButton("Быстрая запись")
+        self.quick_note_btn.setIcon(QIcon("resources/icons/notes.png"))
+        self.quick_note_btn.setIconSize(QSize(18, 18))
+        self.quick_note_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(245, 158, 11, 0.15);
+                color: #D97706;
+                border: 1px solid #F59E0B;
+                border-radius: 12px;
+                padding: 10px 20px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: rgba(245, 158, 11, 0.25);
+                border: 1px solid #D97706;
+                color: #B45309;
+            }
+        """)
+        buttons_layout.addWidget(self.quick_note_btn)
 
-        bottom_layout.addWidget(self.quick_note_btn)
-        bottom_layout.addWidget(self.pause_btn)
-        bottom_layout.addWidget(self.end_btn)
+        # Возобновить/Пауза (зелёная)
+        self.pause_btn = QPushButton("Пауза")
+        self.pause_btn.setIcon(QIcon("resources/icons/play.png"))
+        self.pause_btn.setIconSize(QSize(18, 18))
+        self.pause_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(16, 185, 129, 0.15);
+                color: #059669;
+                border: 1px solid #10B981;
+                border-radius: 12px;
+                padding: 10px 20px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: rgba(16, 185, 129, 0.25);
+                border: 1px solid #059669;
+                color: #047857;
+            }
+        """)
+        buttons_layout.addWidget(self.pause_btn)
 
-        layout.addLayout(bottom_layout)
+        # Завершить (красная)
+        self.end_btn = QPushButton("Завершить")
+        self.end_btn.setIcon(QIcon("resources/icons/urna.png"))
+        self.end_btn.setIconSize(QSize(18, 18))
+        self.end_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(239, 68, 68, 0.15);
+                color: #EF4444;
+                border: 1px solid #EF4444;
+                border-radius: 12px;
+                padding: 10px 20px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: rgba(239, 68, 68, 0.25);
+                border: 1px solid #DC2626;
+                color: #DC2626;
+            }
+        """)
+        buttons_layout.addWidget(self.end_btn)
 
-        # Статус
+        buttons_layout.addStretch()
+        content_layout.addLayout(buttons_layout)
+
+        # ========== СТАТУС ==========
         self.status_label = QLabel("Сессия активна")
         self.status_label.setAlignment(Qt.AlignCenter)
-        self.status_label.setStyleSheet("color: #4caf50;")
-        layout.addWidget(self.status_label)
+        self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
+        content_layout.addWidget(self.status_label)
+
+        content_layout.addStretch()
+
+        scroll.setWidget(content)
+        layout.addWidget(scroll)
 
     def _connect_signals(self):
         """Подключает сигналы."""
@@ -114,7 +240,6 @@ class FocusActiveView(QWidget):
         self.pause_btn.clicked.connect(self._on_pause_clicked)
         self.end_btn.clicked.connect(self._on_end_clicked)
 
-        # ПОДКЛЮЧАЕМ ПОЛЗУНКИ ПРАВИЛЬНО
         self.state_sliders.state_changed.connect(self._on_state_changed)
 
     def _setup_inactivity_timer(self):
@@ -142,25 +267,27 @@ class FocusActiveView(QWidget):
 
     def _on_pause_from_ping(self):
         """Пауза после пинга"""
-        # Уже на паузе
         self.status_label.setText("Сессия на паузе")
-        self.status_label.setStyleSheet("color: #ff9800;")
-        self.pause_btn.setText("▶ Возобновить")
+        self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
+        self.pause_btn.setText("Возобновить")
+        self.pause_btn.setIcon(QIcon("resources/icons/play.png"))
         self._inactivity_timer.stop()
 
     def _on_paused(self):
         """Обработчик паузы"""
         self.status_label.setText("Сессия на паузе")
-        self.status_label.setStyleSheet("color: #ff9800;")
-        self.pause_btn.setText("▶ Возобновить")
+        self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
+        self.pause_btn.setText("Возобновить")
+        self.pause_btn.setIcon(QIcon("resources/icons/play.png"))
         self._inactivity_timer.stop()
         self.music_widget._controller.pause()
 
     def _on_resumed(self):
         """Обработчик возобновления"""
         self.status_label.setText("Сессия активна")
-        self.status_label.setStyleSheet("color: #4caf50;")
-        self.pause_btn.setText("⏸ Пауза")
+        self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
+        self.pause_btn.setText("Пауза")
+        self.pause_btn.setIcon(QIcon("resources/icons/pause.png"))
         self._reset_inactivity_timer()
         self.music_widget._controller.resume()
 
@@ -198,31 +325,22 @@ class FocusActiveView(QWidget):
     def _on_state_changed(self, metric: str, value: int):
         """Обработчик изменения состояния"""
         self._session_controller.log_state(metric, value)
-        self._reset_inactivity_timer()  # активность - сбрасываем таймер
+        self._reset_inactivity_timer()
 
     def start(self, topic_id: int, topic_name: str, activity_check_interval: int):
         """
         Запускает сессию
-
-        Args:
-            topic_id: ID темы
-            topic_name: Название темы
-            activity_check_interval: Интервал контроля активности (минуты)
         """
         self._activity_check_interval = activity_check_interval
         self.topic_label.setText(f"Работа над темой: {topic_name}")
 
-        # Подготавливаем и запускаем сессию
         self._session_controller.prepare_session(topic_id)
         self._session_controller.start_session()
 
-        # Сбрасываем ползунки
         self.state_sliders.reset()
 
-        # Запускаем таймер бездействия
         self._reset_inactivity_timer()
 
-        # Стартуем музыку
         default_sound = self._music_controller.get_current_sound()
         if default_sound and default_sound != 'off':
             self.music_widget._controller.resume()
