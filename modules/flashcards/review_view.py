@@ -181,6 +181,9 @@ class ReviewSessionView(QWidget):
         if not self._current_card:
             return
 
+        # 🆕 Записываем ответ и обновляем прогресс
+        self._controller.record_answer(self._current_card.id, correct)
+
         # Сохраняем ответ и переходим к следующей карточке
         has_more = self._controller.answer_current_card(correct)
 

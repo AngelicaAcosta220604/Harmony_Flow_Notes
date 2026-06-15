@@ -130,4 +130,19 @@ INIT_QUERIES = [
         value TEXT
     );
     """
+
+    # ---------------------------------------------------------
+    # 9. Таблица прогресса карточек
+    # ---------------------------------------------------------
+    """
+    CREATE TABLE IF NOT EXISTS flashcard_progress (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        flashcard_id INTEGER NOT NULL UNIQUE,
+        review_count INTEGER DEFAULT 0,
+        correct_count INTEGER DEFAULT 0,
+        last_reviewed TIMESTAMP,
+        status TEXT DEFAULT 'new',
+        FOREIGN KEY (flashcard_id) REFERENCES flashcards(id) ON DELETE CASCADE
+    );
+    """,
 ]

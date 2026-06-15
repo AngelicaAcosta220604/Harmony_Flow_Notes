@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QListWidget, QListWidgetItem, QTextEdit, QSplitter,
-    QTreeWidget, QTreeWidgetItem, QFrame, QMessageBox, QComboBox
+    QTreeWidget, QTreeWidgetItem, QFrame, QMessageBox, QComboBox, QCheckBox
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
@@ -25,9 +25,58 @@ class TopicCheckboxTree(QTreeWidget):
 
         self._active_first_level_id = None
         self._items_by_id = {}
-        self._sort_mode = 'name_asc'  # режим сортировки по умолчанию
+        self._sort_mode = 'name_asc'
+        self._updating_children = False  # 🆕 Флаг для предотвращения рекурсии
 
         self._load_topics()
+
+    def _on_item_changed(self, item: QTreeWidgetItem, column: int):
+        # Если мы сами программно меняем галочки — игнорируем
+        if self._updating_children:
+            return
+
+        first_level_id = self._get_first_level_container_id(item)
+
+        if item.checkState(0) == Qt.Checked:
+            if self._active_first_level_id is not None and self._active_first_level_id != first_level_id:
+                self._updating_children = True
+                item.setCheckState(0, Qt.Unchecked)
+                self._updating_children = False
+                QMessageBox.warning(
+                    self, "Ограничение выбора",
+                    "Нельзя выбирать карточки из разных разделов первого уровня.\nСначала снимите галочки в текущем разделе."
+                )
+                return
+
+            self._active_first_level_id = first_level_id
+
+            # Если это папка - автоматически отмечаем все дочерние элементы
+            if item.childCount() > 0:
+                self._check_all_children(item, Qt.Checked)
+        else:
+            # Если сняли галочку с папки - снимаем со всех детей
+            if item.childCount() > 0:
+                self._check_all_children(item, Qt.Unchecked)
+
+            if self._active_first_level_id is not None:
+                if not self._has_checked_items_in_container(self._active_first_level_id):
+                    self._active_first_level_id = None
+
+        self._emit_selection()
+
+    def _check_all_children(self, item: QTreeWidgetItem, state):
+        """Рекурсивно отмечает/снимает галочки со всех дочерних элементов"""
+        self._updating_children = True  # Блокируем обработку сигналов
+
+        for i in range(item.childCount()):
+            child = item.child(i)
+            child.setCheckState(0, state)
+
+            # Рекурсивно для вложенных папок
+            if child.childCount() > 0:
+                self._check_all_children(child, state)
+
+        self._updating_children = False  # Разблокируем
 
     def set_sort_mode(self, mode: str):
         """Устанавливает режим сортировки"""
@@ -205,28 +254,16 @@ class TopicCheckboxTree(QTreeWidget):
 
         return check_recursive(container_item)
 
-    def _on_item_changed(self, item: QTreeWidgetItem, column: int):
-        first_level_id = self._get_first_level_container_id(item)
 
-        if item.checkState(0) == Qt.Checked:
-            if self._active_first_level_id is not None and self._active_first_level_id != first_level_id:
-                item.setCheckState(0, Qt.Unchecked)
-                QMessageBox.warning(
-                    self, "Ограничение выбора",
-                    "Нельзя выбирать карточки из разных разделов первого уровня.\nСначала снимите галочки в текущем разделе."
-                )
-                return
-            self._active_first_level_id = first_level_id
-        else:
-            if self._active_first_level_id is not None:
-                if not self._has_checked_items_in_container(self._active_first_level_id):
-                    self._active_first_level_id = None
 
-        self._emit_selection()
+
 
     def _emit_selection(self):
-        selected_ids = [item.data(0, Qt.UserRole) for item in self._items_by_id.values() if
-                        item.checkState(0) == Qt.Checked]
+        """Собирает ID всех отмеченных элементов"""
+        selected_ids = []
+        for item in self._items_by_id.values():
+            if item.checkState(0) == Qt.Checked:
+                selected_ids.append(item.data(0, Qt.UserRole))
         self.selection_changed.emit(selected_ids)
 
     def get_selected_topic_ids(self) -> list:
@@ -327,9 +364,10 @@ class GlobalCardsView(QWidget):
 
         self.stat_total = QLabel("Всего: 0")
         self.stat_new = QLabel("Новые: 0")
-        self.stat_review = QLabel("На повторении: 0")
+        self.stat_in_progress = QLabel("В процессе: 0")  # <-- ИСПРАВЛЕНО
+        self.stat_mastered = QLabel("Выучено: 0")
 
-        for lbl in (self.stat_total, self.stat_new, self.stat_review):
+        for lbl in (self.stat_total, self.stat_new, self.stat_in_progress, self.stat_mastered):
             lbl.setFont(QFont("Arial", 11, QFont.Bold))
             analytics_layout.addWidget(lbl)
         right_layout.addWidget(self.analytics_frame)
@@ -377,25 +415,17 @@ class GlobalCardsView(QWidget):
         self._update_cards_and_analytics(selected_ids)
 
     def _get_card_status(self, card) -> str:
-        """
-        Определяет статус карточки.
-        Если в твоей БД есть поля interval, status или next_review, замени логику здесь.
-        """
-        # Заглушка: если есть поле interval, используем его. Иначе считаем всё "Новым".
-        interval = getattr(card, 'interval', 0)
-        if interval > 0:
-            return "Выучено"
-        # Если бы было поле status: return card.status
-        return "Новое"
+        """Определяет статус карточки"""
+        progress = self._controller.get_card_progress(card.id)
+        return progress['status']
 
     def _update_cards_and_analytics(self, topic_ids: list):
+        """Обновляет аналитику и список карточек на основе выбранных тем"""
         if not topic_ids:
             self.card_list.clear()
             self.card_list.addItem("📭 Выберите хотя бы одну тему в дереве слева")
             self.card_display.clear()
-            self.stat_total.setText("Всего: 0")
-            self.stat_new.setText("Новые: 0")
-            self.stat_review.setText("На повторении: 0")
+            self._update_analytics_labels(0, 0, 0, 0)
             return
 
         cards = self._controller.get_cards_by_topics(topic_ids)
@@ -403,7 +433,6 @@ class GlobalCardsView(QWidget):
         # Сортировка
         sort_by = self.sort_combo.currentData()
         if sort_by == "topic":
-            # Сортируем по имени темы (упрощенно)
             cards.sort(key=lambda c: self._get_topic_name(c.topic_id))
         elif sort_by == "status":
             cards.sort(key=lambda c: self._get_card_status(c))
@@ -411,12 +440,11 @@ class GlobalCardsView(QWidget):
             cards.sort(key=lambda c: c.created_at)
 
         total = len(cards)
-        new_count = sum(1 for c in cards if self._get_card_status(c) == "Новое")
-        review_count = total - new_count
+        new_count = sum(1 for c in cards if self._get_card_status(c) == "new")
+        in_progress_count = sum(1 for c in cards if self._get_card_status(c) == "in_progress")
+        mastered_count = sum(1 for c in cards if self._get_card_status(c) == "mastered")
 
-        self.stat_total.setText(f"📚 Всего: {total}")
-        self.stat_new.setText(f"🆕 Новые: {new_count}")
-        self.stat_review.setText(f"🔄 На повторении: {review_count}")
+        self._update_analytics_labels(total, new_count, in_progress_count, mastered_count)
 
         self.card_list.clear()
         if not cards:
@@ -429,23 +457,53 @@ class GlobalCardsView(QWidget):
             topic_name = self._get_topic_name(card.topic_id)
             status = self._get_card_status(card)
 
+            # Создаём виджет с чекбоксом и текстом
+            widget = QWidget()
+            layout = QHBoxLayout(widget)
+            layout.setContentsMargins(5, 2, 5, 2)
+
+            checkbox = QCheckBox()
+            checkbox.setChecked(False)
+            checkbox.stateChanged.connect(lambda state, cid=card.id: self._on_card_checkbox_changed(cid, state))
+
             # Цветной бейдж статуса
-            if status == "Новое":
+            if status == "new":
                 status_badge = "[🆕 Новое]"
-            elif status == "Выучено":
-                status_badge = "[✅ Выучено]"
-            else:
+                status_color = "#2196f3"
+            elif status == "in_progress":
                 status_badge = "[🔄 В процессе]"
+                status_color = "#ff9800"
+            else:  # mastered
+                status_badge = "[✅ Выучено]"
+                status_color = "#4caf50"
 
             if card.is_free:
                 preview = card.content[:50] + "..." if len(card.content) > 50 else card.content
-                item.setText(f"{status_badge} 📝 [{topic_name}] {preview}")
+                text = f"{status_badge} 📝 [{topic_name}] {preview}"
             else:
                 preview = card.question[:50] + "..." if len(card.question) > 50 else card.question
-                item.setText(f"{status_badge} ❓ [{topic_name}] {preview}")
+                text = f"{status_badge} ❓ [{topic_name}] {preview}"
 
-            item.setData(Qt.UserRole, card.id)
+            label = QLabel(text)
+            label.setStyleSheet(f"color: {status_color};")
+
+            layout.addWidget(checkbox)
+            layout.addWidget(label)
+            layout.addStretch()
+
+            item.setSizeHint(widget.sizeHint())
             self.card_list.addItem(item)
+            self.card_list.setItemWidget(item, widget)
+
+            # Сохраняем связь card_id -> item
+            item.setData(Qt.UserRole, card.id)
+
+    def _update_analytics_labels(self, total: int, new_count: int, in_progress_count: int, mastered_count: int):
+        """Обновляет текст в панели аналитики"""
+        self.stat_total.setText(f"📚 Всего: {total}")
+        self.stat_new.setText(f"🆕 Новые: {new_count}")
+        self.stat_in_progress.setText(f"🔄 В процессе: {in_progress_count}")
+        self.stat_mastered.setText(f"✅ Выучено: {mastered_count}")
 
     def _get_topic_name(self, topic_id: int) -> str:
         row = db.fetchone("SELECT name FROM topics WHERE id = ?", (topic_id,))
@@ -475,6 +533,11 @@ class GlobalCardsView(QWidget):
                 f"<hr>"
                 f"<p><b>Ответ:</b><br>{card.answer}</p>"
             )
+
+    def _on_card_checkbox_changed(self, card_id: int, state: int):
+        """Обработчик изменения чекбокса карточки"""
+        # Здесь можно добавить логику для массовых операций с выбранными карточками
+        pass
 
     def _on_start_review_clicked(self):
         topic_ids = self.topic_tree.get_selected_topic_ids()

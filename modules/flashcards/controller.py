@@ -138,3 +138,25 @@ class FlashcardController:
             'free_percent': round(free_cards / len(cards) * 100, 1) if cards else 0,
             'qa_percent': round(qa_cards / len(cards) * 100, 1) if cards else 0
         }
+
+    def get_card_progress(self, card_id: int) -> dict:
+        """Возвращает прогресс карточки"""
+        from datebase.db_manager import db
+
+        progress = db.fetchone(
+            "SELECT * FROM flashcard_progress WHERE flashcard_id = ?",
+            (card_id,)
+        )
+
+        if not progress:
+            return {
+                'review_count': 0,
+                'correct_count': 0,
+                'status': 'new'
+            }
+
+        return {
+            'review_count': progress['review_count'],
+            'correct_count': progress['correct_count'],
+            'status': progress['status']
+        }

@@ -181,3 +181,38 @@ class ReviewController:
             })
 
         return result
+
+    def record_answer(self, flashcard_id: int, correct: bool):
+        """Записывает ответ и обновляет прогресс карточки"""
+        from datebase.db_manager import db
+
+        # Проверяем, есть ли запись о прогрессе
+        progress = db.fetchone(
+            "SELECT * FROM flashcard_progress WHERE flashcard_id = ?",
+            (flashcard_id,)
+        )
+
+        if not progress:
+            # Создаём новую запись
+            db.execute(
+                """INSERT INTO flashcard_progress (flashcard_id, review_count, correct_count, status)
+                   VALUES (?, ?, ?, ?)""",
+                (flashcard_id, 1, 1 if correct else 0, 'in_progress')
+            )
+        else:
+            # Обновляем существующую
+            new_review_count = progress['review_count'] + 1
+            new_correct_count = progress['correct_count'] + (1 if correct else 0)
+
+            # Определяем статус
+            if new_correct_count >= 5:
+                new_status = 'mastered'
+            else:
+                new_status = 'in_progress'
+
+            db.execute(
+                """UPDATE flashcard_progress 
+                   SET review_count = ?, correct_count = ?, status = ?, last_reviewed = CURRENT_TIMESTAMP
+                   WHERE flashcard_id = ?""",
+                (new_review_count, new_correct_count, new_status, flashcard_id)
+            )

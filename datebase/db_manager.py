@@ -217,6 +217,18 @@ class DatabaseManager:
                 "INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?)",
                 default_settings
             )
+        # flashcard_progress (прогресс повторения карточек)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS flashcard_progress (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                flashcard_id INTEGER NOT NULL UNIQUE,
+                review_count INTEGER DEFAULT 0,
+                correct_count INTEGER DEFAULT 0,
+                last_reviewed DATETIME,
+                status TEXT DEFAULT 'new',
+                FOREIGN KEY (flashcard_id) REFERENCES flashcards(id) ON DELETE CASCADE
+                )
+            ''')
 
         conn.commit()
 
