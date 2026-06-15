@@ -350,7 +350,7 @@ class FocusActiveView(QWidget):
             return
 
         # Сбрасываем UI
-        self.timer.reset()
+        #self.timer.reset()
         self.state_sliders.reset()
 
         # Обновляем UI
@@ -414,23 +414,20 @@ class FocusActiveView(QWidget):
         """Загружает СТАРУЮ сессию из БД"""
         self.topic_label.setText(f"Работа над темой: {topic_name}")
 
-        # 🆕 Используем новый метод контроллера
         success = self._session_controller.load_and_resume_session(session_id)
         if not success:
             SilentMessageBox.warning(self, "Ошибка", "Не удалось загрузить сессию")
             return
 
-        # Восстанавливаем UI
+        # 🆕 Восстанавливаем время из контроллера (оно уже загружено из БД)
         total_seconds = self._session_controller.get_elapsed_seconds()
         self.timer.set_time(total_seconds)
 
-        # Восстанавливаем ползунки
         slider_values = self._session_controller.get_slider_values(session_id)
         self.state_sliders.conc_slider.setValue(slider_values.get('focus', 50))
         self.state_sliders.energy_slider.setValue(slider_values.get('energy', 50))
         self.state_sliders.interest_slider.setValue(slider_values.get('interest', 50))
 
-        # Обновляем UI в зависимости от статуса
         if self._session_controller.is_session_active():
             self.status_label.setText("Сессия активна")
             self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
@@ -442,7 +439,6 @@ class FocusActiveView(QWidget):
             self.pause_btn.setText("Возобновить")
             self.pause_btn.setIcon(QIcon("resources/icons/play.png"))
 
-        # Запускаем PingManager
         self.ping_manager = PingManager(
             idle_ms=self._activity_check_interval * 60 * 1000,
             timeout_ms=90 * 60 * 1000,

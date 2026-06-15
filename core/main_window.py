@@ -314,7 +314,11 @@ class MainWindow(QMainWindow):
                 topic_id = data.get('topic_id')
                 topic_name = data.get('topic_name')
                 interval = data.get('interval', 15)
-                self.focus_active_view.start(topic_id, topic_name, interval)
+
+                # 🆕 Проверяем, есть ли уже активная сессия
+                if not self._session_controller.is_session_active() and not self._session_controller.is_session_paused():
+                    self.focus_active_view.start(topic_id, topic_name, interval)
+
                 self.content_stack.setCurrentWidget(self.focus_active_view)
 
     def _setup_hotkeys(self):

@@ -69,6 +69,12 @@ class SessionController(QObject):
             self._elapsed_seconds += 1
             self.timer_updated.emit(self._elapsed_seconds)
 
+            # 🆕 Сохраняем время в БД каждую секунду
+            db.execute(
+                "UPDATE sessions SET elapsed_seconds = ? WHERE id = ?",
+                (self._elapsed_seconds, self._current_session.id)
+            )
+
     # ==================== НОВАЯ СЕССИЯ ====================
 
     def start_new_session(self, topic_id: int) -> int:
@@ -104,11 +110,7 @@ class SessionController(QObject):
     # ==================== ВОЗОБНОВЛЕНИЕ СТАРОЙ СЕССИИ ====================
 
     def load_and_resume_session(self, session_id: int) -> bool:
-        """
-        Загружает старую сессию из БД и возобновляет её.
-        Возвращает True если успешно.
-        """
-        # Если есть другая активная сессия - завершаем её
+        """Загружает старую сессию из БД и возобновляет её"""
         if self._current_session and self._current_session.id != session_id:
             self.end_session()
 
@@ -116,24 +118,18 @@ class SessionController(QObject):
         if not row:
             return False
 
-        # Восстанавливаем состояние
         self._current_session = Session.from_row(row)
         self._current_topic_id = row['topic_id']
         self._last_slider_save_time = None
 
-        # Восстанавливаем время
-        duration_minutes = row.get('duration_minutes', 0) or 0
-        self._elapsed_seconds = duration_minutes * 60
+        # 🆕 Восстанавливаем время из elapsed_seconds
+        self._elapsed_seconds = row.get('elapsed_seconds', 0) or 0
 
-        # Если сессия была активна - продолжаем
         if row['status'] == 'active':
             self._is_paused = False
-            # Начинаем новый интервал работы
             self.start_interval(session_id)
-            # Запускаем таймер
             self._start_timer()
         else:
-            # Сессия на паузе - таймер не запускаем
             self._is_paused = True
 
         return True

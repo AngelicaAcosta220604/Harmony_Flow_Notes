@@ -118,6 +118,8 @@ class DatabaseManager:
             cursor.execute("ALTER TABLE sessions ADD COLUMN energy INTEGER DEFAULT 50")
         if 'interest' not in columns:
             cursor.execute("ALTER TABLE sessions ADD COLUMN interest INTEGER DEFAULT 50")
+        if 'elapsed_seconds' not in columns:
+            cursor.execute("ALTER TABLE sessions ADD COLUMN elapsed_seconds INTEGER DEFAULT 0")
 
         # session_state_logs (логи состояния во время сессий)
         cursor.execute('''
