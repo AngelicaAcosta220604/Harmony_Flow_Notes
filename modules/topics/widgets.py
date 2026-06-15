@@ -2,14 +2,32 @@
 from PySide6.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QDialog, QDialogButtonBox, QLabel, QComboBox, QLineEdit,
-    QStyle, QCheckBox  # Импортируем QStyle для использования стандартных иконок Qt
+    QStyle, QCheckBox
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtGui import QIcon, QColor, QFont
 from typing import List, Optional, Callable
+import re
 
 from .controller import TopicController
 from models.topic import Topic
 
+def remove_emojis(text: str) -> str:
+    """Удаляет эмодзи из строки"""
+    emoji_pattern = re.compile("["
+                               u"\U0001F600-\U0001F64F"  # смайлики
+                               u"\U0001F300-\U0001F5FF"  # символы
+                               u"\U0001F680-\U0001F6FF"  # транспорт
+                               u"\U0001F700-\U0001F77F"  # алхимия
+                               u"\U0001F780-\U0001F7FF"  # геометрические
+                               u"\U0001F800-\U0001F8FF"  # стрелки
+                               u"\U0001F900-\U0001F9FF"  # доп. символы
+                               u"\U0001FA00-\U0001FA6F"
+                               u"\U0001FA70-\U0001FAFF"
+                               u"\U00002702-\U000027B0"
+                               u"\U000024C2-\U0001F251"
+                               "]+", flags=re.UNICODE)
+    return emoji_pattern.sub(r'', text).strip()
 
 class TreeWidget(QTreeWidget):
     """
@@ -44,14 +62,37 @@ class TreeWidget(QTreeWidget):
     def _add_topic_item(self, parent_item: Optional[QTreeWidgetItem], topic: Topic) -> QTreeWidgetItem:
         """Рекурсивно добавляет тему и её детей"""
         item = QTreeWidgetItem(parent_item if parent_item else self)
-        item.setText(0, topic.display_name)
+
+        # Удаляем эмодзи из названия
+        clean_name = remove_emojis(topic.display_name)
+        item.setText(0, clean_name)
         item.setData(0, Qt.UserRole, topic.id)
 
-        # Безопасная установка стандартных системных иконок через Enum QStyle
+        # Кастомные иконки из PNG
         if topic.is_folder:
-            item.setIcon(0, self.style().standardIcon(QStyle.SP_DirIcon))
+            # Папка — жёлтая иконка
+            icon = QIcon("resources/icons/folder_papka.png")
+            if icon.isNull():
+                icon = self.style().standardIcon(QStyle.SP_DirIcon)
+            item.setIcon(0, icon)
+            # Устанавливаем стиль для папки
+            item.setForeground(0, QColor(0x1F, 0x29, 0x37))  # #1F2937
+            font = item.font(0)
+            font.setWeight(QFont.Weight.Medium)
+            item.setFont(0, font)
+
+
         else:
-            item.setIcon(0, self.style().standardIcon(QStyle.SP_FileIcon))
+            # Тема — синяя иконка
+            icon = QIcon("resources/icons/notes_topic.png")
+            if icon.isNull():
+                icon = self.style().standardIcon(QStyle.SP_FileIcon)
+            item.setIcon(0, icon)
+            # Устанавливаем стиль для темы
+            item.setForeground(0, QColor(0x37, 0x41, 0x51))  # #374151
+            font = item.font(0)
+            font.setWeight(QFont.Weight.Normal)
+            item.setFont(0, font)
 
         for child in topic.children:
             self._add_topic_item(item, child)
@@ -61,11 +102,58 @@ class TreeWidget(QTreeWidget):
 
         return item
 
+    def _update_selection_style(self):
+        """Обновляет стиль выделения для выбранного элемента"""
+        current = self.currentItem()
+        if not current:
+            return
+
+        topic_id = current.data(0, Qt.UserRole)
+        if not topic_id:
+            return
+
+        topic = self._controller.get_topic(topic_id)
+        if not topic:
+            return
+
+        # Сбрасываем стили у всех элементов
+        self._reset_all_selection_styles()
+
+        # Применяем стиль к выбранному
+        if topic.is_folder:
+            # Папка — жёлтый фон + оранжевая полоска
+            current.setBackground(0, QColor(255, 247, 235))  # #FFF7EB
+            current.setForeground(0, QColor(0x1F, 0x29, 0x37))
+            # Добавляем левую полоску через styleSheet
+            current.setData(0, Qt.UserRole + 1, "folder-selected")
+        else:
+            # Тема — голубой фон + синяя полоска
+            current.setBackground(0, QColor(235, 245, 255))  # #EBF5FF
+            current.setForeground(0, QColor(0x1F, 0x29, 0x37))
+            current.setData(0, Qt.UserRole + 1, "topic-selected")
+
+    def _reset_all_selection_styles(self):
+        """Сбрасывает стили выделения у всех элементов"""
+        self._reset_selection_recursive(self.invisibleRootItem())
+
+    def _reset_selection_recursive(self, parent: QTreeWidgetItem):
+        for i in range(parent.childCount()):
+            child = parent.child(i)
+            child.setBackground(0, QColor(255, 255, 255))  # белый фон
+            # Восстанавливаем цвет текста в зависимости от типа
+            topic_id = child.data(0, Qt.UserRole)
+            if topic_id:
+                from models.topic import Topic
+                # Нужно получить тему, но это долго. Просто ставим стандартный цвет
+                child.setForeground(0, QColor(0x37, 0x41, 0x51))
+            self._reset_selection_recursive(child)
+
     def _on_item_clicked(self, item: QTreeWidgetItem, column: int):
         """Обработчик клика по элементу"""
         topic_id = item.data(0, Qt.UserRole)
         if topic_id:
             self.topic_selected.emit(topic_id)
+            self._update_selection_style()  # <--- ДОБАВИТЬ ЭТУ СТРОКУ
 
     def _on_item_double_clicked(self, item: QTreeWidgetItem, column: int):
         topic_id = item.data(0, Qt.UserRole)
@@ -118,6 +206,7 @@ class TreeWidget(QTreeWidget):
     def select_topic(self, topic_id: int):
         """Выбирает тему по ID"""
         self._select_topic_recursive(self.invisibleRootItem(), topic_id)
+        self._update_selection_style()  # <--- ДОБАВИТЬ ЭТУ СТРОКУ
 
     def _select_topic_recursive(self, parent: QTreeWidgetItem, topic_id: int) -> bool:
         """Рекурсивный поиск и выбор темы"""
@@ -211,7 +300,9 @@ class TopicTreeSelector(QWidget):
         self.combo.currentIndexChanged.connect(self._on_current_index_changed)
         layout.addWidget(self.combo)
 
-        self.select_btn = QPushButton("📁")
+        self.select_btn = QPushButton()
+        self.select_btn.setIcon(QIcon("resources/icons/folder.png"))
+        self.select_btn.setIconSize(QSize(16, 16))
         self.select_btn.setFixedWidth(30)
         self.select_btn.setToolTip("Выбрать тему из дерева")
         self.select_btn.clicked.connect(self._on_select_clicked)
@@ -267,6 +358,7 @@ class TopicTreeSelector(QWidget):
         if current_id:
             self.set_selected_topic(current_id)
 
+
 class TaskListItemWidget(QWidget):
     """Виджет для отображения задачи в списке с кнопками и чекбоксом"""
 
@@ -304,14 +396,18 @@ class TaskListItemWidget(QWidget):
         layout.addWidget(self.deadline_label)
 
         # Кнопка "Редактировать"
-        self.edit_btn = QPushButton("✏️")
+        self.edit_btn = QPushButton()
+        self.edit_btn.setIcon(QIcon("resources/icons/pen.png"))
+        self.edit_btn.setIconSize(QSize(16, 16))
         self.edit_btn.setFixedSize(30, 30)
         self.edit_btn.setToolTip("Редактировать задачу")
         self.edit_btn.clicked.connect(lambda: self.edit_clicked.emit(self.task_id))
         layout.addWidget(self.edit_btn)
 
         # Кнопка "Удалить"
-        self.delete_btn = QPushButton("🗑️")
+        self.delete_btn = QPushButton()
+        self.delete_btn.setIcon(QIcon("resources/icons/urna.png"))
+        self.delete_btn.setIconSize(QSize(16, 16))
         self.delete_btn.setFixedSize(30, 30)
         self.delete_btn.setToolTip("Удалить задачу")
         self.delete_btn.clicked.connect(lambda: self.delete_clicked.emit(self.task_id))
@@ -329,7 +425,6 @@ class TaskListItemWidget(QWidget):
             QPushButton {
                 border: none;
                 background-color: transparent;
-                font-size: 14px;
             }
             QPushButton:hover {
                 background-color: #e0e0e0;

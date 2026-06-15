@@ -79,22 +79,102 @@ class ThemeManager:
             border-color: #1976d2;
         }
 
-        /* Дерево */
-        QTreeWidget {
-            background-color: #ffffff;
-            border: 1px solid #e0e0e0;
-            border-radius: 4px;
-        }
+        /* Дерево тем */
+QTreeWidget {
+    background-color: #FFFFFF;
+    border: 1px solid #E6EEF6;
+    border-radius: 16px;
+    outline: none;
+    padding: 8px 0px;
+}
 
-        QTreeWidget::item {
-            padding: 4px;
-        }
+QTreeWidget::item {
+    min-height: 38px;
+    padding: 4px 12px;
+    margin: 1px 8px;
+    border-radius: 8px;
+    font-size: 13px;
+    border: none;
+}
 
-        QTreeWidget::item:selected {
-            background-color: #1976d2;
-            color: #FFFFFF;
-        }
+/* Выделение для папок (жёлтое) */
+QTreeWidget::item:selected {
+    background-color: #FFF7EB;
+    border-left: 3px solid #F59E0B;
+    border-radius: 6px;
+    color: #1F2937;
+}
 
+/* Выделение для тем (голубое) */
+QTreeWidget::item:selected:!has-children {
+    background-color: #EBF5FF;
+    border-left: 3px solid #3B82F6;
+    border-radius: 6px;
+    color: #1F2937;
+}
+
+/* Наведение на элемент */
+QTreeWidget::item:hover:!selected {
+    background-color: #F9FAFB;
+    border-radius: 8px;
+}
+/* Стили для QInputDialog и QMessageBox */
+QInputDialog, QMessageBox {
+    background-color: #FFFFFF;
+    border-radius: 16px;
+}
+
+QInputDialog QLabel, QMessageBox QLabel {
+    font-family: 'Segoe UI', 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1F2937;
+    background-color: transparent;
+}
+
+QInputDialog QLineEdit {
+    background-color: #F0F4F8;
+    border: 1px solid #E6EEF6;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 14px;
+    color: #1F2937;
+    min-height: 24px;
+}
+
+QInputDialog QLineEdit:focus {
+    background-color: #FFFFFF;
+    border: 1.5px solid #3B82F6;
+}
+
+QInputDialog QPushButton, QMessageBox QPushButton {
+    background-color: #F0F4F8;
+    color: #1F2937;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    min-width: 80px;
+    min-height: 28px;
+}
+
+QInputDialog QPushButton:hover, QMessageBox QPushButton:hover {
+    background-color: #E2E8F0;
+}
+
+QInputDialog QPushButton:default, QMessageBox QPushButton:default {
+    background-color: #3B82F6;
+    color: #FFFFFF;
+}
+
+QInputDialog QPushButton:default:hover {
+    background-color: #2563EB;
+}
+
+QInputDialog QDialogButtonBox {
+    button-layout: 0;
+}
         /* Табы */
         QTabWidget::pane {
             border: 1px solid #e0e0e0;
@@ -150,6 +230,101 @@ class ThemeManager:
         QScrollBar::handle:vertical:hover {
             background-color: #a0a0a0;
         }
+/* ========== РАЗДЕЛ ТЕМ (СТРУКТУРА ЗНАНИЙ) ========== */
+
+/* Контейнер дерева тем */
+QTreeWidget {
+    background-color: #FFFFFF;
+    border: 1px solid #E6EEF6;
+    border-radius: 16px;
+    outline: none;
+    padding: 8px 0px;
+}
+
+/* Элементы дерева - общие настройки */
+QTreeWidget::item {
+    min-height: 38px;
+    padding: 4px 12px;
+    margin: 1px 8px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+/* Папки - более плотный шрифт и тёмный цвет */
+QTreeWidget::item:has-children {
+    font-weight: 500;
+    color: #1F2937;
+}
+
+/* Темы - обычный вес и мягкий цвет */
+QTreeWidget::item:!has-children {
+    font-weight: 400;
+    color: #374151;
+}
+
+/* Выделенный элемент */
+QTreeWidget::item:selected {
+    background-color: rgba(59, 130, 246, 0.08);
+    color: #3B82F6;
+    font-weight: 500;
+    border: none;
+    border-radius: 8px;
+}
+
+/* Наведение на элемент */
+QTreeWidget::item:hover:!selected {
+    background-color: #F9FAFB;
+    border-radius: 8px;
+}
+
+/* Стрелочки раскрытия (кастомные иконки) */
+QTreeWidget::branch:closed:has-children {
+    image: url(resources/icons/right.png);
+}
+
+QTreeWidget::branch:open:has-children {
+    image: url(resources/icons/down.png);
+}
+
+QTreeWidget::branch:has-children {
+    min-width: 24px;
+    max-width: 24px;
+}
+
+/* ========== КНОПКИ ПАНЕЛИ ИНСТРУМЕНТОВ ========== */
+
+/* Базовое состояние кнопок (для кнопок внутри виджета тем) */
+QPushButton {
+    background-color: rgba(240, 244, 248, 0.8);
+    color: #1F2937;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+QPushButton:hover {
+    background-color: #FFFFFF;
+    border: 1.5px solid #3B82F6;
+    color: #3B82F6;
+}
+
+QPushButton:pressed {
+    background-color: #EBF2FF;
+}
+
+QPushButton:disabled {
+    opacity: 0.5;
+    background-color: rgba(240, 244, 248, 0.5);
+    color: #9CA3AF;
+}
+
+QPushButton:disabled:hover {
+    border: none;
+    background-color: rgba(240, 244, 248, 0.5);
+    cursor: not-allowed;
+}
     """
 
     DARK_STYLE = """
