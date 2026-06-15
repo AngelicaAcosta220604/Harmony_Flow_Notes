@@ -411,6 +411,7 @@ class MainWindow(QMainWindow):
 
         # Calendar
         self.calendar_view.task_clicked.connect(self._open_task)
+        self.calendar_view.new_task_requested.connect(self._on_new_task_from_calendar)
 
         # Flashcards
 
@@ -1083,3 +1084,29 @@ class MainWindow(QMainWindow):
         layout.addWidget(button_box)
 
         dialog.exec()
+
+    def _on_new_task_from_calendar(self):
+        """Создание задачи из календаря"""
+        from modules.tasks.dialogs import TaskDialog
+
+        # Получаем выбранную дату из календаря
+        selected_date = self.calendar_view._current_date
+
+        dialog = TaskDialog(self, initial_date=selected_date)
+        if dialog.exec() == QDialog.Accepted:
+            try:
+                data = dialog.get_task_data()
+                task_id = container.task_controller.create_task(
+                    title=data['title'],
+                    description=data['description'],
+                    topic_id=data['topic_id'],
+                    deadline=data['deadline']
+                )
+                if task_id:
+                    from core.event_bus import event_bus
+                    event_bus.task_created.emit(task_id)
+                    self.calendar_view.refresh()
+                    self.tasks_view.refresh()
+                    self.statusBar().showMessage(f"✅ Задача «{data['title']}» создана!", 3000)
+            except ValueError as e:
+                SilentMessageBox.warning(self, "Ошибка", str(e))

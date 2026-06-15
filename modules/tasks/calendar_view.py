@@ -292,12 +292,24 @@ class CalendarView(QWidget):
         self.calendar.set_task_dates(list(task_counts.keys()))
 
     def _on_date_selected(self, date: QDate):
+        """Обработчик клика по дню в календаре"""
         self._current_date = date
         self.selected_date_label.setText(date.toString("dddd, d MMMM yyyy"))
+
+        # Получаем задачи на выбранный день
         tasks = self._controller.get_tasks_for_day(date.toPython())
+
+        # Фильтруем по поиску если есть
+        query = self.search_edit.text()
+        if query:
+            tasks = [t for t in tasks if query.lower() in t.title.lower() or
+                     (t.description and query.lower() in t.description.lower())]
+
         self._display_tasks(tasks)
 
     def _display_tasks(self, tasks: list):
+        """Отображает задачи в правой панели"""
+        # Очищаем старые виджеты
         while self.tasks_layout_inner.count():
             child = self.tasks_layout_inner.takeAt(0)
             if child.widget():
@@ -315,13 +327,16 @@ class CalendarView(QWidget):
             self.tasks_layout_inner.addWidget(task_widget)
 
     def _create_task_widget(self, task: Task) -> QWidget:
+        """Создаёт виджет задачи с правильным обработчиком клика"""
         widget = QFrame()
         widget.setCursor(Qt.PointingHandCursor)
+        widget.setProperty("task_id", task.id)
         widget.setStyleSheet("""
             QFrame {
                 background-color: #F9FAFB;
                 border-radius: 12px;
                 border: none;
+                padding: 8px;
             }
             QFrame:hover {
                 background-color: #F0F4F8;
@@ -334,6 +349,7 @@ class CalendarView(QWidget):
 
         title_label = QLabel(task.title)
         title_label.setStyleSheet("font-weight: 600; color: #1F2937;")
+        title_label.setWordWrap(True)
         if task.is_overdue():
             title_label.setStyleSheet("font-weight: 600; color: #EF4444;")
         layout.addWidget(title_label)
@@ -346,7 +362,8 @@ class CalendarView(QWidget):
 
         if task.deadline:
             from services.time_service import TimeService
-            time_label = QLabel(f"⏰ {TimeService.format_time_from_iso(task.deadline)}")
+            # ✅ Исправлено: format_datetime_from_iso вместо format_time_from_iso
+            time_label = QLabel(f"⏰ {TimeService.format_datetime_from_iso(task.deadline)}")
             time_label.setStyleSheet("color: #6B7280; font-size: 10px;")
             layout.addWidget(time_label)
 
@@ -355,10 +372,12 @@ class CalendarView(QWidget):
             status_label.setStyleSheet("color: #10B981; font-size: 10px;")
             layout.addWidget(status_label)
 
-        widget.mousePressEvent = lambda e: self.task_clicked.emit(task.id)
+        # Используем сигнал вместо переназначения mousePressEvent
+        widget.mousePressEvent = lambda event, tid=task.id: self.task_clicked.emit(tid)
 
         return widget
 
     def refresh(self):
+        """Обновляет календарь и список задач"""
         self._load_month_tasks()
         self._on_date_selected(self._current_date)

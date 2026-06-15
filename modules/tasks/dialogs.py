@@ -13,7 +13,7 @@ from widgets import SilentMessageBox
 class TaskDialog(QDialog):
     """Диалог создания/редактирования задачи с удобным выбором даты и времени."""
 
-    def __init__(self, parent=None, task: Task = None, topic_id: int = None):
+    def __init__(self, parent=None, task: Task = None, topic_id: int = None, initial_date=None):
         super().__init__(parent)
         self.setWindowTitle("Создание задачи" if task is None else "Редактирование задачи")
         self.setMinimumSize(550, 600)
@@ -25,6 +25,13 @@ class TaskDialog(QDialog):
 
         if task:
             self._load_task()
+        elif initial_date:
+            # 🆕 Устанавливаем дату из календаря
+            from PySide6.QtCore import QDate
+            if isinstance(initial_date, QDate):
+                self.calendar.setSelectedDate(initial_date)
+            elif isinstance(initial_date, str):
+                self.calendar.setSelectedDate(QDate.fromString(initial_date, "yyyy-MM-dd"))
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
