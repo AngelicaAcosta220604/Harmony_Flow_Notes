@@ -14,7 +14,6 @@ class TopicCheckboxTree(QTreeWidget):
     """
     Дерево тем с чекбоксами.
     Правило: можно выбирать только внутри ОДНОГО контейнера первого уровня.
-    Контейнер первого уровня - это либо папка (содержит children), либо тема в корне.
     """
     selection_changed = Signal(list)
 
@@ -24,46 +23,152 @@ class TopicCheckboxTree(QTreeWidget):
         self.setContextMenuPolicy(Qt.NoContextMenu)
         self.itemChanged.connect(self._on_item_changed)
 
-        self._active_first_level_id = None  # ID активного контейнера первого уровня
+        self._active_first_level_id = None
         self._items_by_id = {}
+        self._sort_mode = 'name_asc'  # режим сортировки по умолчанию
 
         self._load_topics()
 
+    def set_sort_mode(self, mode: str):
+        """Устанавливает режим сортировки"""
+        self._sort_mode = mode
+
+    def reload(self):
+        """Перезагружает дерево с текущей сортировкой"""
+        self._load_topics()
+
     def _load_topics(self):
-        """Загружает темы из БД, строя правильную иерархию"""
+        """Загружает темы из БД с правильной сортировкой"""
         self.clear()
         self._items_by_id.clear()
         self._active_first_level_id = None
 
-        rows = db.fetchall("SELECT id, name, parent_id FROM topics ORDER BY parent_id, name")
+        # Получаем ВСЕ темы
+        rows = db.fetchall("SELECT id, name, parent_id, created_at FROM topics")
 
-        # 1. Создаем все элементы
+        # Создаём элементы (пока не добавляем в дерево)
         for row in rows:
             item = QTreeWidgetItem()
             item.setData(0, Qt.UserRole, row['id'])
             item.setText(0, row['name'])
             item.setCheckState(0, Qt.Unchecked)
+            item.setData(0, Qt.UserRole + 1, row.get('created_at', ''))
             self._items_by_id[row['id']] = item
 
-        # 2. Строим иерархию
+        # Разделяем на корневые и дочерние
+        root_items = []
+        child_items = {}  # parent_id -> list of items
+
         for row in rows:
             item = self._items_by_id[row['id']]
             parent_id = row.get('parent_id')
 
             if not parent_id or parent_id == 0 or parent_id not in self._items_by_id:
-                self.addTopLevelItem(item)
+                root_items.append(item)
             else:
-                parent_item = self._items_by_id[parent_id]
-                parent_item.addChild(item)
+                if parent_id not in child_items:
+                    child_items[parent_id] = []
+                child_items[parent_id].append(item)
 
-        # 3. Стилизация
+        # Сортируем корневые элементы: папки (с детьми) выше тем
+        def is_folder(item):
+            return item.data(0, Qt.UserRole) in child_items
+
+        def sort_key(item):
+            if self._sort_mode == 'name_asc':
+                return (0 if is_folder(item) else 1, item.text(0).lower())
+            elif self._sort_mode == 'name_desc':
+                return (0 if is_folder(item) else 1, item.text(0).lower(), True)  # True для reverse
+            elif self._sort_mode == 'date_new':
+                return (0 if is_folder(item) else 1, item.data(0, Qt.UserRole + 1) or '', True)
+            elif self._sort_mode == 'date_old':
+                return (0 if is_folder(item) else 1, item.data(0, Qt.UserRole + 1) or '')
+            return (0 if is_folder(item) else 1, item.text(0).lower())
+
+        # Сортируем
+        reverse = self._sort_mode in ('name_desc', 'date_new')
+        root_items.sort(key=lambda x: x.text(0).lower(), reverse=reverse)
+        root_items.sort(key=is_folder)  # папки (False=0) перед темами (True=1)
+
+        # Сортируем детей каждого родителя
+        for parent_id, children in child_items.items():
+            children.sort(key=lambda x: x.text(0).lower(), reverse=reverse)
+            children.sort(key=lambda x: x.childCount() > 0)  # папки перед темами
+
+        # Добавляем корневые элементы в дерево
+        for item in root_items:
+            self.addTopLevelItem(item)
+            item_id = item.data(0, Qt.UserRole)
+
+            # Добавляем детей если есть
+            if item_id in child_items:
+                for child in child_items[item_id]:
+                    item.addChild(child)
+                    # Рекурсивно добавляем внуков
+                    child_id = child.data(0, Qt.UserRole)
+                    if child_id in child_items:
+                        for grandchild in child_items[child_id]:
+                            child.addChild(grandchild)
+
+        # Стилизация
         for item in self._items_by_id.values():
             if item.childCount() > 0:
                 self._style_as_folder(item)
             else:
                 self._style_as_topic(item)
 
-        self.expandAll()
+        self.collapseAll()
+
+    def _sort_tree_items(self):
+        """Сортирует элементы дерева: папки выше тем"""
+
+        def sort_children(parent_item: QTreeWidgetItem):
+            if parent_item.childCount() == 0:
+                return
+
+            # Забираем детей (takeChild НЕ удаляет C++ объект, только открепляет)
+            children = []
+            while parent_item.childCount() > 0:
+                children.append(parent_item.takeChild(0))
+
+            folders = [c for c in children if c.childCount() > 0]
+            topics = [c for c in children if c.childCount() == 0]
+
+            folders.sort(key=lambda x: self._get_sort_key(x))
+            topics.sort(key=lambda x: self._get_sort_key(x))
+
+            for folder in folders:
+                parent_item.addChild(folder)
+                sort_children(folder)  # рекурсия для вложенных папок
+
+            for topic in topics:
+                parent_item.addChild(topic)
+
+        # Сортируем корневые элементы
+        root_items = []
+        while self.topLevelItemCount() > 0:
+            root_items.append(self.takeTopLevelItem(0))
+
+        folders = [item for item in root_items if item.childCount() > 0]
+        topics = [item for item in root_items if item.childCount() == 0]
+
+        folders.sort(key=lambda x: self._get_sort_key(x))
+        topics.sort(key=lambda x: self._get_sort_key(x))
+
+        for folder in folders:
+            self.addTopLevelItem(folder)
+            sort_children(folder)
+
+        for topic in topics:
+            self.addTopLevelItem(topic)
+
+    def _get_sort_key(self, item: QTreeWidgetItem):
+        """Ключ сортировки для элемента"""
+        if self._sort_mode in ('name_asc', 'name_desc'):
+            return item.text(0).lower()
+        elif self._sort_mode in ('date_new', 'date_old'):
+            return item.data(0, Qt.UserRole + 1) or ''
+        return item.text(0).lower()
 
     def _style_as_folder(self, item: QTreeWidgetItem):
         font = item.font(0)
@@ -76,22 +181,16 @@ class TopicCheckboxTree(QTreeWidget):
         font = item.font(0)
         font.setBold(False)
         item.setFont(0, font)
-        text = item.text(0).replace('📁 ', '').replace('📝 ', '')
+        text = item.text(0).replace(' ', '').replace('📝 ', '')
         item.setText(0, f"📝 {text}")
 
     def _get_first_level_container_id(self, item: QTreeWidgetItem) -> int:
-        """
-        Возвращает ID контейнера первого уровня для данного элемента.
-        Если элемент сам на первом уровне - возвращает его ID.
-        Если элемент вложен - поднимается до первого уровня.
-        """
         current = item
         while current.parent() is not None:
             current = current.parent()
         return current.data(0, Qt.UserRole)
 
     def _has_checked_items_in_container(self, container_id: int) -> bool:
-        """Проверяет, есть ли выбранные элементы в контейнере"""
         container_item = self._items_by_id.get(container_id)
         if not container_item:
             return False
@@ -106,69 +205,28 @@ class TopicCheckboxTree(QTreeWidget):
 
         return check_recursive(container_item)
 
-    def _get_all_items_in_container(self, container_id: int) -> list:
-        """Возвращает все элементы в контейнере (рекурсивно)"""
-        result = []
-        container_item = self._items_by_id.get(container_id)
-        if not container_item:
-            return result
-
-        def collect_recursive(it: QTreeWidgetItem):
-            result.append(it)
-            for i in range(it.childCount()):
-                collect_recursive(it.child(i))
-
-        collect_recursive(container_item)
-        return result
-
     def _on_item_changed(self, item: QTreeWidgetItem, column: int):
-        """Логика ограничения выбора одним контейнером первого уровня"""
         first_level_id = self._get_first_level_container_id(item)
 
         if item.checkState(0) == Qt.Checked:
-            # Пользователь пытается выбрать элемент
-
-            # Если уже есть активный контейнер
-            if self._active_first_level_id is not None:
-                # Проверяем, тот ли это контейнер
-                if self._active_first_level_id != first_level_id:
-                    # КОНФЛИКТ: пытаемся выбрать в ДРУГОМ контейнере первого уровня!
-                    item.setCheckState(0, Qt.Unchecked)
-                    QMessageBox.warning(
-                        self,
-                        "Ограничение выбора",
-                        "Нельзя выбирать карточки из разных разделов первого уровня.\n\n"
-                        "Например, нельзя смешивать:\n"
-                        "• Папку 'ПДД' и папку 'Испанский'\n"
-                        "• Папку 'Учёба' и тему 'Хобби' (если она в корне)\n\n"
-                        "Сначала снимите все галочки в текущем разделе."
-                    )
-                    return
-
-            # Всё ок, запоминаем контейнер
+            if self._active_first_level_id is not None and self._active_first_level_id != first_level_id:
+                item.setCheckState(0, Qt.Unchecked)
+                QMessageBox.warning(
+                    self, "Ограничение выбора",
+                    "Нельзя выбирать карточки из разных разделов первого уровня.\nСначала снимите галочки в текущем разделе."
+                )
+                return
             self._active_first_level_id = first_level_id
-
-            # Если это папка первого уровня - разворачиваем её
-            first_level_item = self._items_by_id.get(first_level_id)
-            if first_level_item:
-                first_level_item.setExpanded(True)
-
         else:
-            # Пользователь снял галочку
             if self._active_first_level_id is not None:
-                # Проверяем, остались ли ещё выбранные в этом контейнере
                 if not self._has_checked_items_in_container(self._active_first_level_id):
-                    self._active_first_level_id = None  # Освобождаем
+                    self._active_first_level_id = None
 
         self._emit_selection()
 
     def _emit_selection(self):
-        """Собирает ID всех отмеченных тем"""
-        selected_ids = []
-        for item in self._items_by_id.values():
-            if item.checkState(0) == Qt.Checked:
-                selected_ids.append(item.data(0, Qt.UserRole))
-
+        selected_ids = [item.data(0, Qt.UserRole) for item in self._items_by_id.values() if
+                        item.checkState(0) == Qt.Checked]
         self.selection_changed.emit(selected_ids)
 
     def get_selected_topic_ids(self) -> list:
@@ -223,13 +281,35 @@ class GlobalCardsView(QWidget):
         # Сплиттер
         main_splitter = QSplitter(Qt.Horizontal)
 
-        # Левая часть: Дерево
+        # --- ЛЕВАЯ ЧАСТЬ: Дерево тем + Сортировка ---
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(8)
+
         left_layout.addWidget(QLabel("Выберите темы:"))
+
+        # 🆕 ПЛАШКА СОРТИРОВКИ ДЕРЕВА
+        tree_sort_widget = QWidget()
+        tree_sort_layout = QHBoxLayout(tree_sort_widget)
+        tree_sort_layout.setContentsMargins(0, 0, 0, 0)
+
+        sort_label = QLabel("Сортировка:")
+        sort_label.setStyleSheet("font-size: 12px; color: #555;")
+
+        self.tree_sort_combo = QComboBox()
+        self.tree_sort_combo.addItem("🔤 По имени (А-Я)", "name_asc")
+        self.tree_sort_combo.addItem("🔽 По имени (Я-А)", "name_desc")
+        self.tree_sort_combo.addItem(" Новые сверху", "date_new")
+        self.tree_sort_combo.addItem("📅 Старые сверху", "date_old")
+        tree_sort_layout.addWidget(sort_label)
+        tree_sort_layout.addWidget(self.tree_sort_combo, 1)
+
+        left_layout.addWidget(tree_sort_widget)
+
         self.topic_tree = TopicCheckboxTree()
         left_layout.addWidget(self.topic_tree)
+
         main_splitter.addWidget(left_panel)
 
         # Правая часть: Аналитика + Список
@@ -273,6 +353,7 @@ class GlobalCardsView(QWidget):
         self.card_list.itemClicked.connect(self._on_card_selected)
         self.start_review_btn.clicked.connect(self._on_start_review_clicked)
         self.sort_combo.currentIndexChanged.connect(self._load_data)
+        self.tree_sort_combo.currentIndexChanged.connect(self._on_tree_sort_changed)
 
     def _load_data(self):
         selected_ids = self.topic_tree.get_selected_topic_ids()
@@ -393,3 +474,10 @@ class GlobalCardsView(QWidget):
         self.topic_tree.reset_selection()
         self.topic_tree._load_topics()
         self._load_data()
+
+    def _on_tree_sort_changed(self):
+        """Обработчик смены сортировки дерева"""
+        sort_mode = self.tree_sort_combo.currentData()
+        if sort_mode:
+            self.topic_tree.set_sort_mode(sort_mode)
+            self.topic_tree.reload()  # перестроим дерево с новой сортировкой
