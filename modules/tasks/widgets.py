@@ -1,7 +1,7 @@
 # modules/tasks/widgets.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QCalendarWidget, QTextEdit
+    QCalendarWidget, QTextEdit, QCheckBox
 )
 from PySide6.QtCore import Qt, Signal, QDate
 from PySide6.QtGui import QTextCharFormat, QColor
@@ -113,3 +113,4 @@ class TaskPreviewWidget(QWidget):
         """Обработчик клика"""
         self.task_clicked.emit(self.task_id)
         super().mousePressEvent(event)
+
