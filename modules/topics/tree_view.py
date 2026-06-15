@@ -45,7 +45,7 @@ class TopicsView(QWidget):
         title_layout.setAlignment(Qt.AlignCenter)
 
         title_icon_label = QLabel()
-        title_pixmap = QPixmap("resources/icons/notes_topic.png")
+        title_pixmap = QPixmap("resources/icons/structure1.png")
         if not title_pixmap.isNull():
             title_pixmap = title_pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             title_icon_label.setPixmap(title_pixmap)
@@ -68,7 +68,7 @@ class TopicsView(QWidget):
         button_layout.setSpacing(10)
 
         self.new_folder_btn = QPushButton("Новая папка")
-        self.new_folder_btn.setIcon(QIcon("resources/icons/folder.png"))
+        self.new_folder_btn.setIcon(QIcon("resources/icons/new_folder1.png"))
         self.new_folder_btn.setIconSize(QSize(18, 18))
         self.new_folder_btn.setFixedWidth(140)
         self.new_folder_btn.setStyleSheet("""
@@ -92,7 +92,7 @@ class TopicsView(QWidget):
         button_layout.addWidget(self.new_folder_btn)
 
         self.new_topic_btn = QPushButton("Новая тема")
-        self.new_topic_btn.setIcon(QIcon("resources/icons/notes_topic.png"))
+        self.new_topic_btn.setIcon(QIcon("resources/icons/new_notes1.png"))
         self.new_topic_btn.setIconSize(QSize(18, 18))
         self.new_topic_btn.setFixedWidth(140)
         self.new_topic_btn.setStyleSheet("""
@@ -116,7 +116,7 @@ class TopicsView(QWidget):
         button_layout.addWidget(self.new_topic_btn)
 
         self.rename_btn = QPushButton("Переименовать")
-        self.rename_btn.setIcon(QIcon("resources/icons/pen.png"))
+        self.rename_btn.setIcon(QIcon("resources/icons/rename1.png"))
         self.rename_btn.setIconSize(QSize(18, 18))
         self.rename_btn.setFixedWidth(140)
         self.rename_btn.setStyleSheet("""
@@ -140,7 +140,7 @@ class TopicsView(QWidget):
         button_layout.addWidget(self.rename_btn)
 
         self.delete_btn = QPushButton("Удалить")
-        self.delete_btn.setIcon(QIcon("resources/icons/urna.png"))
+        self.delete_btn.setIcon(QIcon("resources/icons/delete1.png"))
         self.delete_btn.setIconSize(QSize(18, 18))
         self.delete_btn.setFixedWidth(140)
         self.delete_btn.setStyleSheet("""
@@ -273,20 +273,20 @@ class TopicsView(QWidget):
             }
         """)
         new_folder_action = QAction("Новая папка", self)
-        new_folder_action.setIcon(QIcon("resources/icons/folder.png"))
+        new_folder_action.setIcon(QIcon("resources/icons/new_folder1.png"))
         new_folder_action.triggered.connect(self._on_new_folder)
         menu.addAction(new_folder_action)
         new_topic_action = QAction("Новая тема", self)
-        new_topic_action.setIcon(QIcon("resources/icons/notes_topic.png"))
+        new_topic_action.setIcon(QIcon("resources/icons/new_notes1.png"))
         new_topic_action.triggered.connect(self._on_new_topic)
         menu.addAction(new_topic_action)
         menu.addSeparator()
         rename_action = QAction("Переименовать", self)
-        rename_action.setIcon(QIcon("resources/icons/pen.png"))
+        rename_action.setIcon(QIcon("resources/icons/rename1.png"))
         rename_action.triggered.connect(self._on_rename)
         menu.addAction(rename_action)
         delete_action = QAction("Удалить", self)
-        delete_action.setIcon(QIcon("resources/icons/urna.png"))
+        delete_action.setIcon(QIcon("resources/icons/delete1.png"))
         delete_action.triggered.connect(self._on_delete)
         menu.addAction(delete_action)
         menu.exec(self.tree.viewport().mapToGlobal(position))
