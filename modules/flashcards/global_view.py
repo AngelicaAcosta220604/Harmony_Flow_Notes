@@ -26,22 +26,22 @@ class TopicCheckboxTree(QTreeWidget):
         self._active_first_level_id = None
         self._items_by_id = {}
         self._sort_mode = 'name_asc'
-        self._updating_children = False  # 🆕 Флаг для предотвращения рекурсии
+        self._updating_children = 0  # 🆕 Счётчик вместо булевого флага
 
         self._load_topics()
 
     def _on_item_changed(self, item: QTreeWidgetItem, column: int):
         # Если мы сами программно меняем галочки — игнорируем
-        if self._updating_children:
+        if self._updating_children > 0:
             return
 
         first_level_id = self._get_first_level_container_id(item)
 
         if item.checkState(0) == Qt.Checked:
             if self._active_first_level_id is not None and self._active_first_level_id != first_level_id:
-                self._updating_children = True
+                self._updating_children += 1
                 item.setCheckState(0, Qt.Unchecked)
-                self._updating_children = False
+                self._updating_children -= 1
                 QMessageBox.warning(
                     self, "Ограничение выбора",
                     "Нельзя выбирать карточки из разных разделов первого уровня.\nСначала снимите галочки в текущем разделе."
@@ -50,11 +50,9 @@ class TopicCheckboxTree(QTreeWidget):
 
             self._active_first_level_id = first_level_id
 
-            # Если это папка - автоматически отмечаем все дочерние элементы
             if item.childCount() > 0:
                 self._check_all_children(item, Qt.Checked)
         else:
-            # Если сняли галочку с папки - снимаем со всех детей
             if item.childCount() > 0:
                 self._check_all_children(item, Qt.Unchecked)
 
@@ -66,17 +64,15 @@ class TopicCheckboxTree(QTreeWidget):
 
     def _check_all_children(self, item: QTreeWidgetItem, state):
         """Рекурсивно отмечает/снимает галочки со всех дочерних элементов"""
-        self._updating_children = True  # Блокируем обработку сигналов
-
-        for i in range(item.childCount()):
-            child = item.child(i)
-            child.setCheckState(0, state)
-
-            # Рекурсивно для вложенных папок
-            if child.childCount() > 0:
-                self._check_all_children(child, state)
-
-        self._updating_children = False  # Разблокируем
+        self._updating_children += 1  # Увеличиваем счётчик
+        try:
+            for i in range(item.childCount()):
+                child = item.child(i)
+                child.setCheckState(0, state)
+                if child.childCount() > 0:
+                    self._check_all_children(child, state)
+        finally:
+            self._updating_children -= 1  # Уменьшаем только когда вся рекурсия завершена
 
     def set_sort_mode(self, mode: str):
         """Устанавливает режим сортировки"""
@@ -421,6 +417,8 @@ class GlobalCardsView(QWidget):
 
     def _update_cards_and_analytics(self, topic_ids: list):
         """Обновляет аналитику и список карточек на основе выбранных тем"""
+
+
         if not topic_ids:
             self.card_list.clear()
             self.card_list.addItem("📭 Выберите хотя бы одну тему в дереве слева")
@@ -429,6 +427,9 @@ class GlobalCardsView(QWidget):
             return
 
         cards = self._controller.get_cards_by_topics(topic_ids)
+
+
+        # ... остальной код
 
         # Сортировка
         sort_by = self.sort_combo.currentData()

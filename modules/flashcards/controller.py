@@ -34,6 +34,7 @@ class FlashcardController:
         """Возвращает карточки для списка тем"""
         if not topic_ids:
             return []
+
         rows = self._repo.get_by_topics(topic_ids)
         return [Flashcard.from_row(row) for row in rows]
 
