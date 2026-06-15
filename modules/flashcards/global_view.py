@@ -232,13 +232,34 @@ class GlobalCardsView(QWidget):
         content_layout = QVBoxLayout(content)
         content_layout.setSpacing(20)
 
-        # ========== ЗАГОЛОВОК ==========
-        header_layout = QHBoxLayout()
-        title_label = QLabel("🃏 Глобальные карточки")
-        title_label.setStyleSheet("font-size: 20px; font-weight: bold; color: #1F2937;")
-        header_layout.addWidget(title_label)
-        header_layout.addStretch()
-        content_layout.addLayout(header_layout)
+        # ========== ЗАГОЛОВОК (белая плашка) ==========
+        header_widget = QWidget()
+        header_widget.setStyleSheet("""
+            QWidget {
+                background-color: #FFFFFF;
+                border-radius: 16px;
+                border: none;
+            }
+        """)
+        header_widget.setFixedHeight(80)
+
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(20, 0, 20, 0)
+        header_layout.setSpacing(12)
+        header_layout.setAlignment(Qt.AlignCenter)
+
+        header_icon = QLabel()
+        header_pixmap = QPixmap("resources/icons/flashcard1.png")
+        if not header_pixmap.isNull():
+            header_pixmap = header_pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            header_icon.setPixmap(header_pixmap)
+        header_layout.addWidget(header_icon)
+
+        header_title = QLabel("Глобальные карточки")
+        header_title.setStyleSheet("font-size: 20px; font-weight: bold; color: #1F2937;")
+        header_layout.addWidget(header_title)
+
+        content_layout.addWidget(header_widget)
 
         # ========== ТРИ ПЛАШКИ В РЯД ==========
         three_cols_layout = QHBoxLayout()
