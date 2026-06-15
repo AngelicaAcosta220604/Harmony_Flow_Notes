@@ -1,12 +1,12 @@
+# modules/sessions/setup_view.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
-    QPushButton, QFrame, QScrollArea, QSizePolicy
+    QPushButton, QFrame, QScrollArea, QCheckBox, QSizePolicy, QSlider
 )
-from PySide6.QtCore import Signal, Qt, QSize
+from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QIcon, QPixmap
 
 from modules.topics.widgets import TopicTreeSelector
-from modules.music.widgets import MusicWidget
 from modules.music.controller import MusicController
 from widgets import SilentMessageBox
 
@@ -14,7 +14,7 @@ from widgets import SilentMessageBox
 class FocusSetupView(QWidget):
     """Экран подготовки к сессии"""
 
-    start_session = Signal(int, int)  # (topic_id, activity_check_interval)
+    start_session = Signal(int, int)
 
     def __init__(self, topic_controller, music_controller: MusicController, settings_controller, parent=None):
         super().__init__(parent)
@@ -23,12 +23,6 @@ class FocusSetupView(QWidget):
         self._settings_controller = settings_controller
         self._setup_ui()
         self._load_settings()
-
-        # 🆕 Подписываемся на создание/удаление тем для обновления списка
-        from core.event_bus import event_bus
-        event_bus.topic_created.connect(lambda tid: self.topic_selector.refresh())
-        event_bus.topic_deleted.connect(lambda tid: self.topic_selector.refresh())
-        event_bus.topic_updated.connect(lambda tid: self.topic_selector.refresh())
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -44,7 +38,7 @@ class FocusSetupView(QWidget):
         content_layout = QVBoxLayout(content)
         content_layout.setSpacing(20)
 
-        # ========== ЗАГОЛОВОК (белая плашка) ==========
+        # ========== ЗАГОЛОВОК ==========
         header_widget = QWidget()
         header_widget.setStyleSheet("""
             QWidget {
@@ -61,7 +55,7 @@ class FocusSetupView(QWidget):
         header_layout.setAlignment(Qt.AlignCenter)
 
         header_icon = QLabel()
-        header_pixmap = QPixmap("resources/icons/session.png")
+        header_pixmap = QPixmap("resources/icons/session1.png")
         if not header_pixmap.isNull():
             header_pixmap = header_pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             header_icon.setPixmap(header_pixmap)
@@ -73,7 +67,17 @@ class FocusSetupView(QWidget):
 
         content_layout.addWidget(header_widget)
 
-        # ========== ПЛАШКА ВЫБОРА ТЕМЫ ==========
+        # ========== РЯД: ЛЕВАЯ КОЛОНКА + ПРАВАЯ КОЛОНКА ==========
+        main_row_layout = QHBoxLayout()
+        main_row_layout.setSpacing(20)
+
+        # ----- ЛЕВАЯ КОЛОНКА -----
+        left_col = QWidget()
+        left_col_layout = QVBoxLayout(left_col)
+        left_col_layout.setSpacing(20)
+        left_col_layout.setContentsMargins(0, 0, 0, 0)
+
+        # ПЛАШКА 1: Выбор темы
         topic_widget = QFrame()
         topic_widget.setStyleSheet("""
             QFrame {
@@ -82,7 +86,7 @@ class FocusSetupView(QWidget):
                 border: none;
             }
         """)
-        topic_widget.setMinimumHeight(100)
+        topic_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         topic_layout = QVBoxLayout(topic_widget)
         topic_layout.setContentsMargins(20, 16, 20, 16)
@@ -90,7 +94,7 @@ class FocusSetupView(QWidget):
 
         topic_title_layout = QHBoxLayout()
         topic_icon = QLabel()
-        topic_icon_pixmap = QPixmap("resources/icons/topic.png")
+        topic_icon_pixmap = QPixmap("resources/icons/new_notes1.png")
         if not topic_icon_pixmap.isNull():
             topic_icon_pixmap = topic_icon_pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             topic_icon.setPixmap(topic_icon_pixmap)
@@ -104,13 +108,9 @@ class FocusSetupView(QWidget):
         self.topic_selector = TopicTreeSelector(self._topic_controller)
         topic_layout.addWidget(self.topic_selector)
 
-        content_layout.addWidget(topic_widget)
+        left_col_layout.addWidget(topic_widget, 1)
 
-        # ========== РЯД 2: Интервал активности и Фоновые звуки ==========
-        row2_layout = QHBoxLayout()
-        row2_layout.setSpacing(16)
-
-        # Плашка "Интервал контроля активности"
+        # ПЛАШКА 2: Интервал контроля активности
         interval_widget = QFrame()
         interval_widget.setStyleSheet("""
             QFrame {
@@ -119,8 +119,7 @@ class FocusSetupView(QWidget):
                 border: none;
             }
         """)
-        interval_widget.setMinimumHeight(140)
-        interval_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        interval_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         interval_layout = QVBoxLayout(interval_widget)
         interval_layout.setContentsMargins(20, 16, 20, 16)
@@ -128,7 +127,7 @@ class FocusSetupView(QWidget):
 
         interval_title_layout = QHBoxLayout()
         interval_icon = QLabel()
-        interval_icon_pixmap = QPixmap("resources/icons/time.png")
+        interval_icon_pixmap = QPixmap("resources/icons/time1.png")
         if not interval_icon_pixmap.isNull():
             interval_icon_pixmap = interval_icon_pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             interval_icon.setPixmap(interval_icon_pixmap)
@@ -158,14 +157,14 @@ class FocusSetupView(QWidget):
             QComboBox:hover {
                 border: 1px solid #3B82F6;
             }
-            QComboBox::drop-down {
-                border: none;
-            }
         """)
         interval_layout.addWidget(self.interval_combo)
-        row2_layout.addWidget(interval_widget, 1)
 
-        # Плашка "Фоновые звуки"
+        left_col_layout.addWidget(interval_widget, 1)
+
+        main_row_layout.addWidget(left_col, 1)
+
+        # ----- ПРАВАЯ КОЛОНКА: Фоновые звуки -----
         sound_widget = QFrame()
         sound_widget.setStyleSheet("""
             QFrame {
@@ -174,8 +173,7 @@ class FocusSetupView(QWidget):
                 border: none;
             }
         """)
-        sound_widget.setMinimumHeight(140)
-        sound_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        sound_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         sound_layout = QVBoxLayout(sound_widget)
         sound_layout.setContentsMargins(20, 16, 20, 16)
@@ -183,7 +181,7 @@ class FocusSetupView(QWidget):
 
         sound_title_layout = QHBoxLayout()
         sound_icon = QLabel()
-        sound_icon_pixmap = QPixmap("resources/icons/music.png")
+        sound_icon_pixmap = QPixmap("resources/icons/music1.png")
         if not sound_icon_pixmap.isNull():
             sound_icon_pixmap = sound_icon_pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             sound_icon.setPixmap(sound_icon_pixmap)
@@ -196,44 +194,97 @@ class FocusSetupView(QWidget):
         sound_title_layout.addStretch()
         sound_layout.addLayout(sound_title_layout)
 
-        self.music_widget = MusicWidget(self._music_controller)
-        sound_layout.addWidget(self.music_widget)
+        self.sound_combo = QComboBox()
+        self.sound_combo.addItems([
+            "Отключено",
+            "Белый шум",
+            "Дождь",
+            "Лес",
+            "Кафе"
+        ])
+        self.sound_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #F0F4F8;
+                border: 1px solid #E6EEF6;
+                border-radius: 8px;
+                padding: 8px 12px;
+                min-height: 36px;
+                font-size: 13px;
+                color: #1F2937;
+            }
+            QComboBox:hover {
+                border: 1px solid #3B82F6;
+            }
+        """)
+        sound_layout.addWidget(self.sound_combo)
 
-        row2_layout.addWidget(sound_widget, 1)
-        content_layout.addLayout(row2_layout)
+        # Громкость
+        volume_layout = QHBoxLayout()
+        volume_layout.setSpacing(8)
 
-        # ========== КНОПКИ ==========
+        self.volume_slider = QSlider(Qt.Horizontal)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setValue(50)
+        self.volume_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                height: 4px;
+                background-color: #E6EEF6;
+                border-radius: 2px;
+            }
+            QSlider::handle:horizontal {
+                background-color: #3B82F6;
+                width: 14px;
+                height: 14px;
+                margin: -5px 0;
+                border-radius: 7px;
+            }
+            QSlider::sub-page:horizontal {
+                background-color: #3B82F6;
+                border-radius: 2px;
+            }
+        """)
+        volume_layout.addWidget(self.volume_slider)
+
+        self.volume_label = QLabel("50%")
+        self.volume_label.setStyleSheet("color: #6B7280; font-size: 12px; min-width: 40px;")
+        volume_layout.addWidget(self.volume_label)
+
+        sound_layout.addLayout(volume_layout)
+
+        # Чекбокс
+        self.sound_checkbox = QCheckBox("Включить фоновые звуки")
+        self.sound_checkbox.setChecked(False)
+        self.sound_checkbox.setStyleSheet("""
+            QCheckBox {
+                spacing: 8px;
+                color: #1F2937;
+                font-size: 13px;
+            }
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+                border-radius: 4px;
+                border: 1px solid #E6EEF6;
+                background-color: #F0F4F8;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #3B82F6;
+                border-color: #3B82F6;
+            }
+        """)
+        sound_layout.addWidget(self.sound_checkbox)
+
+        sound_layout.addStretch()
+
+        main_row_layout.addWidget(sound_widget, 1)
+        content_layout.addLayout(main_row_layout)
+
+        # ========== КНОПКА НАЧАТЬ СЕССИЮ ==========
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        # Кнопка "Продолжить сессию" (скрыта по умолчанию)
-        self.resume_btn = QPushButton("Продолжить сессию")
-        self.resume_btn.setIcon(QIcon("resources/icons/play.png"))
-        self.resume_btn.setIconSize(QSize(20, 20))
-        self.resume_btn.setFixedWidth(200)
-        self.resume_btn.setFixedHeight(48)
-        self.resume_btn.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(59, 130, 246, 0.15);
-                color: #3B82F6;
-                border: 1px solid #3B82F6;
-                border-radius: 12px;
-                padding: 10px 20px;
-                font-weight: 600;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: rgba(59, 130, 246, 0.25);
-                border: 1px solid #2563EB;
-                color: #2563EB;
-            }
-        """)
-        self.resume_btn.setVisible(False)
-        button_layout.addWidget(self.resume_btn)
-
-        # Кнопка "Начать сессию"
         self.start_btn = QPushButton("Начать сессию")
-        self.start_btn.setIcon(QIcon("resources/icons/rocket.png"))
+        self.start_btn.setIcon(QIcon("resources/icons/play1.png"))
         self.start_btn.setIconSize(QSize(20, 20))
         self.start_btn.setFixedWidth(200)
         self.start_btn.setFixedHeight(48)
@@ -264,48 +315,11 @@ class FocusSetupView(QWidget):
 
         # Подключаем сигналы
         self.start_btn.clicked.connect(self._on_start)
-        self.resume_btn.clicked.connect(self._on_resume)
-        self.topic_selector.topic_changed.connect(self._check_active_session)
-
-    def _check_active_session(self, topic_id: int):
-        """Проверяет, есть ли активная/пауза сессия для выбранной темы"""
-        if not topic_id:
-            self.resume_btn.setVisible(False)
-            return
-
-        from core.di.container import container
-        has_session, session_id, status, existing_topic_id = container.session_controller.has_active_or_paused_session(
-            topic_id)
-
-        if has_session:
-            self.resume_btn.setVisible(True)
-            self.resume_btn.setText(f"Продолжить сессию ({status})")
-        else:
-            self.resume_btn.setVisible(False)
-
-    def _on_resume(self):
-        """Возобновляет существующую сессию"""
-        topic_id = self.topic_selector.get_selected_topic_id()
-        if not topic_id:
-            SilentMessageBox.warning(self, "Ошибка", "Выберите тему")
-            return
-
-        from core.di.container import container
-        has_session, session_id, status, existing_topic_id = container.session_controller.has_active_or_paused_session(
-            topic_id)
-
-        if has_session:
-            from core.main_window import MainWindow
-            main_window = self.window()
-            if isinstance(main_window, MainWindow):
-                topic = self._topic_controller.get_topic(topic_id)
-                if topic:
-                    main_window.focus_active_view.resume_existing_session(
-                        session_id, topic_id, topic.name
-                    )
-                    main_window.content_stack.setCurrentWidget(main_window.focus_active_view)
+        self.sound_checkbox.toggled.connect(self._on_sound_toggled)
+        self.volume_slider.valueChanged.connect(self._on_volume_changed)
 
     def _load_settings(self):
+        """Загружает настройки"""
         default_interval = self._settings_controller.get_activity_check_interval()
         index = self.interval_combo.findData(default_interval)
         if index >= 0:
@@ -313,46 +327,38 @@ class FocusSetupView(QWidget):
 
         default_sound = self._settings_controller.get_default_sound()
         if default_sound != 'off':
-            self.music_widget._controller.play(default_sound)
+            sound_map = {
+                'white_noise': "Белый шум",
+                'rain': "Дождь",
+                'forest': "Лес",
+                'cafe': "Кафе"
+            }
+            sound_name = sound_map.get(default_sound, "Отключено")
+            idx = self.sound_combo.findText(sound_name)
+            if idx >= 0:
+                self.sound_combo.setCurrentIndex(idx)
 
     def _on_start(self):
+        """Запуск сессии"""
         topic_id = self.topic_selector.get_selected_topic_id()
         if not topic_id:
             SilentMessageBox.warning(self, "Ошибка", "Выберите тему для сессии")
             return
 
-        # Проверяем, есть ли активная/пауза сессия для этой темы
-        from core.di.container import container
-        has_session, session_id, status, existing_topic_id = container.session_controller.has_active_or_paused_session(topic_id)
+        interval = self.interval_combo.currentData()
+        self.start_session.emit(topic_id, interval)
 
-        if has_session:
-            reply = SilentMessageBox.question(
-                self,
-                "Незавершённая сессия",
-                f"У вас есть {status} сессия для этой темы.\n\n"
-                "• Нажмите «Да» — чтобы завершить её и начать новую\n"
-                "• Нажмите «Нет» — чтобы продолжить существующую сессию",
-                SilentMessageBox.Yes | SilentMessageBox.No,
-                SilentMessageBox.No
-            )
+    def _on_sound_toggled(self, checked: bool):
+        """Включение/выключение звука"""
+        self.sound_combo.setEnabled(checked)
+        self.volume_slider.setEnabled(checked)
+        self.volume_label.setEnabled(checked)
 
-            if reply == SilentMessageBox.Yes:
-                container.session_controller.end_session()
-                interval = self.interval_combo.currentData()
-                self.start_session.emit(topic_id, interval)
-            else:
-                from core.main_window import MainWindow
-                main_window = self.window()
-                if isinstance(main_window, MainWindow):
-                    topic = self._topic_controller.get_topic(topic_id)
-                    if topic:
-                        main_window.focus_active_view.resume_existing_session(
-                            session_id, topic_id, topic.name
-                        )
-                        main_window.content_stack.setCurrentWidget(main_window.focus_active_view)
-        else:
-            interval = self.interval_combo.currentData()
-            self.start_session.emit(topic_id, interval)
+    def _on_volume_changed(self, value: int):
+        """Изменение громкости"""
+        self.volume_label.setText(f"{value}%")
+        self._music_controller.set_volume(value)
 
     def refresh_topics(self):
+        """Обновляет список тем"""
         self.topic_selector.refresh()
