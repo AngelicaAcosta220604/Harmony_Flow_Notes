@@ -57,7 +57,7 @@ class SettingsView(QWidget):
         header_layout.setAlignment(Qt.AlignCenter)
 
         header_icon = QLabel()
-        header_pixmap = QPixmap("resources/icons/settings.png")
+        header_pixmap = QPixmap("resources/icons/setting1.png")
         if not header_pixmap.isNull():
             header_pixmap = header_pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             header_icon.setPixmap(header_pixmap)
@@ -70,9 +70,8 @@ class SettingsView(QWidget):
         content_layout.addWidget(header_widget)
 
         # ========== ПЛАШКА 1: Пользователь ==========
-        user_widget = self._create_setting_card(
-            "resources/icons/user.png", "Пользователь"
-        )
+        # ПЛАШКА 1: Пользователь (зелёный круг)
+        user_widget = self._create_setting_card("resources/icons/user1.png", "Пользователь", "#10B981")
         user_content = QVBoxLayout()
         user_content.setContentsMargins(20, 0, 20, 20)
         user_content.setSpacing(12)
@@ -97,10 +96,8 @@ class SettingsView(QWidget):
         user_widget.layout().addLayout(user_content)
         content_layout.addWidget(user_widget)
 
-        # ========== ПЛАШКА 2: Внешний вид ==========
-        appearance_widget = self._create_setting_card(
-            "resources/icons/theme.png", "Внешний вид"
-        )
+        # ПЛАШКА 2: Внешний вид (синий круг)
+        appearance_widget = self._create_setting_card("resources/icons/view1.png", "Внешний вид", "#3B82F6")
         appearance_content = QVBoxLayout()
         appearance_content.setContentsMargins(20, 0, 20, 20)
         appearance_content.setSpacing(12)
@@ -126,10 +123,9 @@ class SettingsView(QWidget):
         appearance_widget.layout().addLayout(appearance_content)
         content_layout.addWidget(appearance_widget)
 
-        # ========== ПЛАШКА 3: Поведение сессии ==========
-        session_widget = self._create_setting_card(
-            "resources/icons/session.png", "Поведение сессии"
-        )
+        # ПЛАШКА 3: Поведение сессии (оранжевый круг)
+        session_widget = self._create_setting_card("resources/icons/session1.png", "Поведение сессии", "#F59E0B")
+
         session_content = QVBoxLayout()
         session_content.setContentsMargins(20, 0, 20, 20)
         session_content.setSpacing(12)
@@ -185,10 +181,8 @@ class SettingsView(QWidget):
         session_widget.layout().addLayout(session_content)
         content_layout.addWidget(session_widget)
 
-        # ========== ПЛАШКА 4: Редактор ==========
-        editor_widget = self._create_setting_card(
-            "resources/icons/editor.png", "Редактор"
-        )
+        # ПЛАШКА 4: Редактор (фиолетовый круг)
+        editor_widget = self._create_setting_card("resources/icons/time1.png", "Редактор", "#8B5CF6")
         editor_content = QVBoxLayout()
         editor_content.setContentsMargins(20, 0, 20, 20)
         editor_content.setSpacing(12)
@@ -219,10 +213,8 @@ class SettingsView(QWidget):
         editor_widget.layout().addLayout(editor_content)
         content_layout.addWidget(editor_widget)
 
-        # ========== ПЛАШКА 5: Напоминания ==========
-        notify_widget = self._create_setting_card(
-            "resources/icons/bell.png", "Напоминания"
-        )
+        # ПЛАШКА 5: Напоминания (розовый круг)
+        notify_widget = self._create_setting_card("resources/icons/N.png", "Напоминания", "#EC4899")
         notify_content = QVBoxLayout()
         notify_content.setContentsMargins(20, 0, 20, 20)
         notify_content.setSpacing(12)
@@ -251,10 +243,8 @@ class SettingsView(QWidget):
         notify_widget.layout().addLayout(notify_content)
         content_layout.addWidget(notify_widget)
 
-        # ========== ПЛАШКА 6: Звук по умолчанию ==========
-        sound_widget = self._create_setting_card(
-            "resources/icons/music.png", "Звук по умолчанию"
-        )
+        # ПЛАШКА 6: Звук по умолчанию (жёлтый круг)
+        sound_widget = self._create_setting_card("resources/icons/music1.png", "Звук по умолчанию", "#F59E0B")
         sound_content = QVBoxLayout()
         sound_content.setContentsMargins(20, 0, 20, 20)
         sound_content.setSpacing(12)
@@ -342,8 +332,8 @@ class SettingsView(QWidget):
         scroll.setWidget(content)
         layout.addWidget(scroll)
 
-    def _create_setting_card(self, icon_path: str, title: str) -> QFrame:
-        """Создаёт карточку настройки с иконкой и заголовком"""
+    def _create_setting_card(self, icon_path: str, title: str, color: str = "#3B82F6") -> QFrame:
+        """Создаёт карточку настройки с иконкой в цветном круге и заголовком"""
         card = QFrame()
         card.setStyleSheet("""
             QFrame {
@@ -368,24 +358,48 @@ class SettingsView(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Заголовок с иконкой
+        # Заголовок с иконкой в цветном круге
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(20, 16, 20, 0)
         header_layout.setSpacing(12)
 
+        # Цветной круг для иконки
+        r = int(color[1:3], 16)
+        g = int(color[3:5], 16)
+        b = int(color[5:7], 16)
+
+        icon_container = QLabel()
+        icon_container.setFixedSize(32, 32)
+        icon_container.setAlignment(Qt.AlignCenter)
+        icon_container.setStyleSheet(f"""
+            background-color: rgba({r}, {g}, {b}, 0.15);
+            border-radius: 16px;
+            border: none;
+        """)
+
         icon_label = QLabel()
+        icon_label.setAlignment(Qt.AlignCenter)
         pixmap = QPixmap(icon_path)
         if not pixmap.isNull():
-            pixmap = pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            pixmap = pixmap.scaled(18, 18, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             icon_label.setPixmap(pixmap)
-        header_layout.addWidget(icon_label)
+        else:
+            icon_label.setText("🔧")
+            icon_label.setStyleSheet("font-size: 14px;")
+
+        container_layout = QVBoxLayout(icon_container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.addWidget(icon_label)
 
         title_label = QLabel(title)
         title_label.setStyleSheet("font-weight: 600; color: #1F2937; font-size: 14px;")
+
+        header_layout.addWidget(icon_container)
         header_layout.addWidget(title_label)
         header_layout.addStretch()
 
         main_layout.addLayout(header_layout)
+        main_layout.addSpacing(8)  # отступ между заголовком и содержимым
 
         return card
 

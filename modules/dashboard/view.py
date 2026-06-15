@@ -132,7 +132,7 @@ class DashboardView(QWidget):
         return widget
 
     def _create_greeting_block(self) -> QWidget:
-        """Создаёт блок приветствия в стиле плашки"""
+        """Создаёт блок приветствия в стиле плашки с иконками и цветными кружками"""
         widget = QFrame()
         widget.setFrameShape(QFrame.StyledPanel)
         widget.setProperty("class", "dashboard-card")
@@ -153,7 +153,7 @@ class DashboardView(QWidget):
 
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(20, 16, 20, 16)
-        layout.setSpacing(8)
+        layout.setSpacing(12)
         layout.setAlignment(Qt.AlignCenter)
 
         # Приветствие
@@ -167,17 +167,87 @@ class DashboardView(QWidget):
         """)
         layout.addWidget(self.greeting_label)
 
-        # Статистика (вернём обратно)
-        self.stats_label = QLabel()
-        self.stats_label.setAlignment(Qt.AlignCenter)
-        self.stats_label.setStyleSheet("""
-            font-size: 14px; 
-            color: #2C3E50; 
-            background-color: transparent;
+        # Контейнер для статистики с иконками
+        stats_container = QWidget()
+        stats_container.setStyleSheet("background-color: transparent;")
+        stats_layout = QVBoxLayout(stats_container)
+        stats_layout.setSpacing(8)
+        stats_layout.setAlignment(Qt.AlignCenter)
+
+        # Строка "Выполнено задач" с зелёным кружком
+        completed_row = QHBoxLayout()
+        completed_row.setSpacing(8)
+        completed_row.setAlignment(Qt.AlignCenter)
+
+        # Зелёный кружок для задачи
+        completed_icon_container = QLabel()
+        completed_icon_container.setFixedSize(32, 32)
+        completed_icon_container.setAlignment(Qt.AlignCenter)
+        completed_icon_container.setStyleSheet("""
+            background-color: rgba(16, 185, 129, 0.15);
+            border-radius: 16px;
         """)
-        layout.addWidget(self.stats_label)
+
+        completed_icon = QLabel()
+        completed_pixmap = QPixmap("resources/icons/task1.png")
+        if not completed_pixmap.isNull():
+            completed_pixmap = completed_pixmap.scaled(18, 18, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            completed_icon.setPixmap(completed_pixmap)
+        else:
+            completed_icon.setText("📋")
+            completed_icon.setStyleSheet("font-size: 14px;")
+        completed_icon.setAlignment(Qt.AlignCenter)
+
+        completed_icon_layout = QVBoxLayout(completed_icon_container)
+        completed_icon_layout.setContentsMargins(0, 0, 0, 0)
+        completed_icon_layout.addWidget(completed_icon)
+
+        self.completed_label = QLabel("Выполнено задач сегодня: 0")
+        self.completed_label.setStyleSheet("font-size: 14px; color: #2C3E50; background-color: transparent;")
+
+        completed_row.addWidget(completed_icon_container)
+        completed_row.addWidget(self.completed_label)
+        stats_layout.addLayout(completed_row)
+
+        # Строка "Отработано" с красным кружком
+        worked_row = QHBoxLayout()
+        worked_row.setSpacing(8)
+        worked_row.setAlignment(Qt.AlignCenter)
+
+        # Красный кружок для времени
+        worked_icon_container = QLabel()
+        worked_icon_container.setFixedSize(32, 32)
+        worked_icon_container.setAlignment(Qt.AlignCenter)
+        worked_icon_container.setStyleSheet("""
+            background-color: rgba(239, 68, 68, 0.15);
+            border-radius: 16px;
+        """)
+
+        worked_icon = QLabel()
+        worked_pixmap = QPixmap("resources/icons/time1.png")
+        if not worked_pixmap.isNull():
+            worked_pixmap = worked_pixmap.scaled(18, 18, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            worked_icon.setPixmap(worked_pixmap)
+        else:
+            worked_icon.setText("⏱️")
+            worked_icon.setStyleSheet("font-size: 14px;")
+        worked_icon.setAlignment(Qt.AlignCenter)
+
+        worked_icon_layout = QVBoxLayout(worked_icon_container)
+        worked_icon_layout.setContentsMargins(0, 0, 0, 0)
+        worked_icon_layout.addWidget(worked_icon)
+
+        self.worked_label = QLabel("Отработано: 0 ч")
+        self.worked_label.setStyleSheet("font-size: 14px; color: #2C3E50; background-color: transparent;")
+
+        worked_row.addWidget(worked_icon_container)
+        worked_row.addWidget(self.worked_label)
+        stats_layout.addLayout(worked_row)
+
+        layout.addWidget(stats_container)
 
         return widget
+
     def _create_active_topic_block(self) -> QWidget:
         """Создаёт блок активной темы"""
         widget = QFrame()
@@ -189,7 +259,6 @@ class DashboardView(QWidget):
                 background-color: #ffffff;
                 border-radius: 16px;
                 border: none;
-                Color: #ffffff;
             }
         """)
 
@@ -201,9 +270,23 @@ class DashboardView(QWidget):
 
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(15, 12, 15, 12)
+        layout.setSpacing(8)
 
         header_layout = QHBoxLayout()
+        header_layout.setSpacing(8)
+
+        # Круг для иконки
+        icon_container = QLabel()
+        icon_container.setFixedSize(36, 36)
+        icon_container.setAlignment(Qt.AlignCenter)
+        icon_container.setStyleSheet("""
+            background-color: rgba(59, 130, 246, 0.15);
+            border-radius: 18px;
+        """)
+
+        # Иконка внутри круга — по центру
         icon_label = QLabel()
+        icon_label.setAlignment(Qt.AlignCenter)
         pixmap = QPixmap("resources/icons/activ_topic.png")
         if not pixmap.isNull():
             pixmap = pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
@@ -212,9 +295,14 @@ class DashboardView(QWidget):
             icon_label.setText("📌")
             icon_label.setStyleSheet("font-size: 16px; background-color: transparent;")
 
+        container_layout = QVBoxLayout(icon_container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.addWidget(icon_label)
+
         title_label = QLabel("Активная тема")
         title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1E2A3E; background-color: transparent;")
-        header_layout.addWidget(icon_label)
+
+        header_layout.addWidget(icon_container)
         header_layout.addWidget(title_label)
         header_layout.addStretch()
         layout.addLayout(header_layout)
@@ -265,7 +353,6 @@ class DashboardView(QWidget):
                 background-color: #ffffff;
                 border-radius: 16px;
                 border: none;
-                Color: #ffffff;
             }
         """)
 
@@ -277,9 +364,23 @@ class DashboardView(QWidget):
 
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(15, 12, 15, 12)
+        layout.setSpacing(8)
 
+        # Заголовок с иконкой на круге
         header_layout = QHBoxLayout()
+        header_layout.setSpacing(8)
+
+        # Жёлтый круг для иконки сессии
+        icon_container = QLabel()
+        icon_container.setFixedSize(36, 36)
+        icon_container.setAlignment(Qt.AlignCenter)
+        icon_container.setStyleSheet("""
+            background-color: rgba(245, 158, 11, 0.15);
+            border-radius: 18px;
+        """)
+
         icon_label = QLabel()
+        icon_label.setAlignment(Qt.AlignCenter)
         pixmap = QPixmap("resources/icons/session.png")
         if not pixmap.isNull():
             pixmap = pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
@@ -288,23 +389,30 @@ class DashboardView(QWidget):
             icon_label.setText("⏱️")
             icon_label.setStyleSheet("font-size: 16px; background-color: transparent;")
 
+        container_layout = QVBoxLayout(icon_container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.addWidget(icon_label)
+
         title_label = QLabel("Последняя сессия")
         title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1E2A3E; background-color: transparent;")
-        header_layout.addWidget(icon_label)
+
+        header_layout.addWidget(icon_container)
         header_layout.addWidget(title_label)
         header_layout.addStretch()
         layout.addLayout(header_layout)
 
+        # Название темы
         self.last_session_topic = QLabel("—")
         self.last_session_topic.setStyleSheet(
             "font-size: 16px; font-weight: bold; color: #1E2A3E; background-color: transparent;")
         layout.addWidget(self.last_session_topic)
 
+        # Время и концентрация
         stats_layout = QHBoxLayout()
-        self.last_session_duration = QLabel("")
-        self.last_session_duration.setStyleSheet("color: #5A6B7C; background-color: transparent;")
-        self.last_session_conc = QLabel("")
-        self.last_session_conc.setStyleSheet("color: #5A6B7C; background-color: transparent;")
+        stats_layout.setSpacing(16)
+
+        self.last_session_duration = QWidget()
+        self.last_session_conc = QWidget()
         stats_layout.addWidget(self.last_session_duration)
         stats_layout.addWidget(self.last_session_conc)
         stats_layout.addStretch()
@@ -355,7 +463,7 @@ class DashboardView(QWidget):
         layout.addLayout(header_layout)
 
         start_btn = QPushButton("Начать сессию")
-        start_icon = QPixmap("resources/icons/play.png")
+        start_icon = QPixmap("resources/icons/play1.png")
         if not start_icon.isNull():
             start_btn.setIcon(QIcon(start_icon))
             start_btn.setIconSize(QSize(20, 20))
@@ -676,20 +784,17 @@ class DashboardView(QWidget):
         self.greeting_label.setText(f"{greeting}, {user_name}!")
 
         today_stats = self._controller.get_today_stats()
-        stats_text = (
-            f"📋 Выполнено задач сегодня: {today_stats['completed_tasks_today']} "
-            f"| ⏳ Отработано: {today_stats['worked_hours_today']} ч"
-        )
-        self.stats_label.setText(stats_text)
+        self.completed_label.setText(f"Выполнено задач сегодня: {today_stats['completed_tasks_today']}")
+        self.worked_label.setText(f"Отработано: {today_stats['worked_hours_today']} ч")
 
         total_stats = self._controller.get_total_stats()
         self.kpi_row.clear()
-        self.kpi_row.add_card("Темы", str(total_stats['total_topics']), "resources/icons/tema_topic.png")
-        self.kpi_row.add_card("Заметки", str(total_stats['total_notes']), "resources/icons/notes.png")
-        self.kpi_row.add_card("Карточки", str(total_stats['total_flashcards']), "resources/icons/flashcard.png")
-        self.kpi_row.add_card("Задачи", f"{total_stats['completed_tasks']}/{total_stats['total_tasks']}","resources/icons/tack.png")
-        self.kpi_row.add_card("Сессии", str(total_stats['total_sessions']), "resources/icons/session.png")
-        self.kpi_row.add_card("Время", f"{total_stats['total_hours']} ч", "resources/icons/time.png")
+        self.kpi_row.add_card("Темы", str(total_stats['total_topics']), "resources/icons/tema1.png")
+        self.kpi_row.add_card("Заметки", str(total_stats['total_notes']), "resources/icons/notes1.png")
+        self.kpi_row.add_card("Карточки", str(total_stats['total_flashcards']), "resources/icons/flashcard1.png")
+        self.kpi_row.add_card("Задачи", f"{total_stats['completed_tasks']}/{total_stats['total_tasks']}","resources/icons/task1.png")
+        self.kpi_row.add_card("Сессии", str(total_stats['total_sessions']), "resources/icons/session1.png")
+        self.kpi_row.add_card("Время", f"{total_stats['total_hours']} ч", "resources/icons/time1.png")
 
         active_topic = self._controller.get_active_topic()
         if active_topic:
@@ -705,36 +810,98 @@ class DashboardView(QWidget):
             self.active_topic_widget.hide()
 
         last_session = self._controller.get_last_session()
-        if last_session and last_session.get('duration_minutes', 0) > 0:
+        if last_session is not None:
+            self.last_session_widget.show()
+            self.last_session_topic.setText(last_session.get('topic_name', 'Нет данных'))
+            # ... остальной код ...
+
+            # ... остальное
             self.last_session_widget.show()
             self.last_session_topic.setText(last_session['topic_name'])
-            self.last_session_duration.setText(f"resources/icons/time.png {last_session['duration_display']}")
-            self.last_session_conc.setText(f"resources/icons/brain.png {last_session['avg_concentration']}/5")
+
+            # Время — розовый круг
+            duration_layout = self.last_session_duration.layout() if self.last_session_duration.layout() else QHBoxLayout(
+                self.last_session_duration)
+            self.last_session_duration.setLayout(duration_layout)
+            self.last_session_duration.setStyleSheet("border: none; outline: none; background-color: transparent;")
+            for i in reversed(range(duration_layout.count())):
+                duration_layout.itemAt(i).widget().deleteLater()
+
+            # Розовый круг для времени
+            time_container = QLabel()
+            time_container.setFixedSize(28, 28)
+            time_container.setAlignment(Qt.AlignCenter)
+            time_container.setStyleSheet("""
+                background-color: rgba(239, 68, 68, 0.15);
+                border-radius: 14px;
+                border: none;
+                outline: none;
+            """)
+
+            time_icon = QLabel()
+            time_icon.setAlignment(Qt.AlignCenter)
+            time_icon.setStyleSheet("border: none; outline: none; background-color: transparent;")
+            time_pixmap = QPixmap("resources/icons/time1.png")
+            if not time_pixmap.isNull():
+                time_pixmap = time_pixmap.scaled(16, 16, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                time_icon.setPixmap(time_pixmap)
+            else:
+                time_icon.setText("⏱️")
+                time_icon.setStyleSheet("font-size: 12px; border: none;")
+
+            time_container_layout = QVBoxLayout(time_container)
+            time_container_layout.setContentsMargins(0, 0, 0, 0)
+            time_container_layout.addWidget(time_icon)
+
+            time_label = QLabel(last_session['duration_display'])
+            time_label.setStyleSheet("color: #5A6B7C; background-color: transparent; border: none;")
+
+            duration_layout.addWidget(time_container)
+            duration_layout.addWidget(time_label)
+
+            # Концентрация — зелёный круг
+            conc_layout = self.last_session_conc.layout() if self.last_session_conc.layout() else QHBoxLayout(
+                self.last_session_conc)
+            self.last_session_conc.setLayout(conc_layout)
+            self.last_session_conc.setStyleSheet("border: none; outline: none; background-color: transparent;")
+            for i in reversed(range(conc_layout.count())):
+                conc_layout.itemAt(i).widget().deleteLater()
+
+            # Зелёный круг для мозга
+            brain_container = QLabel()
+            brain_container.setFixedSize(28, 28)
+            brain_container.setAlignment(Qt.AlignCenter)
+            brain_container.setStyleSheet("""
+                background-color: rgba(16, 185, 129, 0.15);
+                border-radius: 14px;
+                border: none;
+                outline: none;
+            """)
+
+            brain_icon = QLabel()
+            brain_icon.setAlignment(Qt.AlignCenter)
+            brain_icon.setStyleSheet("border: none; outline: none; background-color: transparent;")
+            brain_pixmap = QPixmap("resources/icons/brain1.png")
+            if not brain_pixmap.isNull():
+                brain_pixmap = brain_pixmap.scaled(16, 16, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                brain_icon.setPixmap(brain_pixmap)
+            else:
+                brain_icon.setText("🧠")
+                brain_icon.setStyleSheet("font-size: 12px; border: none;")
+
+            brain_container_layout = QVBoxLayout(brain_container)
+            brain_container_layout.setContentsMargins(0, 0, 0, 0)
+            brain_container_layout.addWidget(brain_icon)
+
+            conc_label = QLabel(f"{last_session['avg_concentration']}/5")
+            conc_label.setStyleSheet("color: #5A6B7C; background-color: transparent; border: none;")
+
+            conc_layout.addWidget(brain_container)
+            conc_layout.addWidget(conc_label)
+
         else:
+
             self.last_session_widget.hide()
-
-        urgent_tasks = self._controller.get_urgent_tasks()
-        self._update_urgent_tasks(urgent_tasks)
-
-        # Аналитика за сегодня с прогресс-барами
-        today_analytics = self._controller.get_today_analytics()
-        if today_analytics['has_data']:
-            self.today_analytics_widget.show()
-            self.today_time_label.setText(f"{today_analytics['total_hours']} ч")
-
-            # Концентрация (от 0 до 10, переводим в проценты для прогресс-бара)
-            conc_value = today_analytics['avg_concentration']
-            self.today_conc_label.setText(str(conc_value))
-            conc_percent = min(100, int((conc_value / 10) * 100))
-            self.conc_fill.setFixedWidth(int(self.conc_progress.width() * conc_percent / 100))
-
-            # Энергия (от 0 до 10, переводим в проценты)
-            energy_value = today_analytics['avg_energy']
-            self.today_energy_label.setText(str(energy_value))
-            energy_percent = min(100, int((energy_value / 10) * 100))
-            self.energy_fill.setFixedWidth(int(self.energy_progress.width() * energy_percent / 100))
-        else:
-            self.today_analytics_widget.hide()
 
             def resizeEvent(self, event):
                 super().resizeEvent(event)

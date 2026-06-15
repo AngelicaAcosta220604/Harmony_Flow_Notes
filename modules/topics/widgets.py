@@ -301,7 +301,7 @@ class TopicTreeSelector(QWidget):
         layout.addWidget(self.combo)
 
         self.select_btn = QPushButton()
-        self.select_btn.setIcon(QIcon("resources/icons/folder.png"))
+        self.select_btn.setIcon(QIcon("resources/icons/notes1.png"))
         self.select_btn.setIconSize(QSize(16, 16))
         self.select_btn.setFixedWidth(30)
         self.select_btn.setToolTip("Выбрать тему из дерева")
@@ -397,7 +397,7 @@ class TaskListItemWidget(QWidget):
 
         # Кнопка "Редактировать"
         self.edit_btn = QPushButton()
-        self.edit_btn.setIcon(QIcon("resources/icons/pen.png"))
+        self.edit_btn.setIcon(QIcon("resources/icons/rename1.png"))
         self.edit_btn.setIconSize(QSize(16, 16))
         self.edit_btn.setFixedSize(30, 30)
         self.edit_btn.setToolTip("Редактировать задачу")
@@ -406,7 +406,7 @@ class TaskListItemWidget(QWidget):
 
         # Кнопка "Удалить"
         self.delete_btn = QPushButton()
-        self.delete_btn.setIcon(QIcon("resources/icons/urna.png"))
+        self.delete_btn.setIcon(QIcon("resources/icons/delete1.png"))
         self.delete_btn.setIconSize(QSize(16, 16))
         self.delete_btn.setFixedSize(30, 30)
         self.delete_btn.setToolTip("Удалить задачу")

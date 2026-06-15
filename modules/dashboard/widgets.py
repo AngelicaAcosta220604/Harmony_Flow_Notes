@@ -19,7 +19,7 @@ class KpiCard(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumHeight(110)
+        self.setMinimumHeight(150)  # Ещё увеличил высоту
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         self.setStyleSheet("""
@@ -39,12 +39,12 @@ class KpiCard(QFrame):
         # Основной вертикальный layout
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(8)
-        layout.setAlignment(Qt.AlignTop)
+        layout.setSpacing(16)  # Увеличен отступ между элементами
+        layout.setAlignment(Qt.AlignCenter)
 
         # Цветной круг с иконкой
         self.icon_container = QLabel()
-        self.icon_container.setFixedSize(44, 44)
+        self.icon_container.setFixedSize(52, 52)
         self.icon_container.setAlignment(Qt.AlignCenter)
 
         self.icon_label = QLabel()
@@ -56,19 +56,19 @@ class KpiCard(QFrame):
 
         layout.addWidget(self.icon_container)
 
-        # Название
+        # Название (увеличен отступ сверху через padding-top)
         self.title_label = QLabel()
+        self.title_label.setAlignment(Qt.AlignCenter)
         self.title_label.setStyleSheet(
-            "font-size: 12px; color: #6B7280; background-color: transparent; font-weight: 500;")
+            "font-size: 13px; color: #6B7280; background-color: transparent; font-weight: 500; padding-top: 4px;")
         layout.addWidget(self.title_label)
 
         # Значение
         self.value_label = QLabel()
+        self.value_label.setAlignment(Qt.AlignCenter)
         self.value_label.setStyleSheet(
-            "font-size: 26px; font-weight: bold; color: #1F2937; background-color: transparent;")
+            "font-size: 28px; font-weight: bold; color: #1F2937; background-color: transparent;")
         layout.addWidget(self.value_label)
-
-        layout.addStretch()
 
         self.current_title = ""
         self.current_icon_path = ""
@@ -79,7 +79,7 @@ class KpiCard(QFrame):
         g = int(color[3:5], 16)
         b = int(color[5:7], 16)
         self.icon_container.setStyleSheet(f"""
-            border-radius: 22px;
+            border-radius: 26px;
             background-color: rgba({r}, {g}, {b}, 0.15);
         """)
 
@@ -92,7 +92,7 @@ class KpiCard(QFrame):
         # Загружаем иконку
         pixmap = QPixmap(icon_path)
         if not pixmap.isNull():
-            pixmap = pixmap.scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            pixmap = pixmap.scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.icon_label.setPixmap(pixmap)
             self.icon_label.setStyleSheet("background-color: transparent;")
 
