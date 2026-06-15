@@ -2,7 +2,7 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QListWidget, QListWidgetItem, QStackedWidget, QLabel,
-    QPushButton, QFrame, QApplication
+    QPushButton, QFrame, QApplication, QTextEdit, QDialog
 )
 from PySide6.QtCore import Qt, QSize, QTimer, Signal
 from PySide6.QtGui import QFont, QKeySequence, QShortcut
@@ -12,6 +12,7 @@ from core.navigation import Navigation, NavSection
 from .di.container import container
 from .navigation import NavSection, Navigation
 from .event_bus import event_bus
+from widgets import SilentMessageBox
 
 # Импортируем все вьюхи
 from modules.dashboard.view import DashboardView
@@ -185,7 +186,7 @@ class MainWindow(QMainWindow):
         )
         self.content_stack.addWidget(self.focus_active_view)
 
-        # Tasks (глобальные).
+        # Tasks (глобальные)
         self.tasks_view = GlobalTasksView(c.task_controller)
         self.content_stack.addWidget(self.tasks_view)
 
@@ -209,7 +210,7 @@ class MainWindow(QMainWindow):
         self.settings_view = SettingsView(c.settings_controller)
         self.content_stack.addWidget(self.settings_view)
 
-        # Sessions History (дополнительно)
+        # Sessions History
         self.sessions_history_view = SessionsView(c.session_controller)
         self.content_stack.addWidget(self.sessions_history_view)
 
@@ -218,7 +219,7 @@ class MainWindow(QMainWindow):
         self.content_stack.addWidget(self.review_session_view)
 
     def _setup_navigation(self):
-        from core.navigation import Navigation  # <-- добавить эту строку в начало метода
+        from core.navigation import Navigation
         self.navigation = Navigation()
         self.navigation.section_changed.connect(self._on_navigation_changed)
         self.sidebar.currentRowChanged.connect(self._on_sidebar_clicked)
@@ -268,8 +269,6 @@ class MainWindow(QMainWindow):
         view = self._get_view_for_section(section)
         if view:
             self.content_stack.setCurrentWidget(view)
-
-            # Передаём дополнительные данные если есть
             self._handle_navigation_data(section, data)
 
     def _get_view_for_section(self, section: NavSection):
@@ -293,15 +292,12 @@ class MainWindow(QMainWindow):
             return
 
         if section == NavSection.TOPICS and isinstance(data, int):
-            # Открываем конкретную тему
             self.topic_view.set_topic(data)
-            # Переключаем на экран темы (временно добавляем в стек)
             if self.content_stack.indexOf(self.topic_view) == -1:
                 self.content_stack.addWidget(self.topic_view)
             self.content_stack.setCurrentWidget(self.topic_view)
 
         elif section == NavSection.FLASHCARDS and isinstance(data, dict):
-            # Запускаем сессию повторения
             if data.get('action') == 'review':
                 topic_id = data.get('topic_id')
                 if topic_id:
@@ -309,7 +305,6 @@ class MainWindow(QMainWindow):
                     self.content_stack.setCurrentWidget(self.review_session_view)
 
         elif section == NavSection.FOCUS and isinstance(data, dict):
-            # Запускаем активную сессию
             if data.get('action') == 'start':
                 topic_id = data.get('topic_id')
                 topic_name = data.get('topic_name')
@@ -343,13 +338,22 @@ class MainWindow(QMainWindow):
         """Подключает сигналы от вьюх к навигации"""
         c = container
 
-        # Topic view signals
+        # Topic view signals (записи)
         self.topic_view.create_note_requested.connect(
             lambda topic_id: self._open_note_editor(topic_id)
         )
+        self.topic_view.edit_note_requested.connect(self._open_note_editor)
+        self.topic_view.show_all_notes_requested.connect(self._open_note_reader)
+
+        # Topic view signals (задачи)
         self.topic_view.create_task_requested.connect(
             lambda topic_id: self._open_task_creator(topic_id)
         )
+        self.topic_view.edit_task_requested.connect(self._open_task_editor)
+        self.topic_view.delete_task_requested.connect(self._delete_task)
+        self.topic_view.complete_task_requested.connect(self._complete_task)
+
+        # Topic view signals (карточки)
         self.topic_view.create_flashcard_requested.connect(
             lambda topic_id: self._open_flashcard_creator(topic_id)
         )
@@ -414,7 +418,7 @@ class MainWindow(QMainWindow):
         self.settings_view.theme_changed.connect(self._on_theme_changed)
         self.settings_view.settings_changed.connect(self._on_settings_changed)
 
-        # ===== Кнопка назад =====
+        # Кнопка назад
         self.topic_view.back_requested.connect(
             lambda: self.navigation.navigate_to(NavSection.TOPICS)
         )
@@ -440,8 +444,6 @@ class MainWindow(QMainWindow):
         """Обработчик завершения сессии"""
         self.statusBar().showMessage(f"Сессия завершена! Длительность: {duration_minutes} минут")
         self.navigation.navigate_to(NavSection.DASHBOARD)
-
-        # Обновляем аналитику
         self.analytics_view.refresh()
         self.dashboard_view.refresh()
 
@@ -452,7 +454,6 @@ class MainWindow(QMainWindow):
 
     def _on_new_note_hotkey(self):
         """Новая заметка по Ctrl+N"""
-        # TODO: открыть редактор заметок для текущей темы
         pass
 
     def _on_new_task_hotkey(self):
@@ -480,7 +481,6 @@ class MainWindow(QMainWindow):
 
     def _on_settings_changed(self):
         """Обработчик изменения настроек"""
-        # Обновляем уведомления
         enabled = container.settings_controller.get_notifications_enabled()
         container.notification_service.set_enabled(enabled)
 
@@ -494,28 +494,20 @@ class MainWindow(QMainWindow):
 
     def _open_note(self, note_id: int):
         """Открывает заметку для редактирования"""
-        # TODO: перейти к редактору заметок
-        pass
+        self._open_note_editor(note_id)
 
     def _open_task(self, task_id: int):
         """Открывает задачу"""
         self.navigation.navigate_to(NavSection.TASKS)
-        # TODO: выделить задачу в списке
-        pass
 
     def _open_flashcard(self, card_id: int):
         """Открывает карточку"""
         self.navigation.navigate_to(NavSection.FLASHCARDS)
-        # TODO: выделить карточку в списке
-        pass
 
     def _check_onboarding(self):
         """Проверяет, нужно ли показать онбординг при первом запуске"""
-        # Проверяем наличие данных
         topics = container.topic_repo.get_all()
         user_name = container.settings_controller.get_user_name()
-
-        # Если нет тем и имя по умолчанию (или пустое) — запускаем онбординг
         if len(topics) == 0 and user_name == "Пользователь":
             self._show_onboarding()
 
@@ -526,36 +518,166 @@ class MainWindow(QMainWindow):
             container.note_controller,
             container.settings_controller
         )
-
         if wizard.exec():
-            # Онбординг завершён, обновляем дашборд
             self._refresh_topics()
             self.dashboard_view.refresh()
             self.statusBar().showMessage("Добро пожаловать в HFlow!", 3000)
 
     def closeEvent(self, event):
         """Обработчик закрытия окна"""
-        # Корректно завершаем приложение
         app = QApplication.instance()
         from core import HFlowApp
         if isinstance(app, HFlowApp):
             app.shutdown()
         event.accept()
 
-    def _open_note_editor(self, topic_id: int):
+    # ==================== РАБОТА С ЗАПИСЯМИ ====================
+
+    def _open_note_reader(self, note_id: int):
+        """Открыть запись в режиме чтения (как вкладку внутри приложения)"""
+        from core.di.container import container
+        from PySide6.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QLabel, QPushButton, QFrame
+
+        note = container.note_controller.get_note(note_id)
+        if not note:
+            return
+
+        # Удаляем старый виджет чтения, если есть
+        if hasattr(self, '_current_reader') and self._current_reader:
+            self.content_stack.removeWidget(self._current_reader)
+            self._current_reader.deleteLater()
+
+        # Создаём новый виджет
+        self._current_reader = QWidget()
+        layout = QVBoxLayout(self._current_reader)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
+
+        title_label = QLabel(note.title)
+        title_label.setStyleSheet("font-size: 20px; font-weight: bold;")
+        layout.addWidget(title_label)
+
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        layout.addWidget(separator)
+
+        content_text = QTextEdit()
+        content_text.setPlainText(note.content)
+        content_text.setReadOnly(True)
+        content_text.setStyleSheet("""
+            QTextEdit {
+                font-size: 12px;
+                background-color: #fafafa;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 10px;
+            }
+        """)
+        layout.addWidget(content_text, 1)
+
+        back_btn = QPushButton("← Назад к теме")
+        back_btn.setFixedWidth(150)
+        back_btn.clicked.connect(self._close_reader)
+        layout.addWidget(back_btn)
+
+        self.content_stack.addWidget(self._current_reader)
+        self.content_stack.setCurrentWidget(self._current_reader)
+
+    def _close_reader(self):
+        """Закрывает виджет чтения и возвращает к теме"""
+        if hasattr(self, '_current_reader') and self._current_reader:
+            self.content_stack.removeWidget(self._current_reader)
+            self._current_reader.deleteLater()
+            self._current_reader = None
+        self.content_stack.setCurrentWidget(self.topic_view)
+        self.topic_view.refresh()
+
+    def _open_note_editor(self, value):
+        """Открыть редактор заметок (как вкладку внутри приложения)"""
         from modules.notes.editor import NoteEditorView
-        self.note_editor = NoteEditorView(container.note_controller)
-        self.note_editor.create_new_note(topic_id)
-        self.content_stack.addWidget(self.note_editor)
-        self.content_stack.setCurrentWidget(self.note_editor)
+        from PySide6.QtWidgets import QPushButton
+
+        # Удаляем старый редактор, если есть
+        if hasattr(self, '_current_editor') and self._current_editor:
+            self.content_stack.removeWidget(self._current_editor)
+            self._current_editor.deleteLater()
+
+        self._current_editor = NoteEditorView(container.note_controller)
+
+        note = container.note_controller.get_note(value) if value else None
+        if note:
+            self._current_editor.load_note(value)
+        else:
+            self._current_editor.create_new_note(value)
+
+        # Кнопка "Назад к теме"
+        back_btn = QPushButton("← Назад к теме")
+        back_btn.clicked.connect(self._close_editor)
+        back_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #1976d2;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 5px 10px;
+                margin: 2px;
+            }
+            QPushButton:hover {
+                background-color: #1565c0;
+            }
+        """)
+        self._current_editor.toolbar.addWidget(back_btn)
+
+        self.content_stack.addWidget(self._current_editor)
+        self.content_stack.setCurrentWidget(self._current_editor)
+
+    def _close_editor(self):
+        """Закрывает редактор и возвращает к теме"""
+        if hasattr(self, '_current_editor') and self._current_editor:
+            self.content_stack.removeWidget(self._current_editor)
+            self._current_editor.deleteLater()
+            self._current_editor = None
+        self.content_stack.setCurrentWidget(self.topic_view)
+        self.topic_view.refresh()
+
+    # ==================== РАБОТА С ЗАДАЧАМИ ====================
 
     def _open_task_creator(self, topic_id: int):
+        print(f"🟢 _open_task_creator called with topic_id={topic_id}")  # <--- добавить
         from modules.tasks.dialogs import TaskDialog
         dialog = TaskDialog(self, topic_id=topic_id)
-        if dialog.exec():
+        if dialog.exec() == QDialog.Accepted:
             self._refresh_topics()
+            self.topic_view.refresh()
+
+    def _open_task_editor(self, task_id: int):
+        """Открыть редактор задачи"""
+        from modules.tasks.dialogs import TaskDialog
+        task = container.task_controller.get_task(task_id)
+        if task:
+            dialog = TaskDialog(self, task=task)
+            if dialog.exec():
+                self._refresh_topics()
+                self.topic_view.refresh()
+
+    def _delete_task(self, task_id: int):
+        """Удалить задачу"""
+        reply = SilentMessageBox.question(self, "Подтверждение удаления", "Удалить задачу?")
+        if reply == SilentMessageBox.Yes:
+            container.task_controller.delete_task(task_id)
+            self._refresh_topics()
+            self.topic_view.refresh()
+
+    def _complete_task(self, task_id: int):
+        """Отметить задачу выполненной"""
+        container.task_controller.complete_task(task_id)
+        self._refresh_topics()
+        self.topic_view.refresh()
+
+    # ==================== РАБОТА С КАРТОЧКАМИ ====================
 
     def _open_flashcard_creator(self, topic_id: int):
+        """Создать новую карточку в теме"""
         from modules.flashcards.dialogs import CardTypeDialog
         dialog = CardTypeDialog(self)
         if dialog.exec():
@@ -566,10 +688,15 @@ class MainWindow(QMainWindow):
                 container.flashcard_controller.create_qa_card(topic_id, data['question'], data['answer'])
             self._refresh_dashboard()
 
+    # ==================== ФОКУС-СЕССИИ ====================
+
     def _start_focus_session_from_topic(self, topic_id: int):
-        self.navigation.navigate_to(NavSection.FOCUS, {
-            'action': 'start',
-            'topic_id': topic_id,
-            'topic_name': container.topic_controller.get_topic(topic_id).name,
-            'interval': 15
-        })
+        """Запустить фокус-сессию из темы"""
+        topic = container.topic_controller.get_topic(topic_id)
+        if topic:
+            self.navigation.navigate_to(NavSection.FOCUS, {
+                'action': 'start',
+                'topic_id': topic_id,
+                'topic_name': topic.name,
+                'interval': 15
+            })

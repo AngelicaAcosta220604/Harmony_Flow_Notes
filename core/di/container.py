@@ -78,7 +78,13 @@ class Container:
         self.sound_service = SoundService()
 
         # ==================== КОНТРОЛЛЕРЫ ====================
-        self.topic_controller = TopicController(self.topic_repo)
+        self.topic_controller = TopicController(
+            self.topic_repo,
+            self.note_repo,
+            self.task_repo,
+            self.flashcard_repo,
+            self.session_repo
+        )
         self.topic_analytics_controller = TopicAnalyticsController(
             self.session_repo, self.task_repo, self.note_repo, self.flashcard_repo
         )

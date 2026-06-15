@@ -2,7 +2,7 @@
 from PySide6.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QDialog, QDialogButtonBox, QLabel, QComboBox, QLineEdit,
-    QStyle  # Импортируем QStyle для использования стандартных иконок Qt
+    QStyle, QCheckBox  # Импортируем QStyle для использования стандартных иконок Qt
 )
 from PySide6.QtCore import Qt, Signal
 from typing import List, Optional, Callable
@@ -266,3 +266,77 @@ class TopicTreeSelector(QWidget):
         self._load_topics()
         if current_id:
             self.set_selected_topic(current_id)
+
+class TaskListItemWidget(QWidget):
+    """Виджет для отображения задачи в списке с кнопками и чекбоксом"""
+
+    complete_clicked = Signal(int)
+    edit_clicked = Signal(int)
+    delete_clicked = Signal(int)
+
+    def __init__(self, task_id: int, title: str, deadline: str, status: str, is_overdue: bool, parent=None):
+        super().__init__(parent)
+        self.task_id = task_id
+        self._setup_ui(title, deadline, status, is_overdue)
+
+    def _setup_ui(self, title: str, deadline: str, status: str, is_overdue: bool):
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(10)
+
+        # Чекбокс для выполнения
+        self.checkbox = QCheckBox()
+        self.checkbox.setChecked(status == 'completed')
+        self.checkbox.stateChanged.connect(self._on_checkbox_changed)
+        layout.addWidget(self.checkbox)
+
+        # Название задачи
+        self.title_label = QLabel(title)
+        if status == 'completed':
+            self.title_label.setStyleSheet("text-decoration: line-through; color: #888;")
+        elif is_overdue:
+            self.title_label.setStyleSheet("color: #f44336; font-weight: bold;")
+        layout.addWidget(self.title_label, 1)
+
+        # Дедлайн
+        self.deadline_label = QLabel(deadline)
+        self.deadline_label.setStyleSheet("color: #888; font-size: 10px;")
+        layout.addWidget(self.deadline_label)
+
+        # Кнопка "Редактировать"
+        self.edit_btn = QPushButton("✏️")
+        self.edit_btn.setFixedSize(30, 30)
+        self.edit_btn.setToolTip("Редактировать задачу")
+        self.edit_btn.clicked.connect(lambda: self.edit_clicked.emit(self.task_id))
+        layout.addWidget(self.edit_btn)
+
+        # Кнопка "Удалить"
+        self.delete_btn = QPushButton("🗑️")
+        self.delete_btn.setFixedSize(30, 30)
+        self.delete_btn.setToolTip("Удалить задачу")
+        self.delete_btn.clicked.connect(lambda: self.delete_clicked.emit(self.task_id))
+        layout.addWidget(self.delete_btn)
+
+        self.setFixedHeight(50)
+        self.setStyleSheet("""
+            TaskListItemWidget {
+                border-bottom: 1px solid #ddd;
+                background-color: transparent;
+            }
+            TaskListItemWidget:hover {
+                background-color: #f0f0f0;
+            }
+            QPushButton {
+                border: none;
+                background-color: transparent;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+                border-radius: 4px;
+            }
+        """)
+
+    def _on_checkbox_changed(self, state):
+        if state == Qt.Checked:
+            self.complete_clicked.emit(self.task_id)
