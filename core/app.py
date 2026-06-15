@@ -29,6 +29,8 @@ class HFlowApp(QApplication):
         # Инициализируем контейнер зависимостей
         container.init()
 
+        container.session_controller.check_and_pause_active_session()
+
         # Создаём навигацию
         self.navigation = Navigation()
 

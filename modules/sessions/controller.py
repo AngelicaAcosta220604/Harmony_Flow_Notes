@@ -3,6 +3,8 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from PySide6.QtCore import QTimer, QObject, Signal
 
+from datebase.db_manager import db
+
 from datebase.repositories.session_repo import SessionRepository
 from datebase.repositories.session_state_log_repo import SessionStateLogRepository
 from datebase.repositories.quick_note_repo import QuickNoteRepository
@@ -84,18 +86,15 @@ class SessionController(QObject):
             self.timer_updated.emit(self._elapsed_seconds)
 
     def pause_session(self):
-        """Ставит сессию на паузу"""
         if self._current_session and not self._is_paused:
             self._is_paused = True
-            self._current_session.pause()
             self._session_repo.update(self._current_session.id, status='paused')
             self.session_paused.emit()
 
     def resume_session(self):
-        """Возобновляет сессию"""
+        """Возобновляет текущую сессию"""
         if self._current_session and self._is_paused:
             self._is_paused = False
-            self._current_session.resume()
             self._session_repo.update(self._current_session.id, status='active')
             self.session_resumed.emit()
 
@@ -195,10 +194,12 @@ class SessionController(QObject):
         return self._current_session is not None and self._is_paused
 
     def get_session_stats(self, session_id: int) -> Dict[str, Any]:
-        """Возвращает статистику по завершённой сессии"""
-        session = self._session_repo.get_by_id(session_id)
-        if not session:
+        row = self._session_repo.get_by_id(session_id)
+        if not row:
             return {}
+
+        # Преобразуем в dict для безопасности
+        session = dict(row) if not isinstance(row, dict) else row
 
         logs = self._state_log_repo.get_by_session(session_id)
         quick_notes = self._quick_note_repo.get_by_session(session_id)
@@ -226,19 +227,58 @@ class SessionController(QObject):
         rows = self._session_repo.get_all()
         sessions = []
         for row in rows:
-            topic = self._topic_repo.get_by_id(row['topic_id'])
+            row_dict = dict(row) if not isinstance(row, dict) else row
+            topic = self._topic_repo.get_by_id(row_dict['topic_id'])
             sessions.append({
-                'id': row['id'],
+                'id': row_dict['id'],
                 'topic_name': topic['name'] if topic else "—",
-                'date': row['start_time'][:10] if row['start_time'] else "—",
-                'duration_minutes': row.get('duration_minutes') or 0,
-                'duration_display': TimeService.format_duration(row.get('duration_minutes')),
-                'status': row.get('status')
+                'date': row_dict['start_time'][:10] if row_dict['start_time'] else "—",
+                'duration_minutes': row_dict.get('duration_minutes') or 0,
+                'duration_display': TimeService.format_duration(row_dict.get('duration_minutes')),
+                'status': row_dict.get('status')
             })
         return sessions
-
     def cleanup(self):
         """Очищает ресурсы"""
         if self._timer:
             self._timer.stop()
             self._timer = None
+
+    def has_active_or_paused_session(self, topic_id: int = None) -> tuple:
+        """
+        Проверяет, есть ли незавершённые сессии.
+        Возвращает (has_session, session_id, status, topic_id)
+        """
+        from datebase.db_manager import db
+
+        if topic_id:
+            rows = db.fetchall(
+                """SELECT id, status, topic_id FROM sessions 
+                WHERE topic_id = ? AND status IN ('active', 'paused', 'auto_paused')
+                ORDER BY start_time DESC""",
+                (topic_id,)
+            )
+        else:
+            rows = db.fetchall(
+                """SELECT id, status, topic_id FROM sessions 
+                WHERE status IN ('active', 'paused', 'auto_paused')
+                ORDER BY start_time DESC""",
+            )
+
+        if rows:
+            session = rows[0]
+            return True, session['id'], session['status'], session['topic_id']
+        return False, None, None, None
+
+    def check_and_pause_active_session(self):
+        """При запуске приложения ставит на паузу все 'active' сессии из БД"""
+        from datebase.db_manager import db
+
+        rows = db.fetchall(
+            """SELECT id FROM sessions WHERE status = 'active'"""
+        )
+        for row in rows:
+            db.execute(
+                "UPDATE sessions SET status = ? WHERE id = ?",
+                ('paused', row['id'])
+            )

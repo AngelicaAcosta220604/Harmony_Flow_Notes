@@ -1,21 +1,84 @@
-# modules/flashcards/global_view.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QListWidget, QListWidgetItem, QStackedWidget, QTextEdit,
-    QComboBox, QMessageBox
+    QListWidget, QListWidgetItem, QTextEdit, QComboBox,
+    QMessageBox, QDialog, QCheckBox, QDialogButtonBox
 )
 from PySide6.QtCore import Qt, Signal
 
 from .controller import FlashcardController
-from models.flashcard import Flashcard
+from datebase.db_manager import db
+
+
+class ReviewSetupDialog(QDialog):
+    """Диалог для выбора тем и фильтров перед началом повторения"""
+
+    def __init__(td, parent=None):
+        super().__init__(parent)
+        td.setWindowTitle("Настройка повторения")
+        td.resize(400, 500)
+
+        layout = QVBoxLayout(td)
+
+        # Список тем с чекбоксами
+        td.topic_list = QListWidget()
+        td.topic_list.setSelectionMode(QListWidget.NoSelection)
+
+        # Получаем все темы из БД
+        rows = db.fetchall("SELECT id, name FROM topics ORDER BY name")
+        for row in rows:
+            item = QListWidgetItem(row['name'])
+            item.setCheckState(Qt.Checked)  # По умолчанию все выбраны
+            item.setData(Qt.UserRole, row['id'])
+            td.topic_list.addItem(item)
+
+        layout.addWidget(QLabel("Выберите темы для повторения:"))
+        layout.addWidget(td.topic_list)
+
+        # Фильтры
+        td.cb_free = QCheckBox("Включить свободные карточки")
+        td.cb_free.setChecked(True)
+
+        td.cb_qa = QCheckBox("Включить карточки Вопрос-Ответ")
+        td.cb_qa.setChecked(True)
+
+        td.cb_skip = QCheckBox("Пропускать уже выученные (с интервалом > 0)")
+        td.cb_skip.setChecked(True)
+
+        filters_layout = QVBoxLayout()
+        filters_layout.addWidget(td.cb_free)
+        filters_layout.addWidget(td.cb_qa)
+        filters_layout.addWidget(td.cb_skip)
+
+        layout.addLayout(filters_layout)
+
+        # Кнопки ОК / Отмена
+        btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btn_box.accepted.connect(td.accept)
+        btn_box.rejected.connect(td.reject)
+        layout.addWidget(btn_box)
+
+    def get_data(td):
+        """Возвращает кортеж: (topic_ids, include_free, include_qa, skip_reviewed)"""
+        topic_ids = []
+        for i in range(td.topic_list.count()):
+            item = td.topic_list.item(i)
+            if item.checkState() == Qt.Checked:
+                topic_ids.append(item.data(Qt.UserRole))
+
+        return (
+            topic_ids,
+            td.cb_free.isChecked(),
+            td.cb_qa.isChecked(),
+            td.cb_skip.isChecked()
+        )
 
 
 class GlobalCardsView(QWidget):
     """
     Экран для просмотра карточек из всех тем
-        """
-
+    """
     card_selected = Signal(int)  # (card_id)
+    start_review_requested = Signal(list, bool, bool, bool)  # (topic_ids, include_free, include_qa, skip_reviewed)
 
     def __init__(self, controller: FlashcardController, parent=None):
         super().__init__(parent)
@@ -40,12 +103,20 @@ class GlobalCardsView(QWidget):
 
         header_layout.addStretch()
 
+        # Кнопка начала повторения (НОВАЯ)
+        self.start_review_btn = QPushButton("▶ Начать повторение")
+        self.start_review_btn.setStyleSheet(
+            "background-color: #4caf50; color: white; font-weight: bold; "
+            "padding: 6px 12px; border-radius: 4px;"
+        )
+        header_layout.addWidget(self.start_review_btn)
+
         # Фильтр по типу
         self.type_filter = QComboBox()
         self.type_filter.addItem("Все", "all")
         self.type_filter.addItem("Свободные", "free")
         self.type_filter.addItem("Вопрос-Ответ", "qa")
-        header_layout.addWidget(QLabel("Фильтр:"))
+        header_layout.addWidget(QLabel("Фильтلر:"))
         header_layout.addWidget(self.type_filter)
 
         # Кнопка обновления
@@ -74,6 +145,20 @@ class GlobalCardsView(QWidget):
         """Подключает сигналы"""
         self.card_list.itemClicked.connect(self._on_card_selected)
         self.type_filter.currentIndexChanged.connect(self._load_cards)
+        self.start_review_btn.clicked.connect(self._on_start_review_clicked)  # НОВОЕ
+
+    def _on_start_review_clicked(self):
+        """Открывает диалог настройки и запускает повторение"""
+        dialog = ReviewSetupDialog(self)
+        if dialog.exec() == QDialog.Accepted:
+            topic_ids, include_free, include_qa, skip_reviewed = dialog.get_data()
+
+            if not topic_ids:
+                QMessageBox.warning(self, "Внимание", "Выберите хотя бы одну тему для повторения.")
+                return
+
+            # Эмитим сигнал, который ловит main_window.py
+            self.start_review_requested.emit(topic_ids, include_free, include_qa, skip_reviewed)
 
     def _load_cards(self):
         """Загружает карточки с учётом фильтра"""

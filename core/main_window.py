@@ -405,6 +405,7 @@ class MainWindow(QMainWindow):
 
         # Flashcards
         self.flashcards_view.card_selected.connect(self._open_flashcard)
+        self.flashcards_view.start_review_requested.connect(self._start_review_session)
 
         # Search
         self.search_view.topic_selected.connect(
@@ -430,15 +431,39 @@ class MainWindow(QMainWindow):
         event_bus.task_completed.connect(lambda tid: self._refresh_dashboard())
 
     def _start_focus_session(self, topic_id: int, interval: int):
-        """Запускает фокус-сессию"""
         topic = container.topic_controller.get_topic(topic_id)
-        if topic:
-            self.navigation.navigate_to(NavSection.FOCUS, {
-                'action': 'start',
-                'topic_id': topic_id,
-                'topic_name': topic.name,
-                'interval': interval
-            })
+        if not topic:
+            return
+
+        # ПРОВЕРКА НА НЕЗАВЕРШЕННЫЕ СЕССИИ
+        has_session, session_id, status, existing_topic_id = container.session_controller.has_active_or_paused_session(
+            topic_id)
+
+        if has_session:
+            from widgets import SilentMessageBox
+            from PySide6.QtWidgets import QMessageBox
+
+            reply = SilentMessageBox.question(
+                self,
+                "Незавершённая сессия",
+                f"У вас есть {status} сессия для этой темы.\n\n"
+                "• Нажмите «Да» — чтобы завершить её и начать новую\n"
+                "• Нажмите «Нет» — чтобы продолжить существующую сессию",
+                QMessageBox.Yes | QMessageBox.No
+            )
+
+            if reply == QMessageBox.Yes:
+                container.session_controller.end_session(session_id)
+                # Начинаем новую
+                self.focus_active_view.start(topic_id, topic.name, interval)
+            else:
+                # Возобновляем старую
+                self.focus_active_view.resume_existing_session(session_id, topic_id, topic.name)
+        else:
+            # Просто начинаем новую
+            self.focus_active_view.start(topic_id, topic.name, interval)
+
+        self.content_stack.setCurrentWidget(self.focus_active_view)
 
     def _on_session_ended(self, duration_minutes: int):
         """Обработчик завершения сессии"""
@@ -446,6 +471,11 @@ class MainWindow(QMainWindow):
         self.navigation.navigate_to(NavSection.DASHBOARD)
         self.analytics_view.refresh()
         self.dashboard_view.refresh()
+
+    def _start_review_session(self, topic_ids: list, include_free: bool, include_qa: bool, skip_reviewed: bool):
+        # Передаем данные в ReviewSessionView
+        self.review_session_view.start_session(topic_ids, include_free, include_qa, skip_reviewed)
+        self.content_stack.setCurrentWidget(self.review_session_view)
 
     def _on_search_hotkey(self):
         """Глобальный поиск по Ctrl+F"""
@@ -524,7 +554,13 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Добро пожаловать в HFlow!", 3000)
 
     def closeEvent(self, event):
-        """Обработчик закрытия окна"""
+        # Если есть активная сессия — сохраняем её состояние
+        session_id = container.session_controller.get_current_session_id()
+        if session_id and container.session_controller.is_session_active():
+            self.focus_active_view.force_save_time()
+            self.focus_active_view.force_save_state()
+            container.session_controller.pause_session()  # Ставим на паузу в БД
+
         app = QApplication.instance()
         from core import HFlowApp
         if isinstance(app, HFlowApp):
