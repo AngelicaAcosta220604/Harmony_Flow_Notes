@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider,
     QPushButton, QDialog, QProgressBar
 )
-from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal, QSize
 from PySide6.QtGui import QFont
 
 
@@ -20,7 +20,7 @@ class CustomTimer(QWidget):
         layout.setAlignment(Qt.AlignCenter)
 
         self.time_label = QLabel("00:00")
-        font = QFont("Courier New", 48, QFont.Bold)
+        font = QFont("Courier New", 120, QFont.Bold)
         self.time_label.setFont(font)
         self.time_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.time_label)
