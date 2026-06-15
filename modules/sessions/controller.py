@@ -41,41 +41,27 @@ class SessionController(QObject):
         self._current_session: Optional[Session] = None
         self._current_topic_id: Optional[int] = None
         self._elapsed_seconds: int = 0
-        self._timer: Optional[QTimer] = None
         self._is_paused: bool = False
         self._start_time: Optional[datetime] = None
 
-        # 🆕 Для ограничения сохранения ползунков (не чаще раза в минуту)
-        self._last_slider_save_time: Optional[datetime] = None
-
-    def prepare_session(self, topic_id: int) -> bool:
-        """Подготавливает сессию для темы"""
-        topic = self._topic_repo.get_by_id(topic_id)
-        if not topic:
-            return False
-
-        self._current_topic_id = topic_id
-        self._elapsed_seconds = 0
-        self._is_paused = False
-        return True
-
-    def start_session(self) -> int:
-        """Начинает сессию"""
-        session_id = self._session_repo.create(self._current_topic_id)
-        self._current_session = Session.from_row(
-            self._session_repo.get_by_id(session_id)
-        )
-        self._start_time = datetime.now()
-
-        # Запускаем таймер
+        # 🆕 ОДИН таймер на весь жизненный цикл контроллера
         self._timer = QTimer()
         self._timer.timeout.connect(self._on_timer_tick)
-        self._timer.start(1000)
 
-        # 🆕 Начинаем первый интервал работы
-        self.start_interval(session_id)
+        # Для ограничения сохранения ползунков (не чаще раза в минуту)
+        self._last_slider_save_time: Optional[datetime] = None
 
-        return session_id
+    # ==================== УПРАВЛЕНИЕ ТАЙМЕРОМ ====================
+
+    def _start_timer(self):
+        """Запускает таймер (если он ещё не запущен)"""
+        if not self._timer.isActive():
+            self._timer.start(1000)
+
+    def _stop_timer(self):
+        """Останавливает таймер"""
+        if self._timer.isActive():
+            self._timer.stop()
 
     def _on_timer_tick(self):
         """Обновление таймера каждую секунду"""
@@ -83,13 +69,85 @@ class SessionController(QObject):
             self._elapsed_seconds += 1
             self.timer_updated.emit(self._elapsed_seconds)
 
+    # ==================== НОВАЯ СЕССИЯ ====================
+
+    def start_new_session(self, topic_id: int) -> int:
+        """Создаёт и запускает новую сессию"""
+        # Если есть активная сессия - завершаем её
+        if self._current_session:
+            self.end_session()
+
+        topic = self._topic_repo.get_by_id(topic_id)
+        if not topic:
+            return 0
+
+        self._current_topic_id = topic_id
+        self._elapsed_seconds = 0
+        self._is_paused = False
+        self._last_slider_save_time = None
+
+        # Создаём запись в БД
+        session_id = self._session_repo.create(topic_id)
+        self._current_session = Session.from_row(
+            self._session_repo.get_by_id(session_id)
+        )
+        self._start_time = datetime.now()
+
+        # Начинаем первый интервал работы
+        self.start_interval(session_id)
+
+        # Запускаем таймер
+        self._start_timer()
+
+        return session_id
+
+    # ==================== ВОЗОБНОВЛЕНИЕ СТАРОЙ СЕССИИ ====================
+
+    def load_and_resume_session(self, session_id: int) -> bool:
+        """
+        Загружает старую сессию из БД и возобновляет её.
+        Возвращает True если успешно.
+        """
+        # Если есть другая активная сессия - завершаем её
+        if self._current_session and self._current_session.id != session_id:
+            self.end_session()
+
+        row = self._session_repo.get_by_id(session_id)
+        if not row:
+            return False
+
+        # Восстанавливаем состояние
+        self._current_session = Session.from_row(row)
+        self._current_topic_id = row['topic_id']
+        self._last_slider_save_time = None
+
+        # Восстанавливаем время
+        duration_minutes = row.get('duration_minutes', 0) or 0
+        self._elapsed_seconds = duration_minutes * 60
+
+        # Если сессия была активна - продолжаем
+        if row['status'] == 'active':
+            self._is_paused = False
+            # Начинаем новый интервал работы
+            self.start_interval(session_id)
+            # Запускаем таймер
+            self._start_timer()
+        else:
+            # Сессия на паузе - таймер не запускаем
+            self._is_paused = True
+
+        return True
+
+    # ==================== ПАУЗА / ВОЗОБНОВЛЕНИЕ ====================
+
     def pause_session(self):
         """Ставит сессию на паузу"""
         if self._current_session and not self._is_paused:
-            # 🆕 Завершаем текущий интервал
+            # Завершаем текущий интервал
             self.end_interval(self._current_session.id)
 
             self._is_paused = True
+            self._stop_timer()  # 🆕 Просто останавливаем таймер
             self._session_repo.update(self._current_session.id, status='paused')
             self.session_paused.emit()
 
@@ -99,14 +157,11 @@ class SessionController(QObject):
             self._is_paused = False
             self._session_repo.update(self._current_session.id, status='active')
 
-            # 🆕 Начинаем новый интервал работы
+            # Начинаем новый интервал работы
             self.start_interval(self._current_session.id)
 
-            # 🆕 Запускаем таймер, если он не запущен
-            if self._timer is None or not self._timer.isActive():
-                self._timer = QTimer()
-                self._timer.timeout.connect(self._on_timer_tick)
-                self._timer.start(1000)
+            # 🆕 Просто запускаем тот же таймер
+            self._start_timer()
 
             self.session_resumed.emit()
 
@@ -115,7 +170,7 @@ class SessionController(QObject):
         if not self._current_session:
             return 0
 
-        # 🆕 Завершаем последний интервал
+        # Завершаем последний интервал
         self.end_interval(self._current_session.id)
 
         duration_minutes = self._elapsed_seconds // 60
@@ -129,14 +184,17 @@ class SessionController(QObject):
             status
         )
 
-        if self._timer:
-            self._timer.stop()
+        # 🆕 Останавливаем таймер (но не удаляем)
+        self._stop_timer()
 
         self.session_completed.emit(duration_minutes)
 
         session_id = self._current_session.id
         self._current_session = None
+        self._current_topic_id = None
+        self._elapsed_seconds = 0
         self._is_paused = False
+        self._last_slider_save_time = None
 
         return duration_minutes
 
@@ -186,7 +244,6 @@ class SessionController(QObject):
 
         now = datetime.now()
 
-        # Проверяем, прошло ли больше минуты с последнего сохранения
         should_save = False
         if self._last_slider_save_time is None:
             should_save = True
@@ -194,7 +251,6 @@ class SessionController(QObject):
             should_save = True
 
         if should_save:
-            # Сохраняем в state_log
             minute = self.get_duration_minutes()
             self._state_log_repo.create(
                 session_id=self._current_session.id,
@@ -203,10 +259,7 @@ class SessionController(QObject):
                 minute=minute
             )
 
-            # Обновляем текущие значения в sessions
             self.save_slider_value(metric, value)
-
-            # Обновляем время последнего сохранения
             self._last_slider_save_time = now
 
         self.state_changed.emit(metric, value)
@@ -257,6 +310,14 @@ class SessionController(QObject):
 
     def delete_session(self, session_id: int):
         """Удаляет сессию и все связанные данные"""
+        # Если удаляем текущую сессию - останавливаем таймер
+        if self._current_session and self._current_session.id == session_id:
+            self._stop_timer()
+            self._current_session = None
+            self._current_topic_id = None
+            self._elapsed_seconds = 0
+            self._is_paused = False
+
         db.execute("DELETE FROM session_state_logs WHERE session_id = ?", (session_id,))
         db.execute("DELETE FROM quick_notes WHERE session_id = ?", (session_id,))
         db.execute("DELETE FROM session_intervals WHERE session_id = ?", (session_id,))
@@ -278,19 +339,15 @@ class SessionController(QObject):
     # ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
 
     def get_elapsed_seconds(self) -> int:
-        """Возвращает прошедшее время в секундах."""
         return self._elapsed_seconds
 
     def get_elapsed_display(self) -> str:
-        """Возвращает отформатированное время"""
         return TimeService.format_time(self._elapsed_seconds)
 
     def get_duration_minutes(self) -> int:
-        """Возвращает текущую длительность в минутах"""
         return self._elapsed_seconds // 60
 
     def add_quick_note(self, content: str) -> int:
-        """Добавляет быструю запись"""
         if not self._current_session or not self._current_topic_id:
             return -1
 
@@ -301,7 +358,6 @@ class SessionController(QObject):
         )
 
     def get_quick_notes(self) -> List[QuickNote]:
-        """Возвращает быстрые записи текущей сессии"""
         if not self._current_session:
             return []
 
@@ -309,19 +365,15 @@ class SessionController(QObject):
         return [QuickNote.from_row(row) for row in rows]
 
     def get_current_session_id(self) -> Optional[int]:
-        """Возвращает ID текущей сессии"""
         return self._current_session.id if self._current_session else None
 
     def is_session_active(self) -> bool:
-        """Возвращает, активна ли сессия"""
         return self._current_session is not None and not self._is_paused
 
     def is_session_paused(self) -> bool:
-        """Возвращает, на паузе ли сессия"""
         return self._current_session is not None and self._is_paused
 
     def has_active_or_paused_session(self, topic_id: int = None) -> tuple:
-        """Проверяет, есть ли незавершённые сессии"""
         if topic_id:
             rows = db.fetchall(
                 """SELECT id, status, topic_id FROM sessions 
@@ -353,7 +405,6 @@ class SessionController(QObject):
             )
 
     def get_session_stats(self, session_id: int) -> Dict[str, Any]:
-        """Возвращает статистику по завершённой сессии"""
         session = self._session_repo.get_by_id(session_id)
         if not session:
             return {}
@@ -383,7 +434,6 @@ class SessionController(QObject):
         }
 
     def get_all_sessions(self) -> List[Dict[str, Any]]:
-        """Возвращает все сессии"""
         rows = self._session_repo.get_all()
         sessions = []
         for row in rows:
@@ -400,6 +450,4 @@ class SessionController(QObject):
 
     def cleanup(self):
         """Очищает ресурсы"""
-        if self._timer:
-            self._timer.stop()
-            self._timer = None
+        self._stop_timer()

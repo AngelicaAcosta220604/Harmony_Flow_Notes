@@ -449,32 +449,27 @@ class MainWindow(QMainWindow):
         if not topic:
             return
 
-        # ПРОВЕРКА НА НЕЗАВЕРШЕННЫЕ СЕССИИ
+        # Проверяем на незавершённые сессии
         has_session, session_id, status, existing_topic_id = container.session_controller.has_active_or_paused_session(
             topic_id)
 
         if has_session:
-            from widgets import SilentMessageBox
-            from PySide6.QtWidgets import QMessageBox
-
             reply = SilentMessageBox.question(
                 self,
                 "Незавершённая сессия",
                 f"У вас есть {status} сессия для этой темы.\n\n"
                 "• Нажмите «Да» — чтобы завершить её и начать новую\n"
                 "• Нажмите «Нет» — чтобы продолжить существующую сессию",
-                QMessageBox.Yes | QMessageBox.No
+                SilentMessageBox.Yes | SilentMessageBox.No,
+                SilentMessageBox.No
             )
 
-            if reply == QMessageBox.Yes:
-                container.session_controller.end_session(session_id)
-                # Начинаем новую
+            if reply == SilentMessageBox.Yes:
+                container.session_controller.end_session()
                 self.focus_active_view.start(topic_id, topic.name, interval)
             else:
-                # Возобновляем старую
                 self.focus_active_view.resume_existing_session(session_id, topic_id, topic.name)
         else:
-            # Просто начинаем новую
             self.focus_active_view.start(topic_id, topic.name, interval)
 
         self.content_stack.setCurrentWidget(self.focus_active_view)

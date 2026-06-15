@@ -323,11 +323,9 @@ class FocusSetupView(QWidget):
 
         # Проверяем, есть ли активная/пауза сессия для этой темы
         from core.di.container import container
-        has_session, session_id, status, existing_topic_id = container.session_controller.has_active_or_paused_session(
-            topic_id)
+        has_session, session_id, status, existing_topic_id = container.session_controller.has_active_or_paused_session(topic_id)
 
         if has_session:
-            # Показываем диалог: продолжить или начать новую
             reply = SilentMessageBox.question(
                 self,
                 "Незавершённая сессия",
@@ -339,13 +337,10 @@ class FocusSetupView(QWidget):
             )
 
             if reply == SilentMessageBox.Yes:
-                # Завершаем старую сессию
-                container.session_controller.end_session(session_id)
-                # Начинаем новую
+                container.session_controller.end_session()
                 interval = self.interval_combo.currentData()
                 self.start_session.emit(topic_id, interval)
             else:
-                # Возобновляем старую сессию
                 from core.main_window import MainWindow
                 main_window = self.window()
                 if isinstance(main_window, MainWindow):
@@ -356,7 +351,6 @@ class FocusSetupView(QWidget):
                         )
                         main_window.content_stack.setCurrentWidget(main_window.focus_active_view)
         else:
-            # Начинаем новую сессию
             interval = self.interval_combo.currentData()
             self.start_session.emit(topic_id, interval)
 

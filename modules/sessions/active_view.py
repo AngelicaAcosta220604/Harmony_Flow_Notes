@@ -338,18 +338,28 @@ class FocusActiveView(QWidget):
         self.ping_manager.reset_idle()
 
     def start(self, topic_id: int, topic_name: str, activity_check_interval: int):
-        """
-        Запускает сессию
-        """
+        """Запускает НОВУЮ сессию"""
         self._activity_check_interval = activity_check_interval
         self.topic_label.setText(f"Работа над темой: {topic_name}")
 
-        self._session_controller.prepare_session(topic_id)
-        self._session_controller.start_session()
+        # 🆕 Используем новый метод, который создаёт новую сессию
+        session_id = self._session_controller.start_new_session(topic_id)
 
+        if not session_id:
+            SilentMessageBox.warning(self, "Ошибка", "Не удалось создать сессию")
+            return
+
+        # Сбрасываем UI
+        self.timer.reset()
         self.state_sliders.reset()
 
-        # Запускаем PingManager с новым интервалом
+        # Обновляем UI
+        self.status_label.setText("Сессия активна")
+        self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
+        self.pause_btn.setText("Пауза")
+        self.pause_btn.setIcon(QIcon("resources/icons/pause.png"))
+
+        # Запускаем PingManager
         self.ping_manager = PingManager(
             idle_ms=self._activity_check_interval * 60 * 1000,
             timeout_ms=90 * 60 * 1000,
@@ -358,6 +368,7 @@ class FocusActiveView(QWidget):
         self.ping_manager.pingNeeded.connect(self._show_ping_dialog)
         self.ping_manager.timeoutReached.connect(self._auto_pause_from_ping)
 
+        # Запускаем музыку если настроена
         default_sound = self._music_controller.get_current_sound()
         if default_sound and default_sound != 'off':
             self.music_widget._controller.resume()
@@ -400,42 +411,42 @@ class FocusActiveView(QWidget):
         super().hideEvent(event)
 
     def resume_existing_session(self, session_id: int, topic_id: int, topic_name: str):
-        """Загружает старую сессию из БД"""
+        """Загружает СТАРУЮ сессию из БД"""
         self.topic_label.setText(f"Работа над темой: {topic_name}")
 
-        from datebase.db_manager import db
-        row = db.fetchone("SELECT * FROM sessions WHERE id = ?", (session_id,))
-        if not row:
+        # 🆕 Используем новый метод контроллера
+        success = self._session_controller.load_and_resume_session(session_id)
+        if not success:
+            SilentMessageBox.warning(self, "Ошибка", "Не удалось загрузить сессию")
             return
 
-        # Восстанавливаем время (duration_minutes * 60 = секунды)
-        duration_minutes = row.get('duration_minutes', 0) or 0
-        total_seconds = duration_minutes * 60
+        # Восстанавливаем UI
+        total_seconds = self._session_controller.get_elapsed_seconds()
         self.timer.set_time(total_seconds)
 
-        # Восстанавливаем ползунки через контроллер
+        # Восстанавливаем ползунки
         slider_values = self._session_controller.get_slider_values(session_id)
-        # Маппинг: focus (из БД) -> conc_slider (в UI)
         self.state_sliders.conc_slider.setValue(slider_values.get('focus', 50))
         self.state_sliders.energy_slider.setValue(slider_values.get('energy', 50))
         self.state_sliders.interest_slider.setValue(slider_values.get('interest', 50))
 
-        # 🆕 Устанавливаем текущую сессию в контроллере
-        self._session_controller._current_session = self._session_controller.get_session(session_id)
-        self._session_controller._current_topic_id = topic_id
-        self._session_controller._elapsed_seconds = total_seconds
-        self._session_controller._is_paused = (row['status'] == 'paused')
-
-        # Если сессия была активна — продолжаем
-        if row['status'] == 'active':
-            self._session_controller.resume_session()
+        # Обновляем UI в зависимости от статуса
+        if self._session_controller.is_session_active():
             self.status_label.setText("Сессия активна")
             self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
             self.pause_btn.setText("Пауза")
             self.pause_btn.setIcon(QIcon("resources/icons/pause.png"))
         else:
-            # Сессия на паузе - таймер не запускается
             self.status_label.setText("Сессия на паузе")
             self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
             self.pause_btn.setText("Возобновить")
             self.pause_btn.setIcon(QIcon("resources/icons/play.png"))
+
+        # Запускаем PingManager
+        self.ping_manager = PingManager(
+            idle_ms=self._activity_check_interval * 60 * 1000,
+            timeout_ms=90 * 60 * 1000,
+            parent=self
+        )
+        self.ping_manager.pingNeeded.connect(self._show_ping_dialog)
+        self.ping_manager.timeoutReached.connect(self._auto_pause_from_ping)
