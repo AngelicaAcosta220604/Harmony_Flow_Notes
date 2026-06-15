@@ -56,21 +56,19 @@ class TaskController:
             deadline: Optional[str] = None
     ) -> int:
         """
-        Создаёт новую задачу
-
-        Args:
-            title: Название задачи
-            description: Описание
-            topic_id: ID темы (может быть None для общих задач)
-            deadline: Дедлайн в ISO формате
-
-        Returns:
-            ID созданной задачи
+        Создаёт новую задачу и эмитит сигнал
         """
         if not title.strip():
             raise ValueError("Название задачи не может быть пустым")
 
-        return self._task_repo.create(title.strip(), description, topic_id, deadline)
+        task_id = self._task_repo.create(title.strip(), description, topic_id, deadline)
+
+        # 🆕 Эмитим сигнал создания задачи
+        if task_id:
+            from core.event_bus import event_bus
+            event_bus.task_created.emit(task_id)
+
+        return task_id
 
     def update_task(self, task_id: int, **kwargs) -> bool:
         """Обновляет задачу"""
@@ -85,8 +83,11 @@ class TaskController:
 
     def delete_task(self, task_id: int) -> bool:
         """Удаляет задачу"""
-        rows_affected = self._task_repo.delete(task_id)
-        return rows_affected > 0
+        success = self._task_repo.delete(task_id)
+        if success:
+            from core.event_bus import event_bus
+            event_bus.task_deleted.emit(task_id)
+        return success
 
     def delete_tasks_by_topic(self, topic_id: int) -> int:
         """Удаляет все задачи темы"""

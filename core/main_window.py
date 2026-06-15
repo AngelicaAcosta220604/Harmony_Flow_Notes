@@ -709,12 +709,33 @@ class MainWindow(QMainWindow):
     # ==================== РАБОТА С ЗАДАЧАМИ ====================
 
     def _open_task_creator(self, topic_id: int):
-        print(f"🟢 _open_task_creator called with topic_id={topic_id}")  # <--- добавить
+        """Открывает диалог создания задачи и сохраняет её"""
         from modules.tasks.dialogs import TaskDialog
+
         dialog = TaskDialog(self, topic_id=topic_id)
         if dialog.exec() == QDialog.Accepted:
-            self._refresh_topics()
-            self.topic_view.refresh()
+            task_data = dialog.get_task_data()
+
+            task_id = container.task_controller.create_task(
+                title=task_data['title'],
+                description=task_data.get('description', ''),
+                topic_id=task_data.get('topic_id'),
+                deadline=task_data.get('deadline')
+            )
+
+            if task_id:
+                # 🆕 Показываем уведомление
+                self.statusBar().showMessage(f"✅ Задача «{task_data['title']}» создана!", 3000)
+
+                # 🆕 Эмитим сигнал для обновления UI
+                from core.event_bus import event_bus
+                event_bus.task_created.emit(task_id)
+
+                # 🆕 Обновляем тему если она открыта
+                if self.content_stack.currentWidget() == self.topic_view:
+                    self.topic_view.refresh()
+
+                self._refresh_dashboard()
 
     def _open_task_editor(self, task_id: int):
         """Открыть редактор задачи"""

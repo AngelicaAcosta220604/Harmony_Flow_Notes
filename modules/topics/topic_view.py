@@ -549,6 +549,18 @@ class TopicView(QWidget):
         self._stat_value_labels = {}
         self._setup_ui()
 
+        # 🆕 Подписываемся на события задач для автообновления
+        from core.event_bus import event_bus
+        event_bus.task_created.connect(self._on_task_changed)
+        event_bus.task_completed.connect(self._on_task_changed)
+        event_bus.task_deleted.connect(self._on_task_changed)
+
+    def _on_task_changed(self, task_id: int = None):
+        """Обновляет список задач при изменении"""
+        if self._current_topic_id:
+            self._load_tasks(self._current_topic_id)
+            self._load_stats(self._current_topic_id)
+
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
