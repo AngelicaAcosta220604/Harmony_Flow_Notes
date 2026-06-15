@@ -1,13 +1,13 @@
 # modules/notes/widgets.py
 from PySide6.QtWidgets import (
     QTextEdit, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QComboBox, QToolBar, QColorDialog, QFontComboBox, QLabel, QMenu
+    QComboBox, QToolBar, QColorDialog, QFontComboBox, QLabel, QMenu, QSizePolicy, QFrame, QGraphicsDropShadowEffect
 )
 from widgets import SilentMessageBox
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import (
     QTextCursor, QTextCharFormat, QFont, QColor, QAction,
-    QKeySequence, QTextListFormat
+    QKeySequence, QTextListFormat, QPixmap
 )
 
 
@@ -27,6 +27,10 @@ class RichTextEditor(QTextEdit):
         super().__init__(parent)
         self._setup_editor()
         self._connect_signals()
+
+        # 🆕 Минимальная высота для редактора
+        self.setMinimumHeight(400)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     def _setup_editor(self):
         """Настраивает редактор"""
@@ -201,6 +205,9 @@ class EditorToolbar(QToolBar):
         self.setMovable(False)
         self.setFloatable(False)
 
+        # 🆕 Разрешаем перенос инструментов
+        self.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+
         # Кнопки форматирования
         self.add_action("B", "Жирный (Ctrl+B)", self._editor.toggle_bold)
         self.add_action("I", "Курсив (Ctrl+I)", self._editor.toggle_italic)
@@ -264,6 +271,11 @@ class EditorToolbar(QToolBar):
         self.hint_label.setStyleSheet("color: #888888; font-size: 10px; margin-left: 10px;")
         self.addWidget(self.hint_label)
 
+        #  Добавляем растягивающийся spacer в конец
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.addWidget(spacer)
+
     def add_action(self, text: str, tooltip: str, callback) -> QAction:
         action = QAction(text, self)
         action.setToolTip(tooltip)
@@ -307,3 +319,4 @@ class EditorToolbar(QToolBar):
             )
             return
         self._editor.create_card_from_selection.emit(selected)
+
