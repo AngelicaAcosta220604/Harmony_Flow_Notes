@@ -1,73 +1,104 @@
-# modules/dashboard/widgets.py
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (
+    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QFrame
+)
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QPixmap, QFont
 
 
 class KpiCard(QFrame):
-    """
-    Карточка с ключевым показателем (KPI)
-    """
+    """Карточка KPI с иконкой, названием и значением"""
 
-    def __init__(self, title: str, value: str, icon: str = "", parent=None):
+    def __init__(self, title: str = "", value: str = "", icon_path: str = None, parent=None):
         super().__init__(parent)
         self.setFrameShape(QFrame.StyledPanel)
-        self.setFrameShadow(QFrame.Raised)
         self.setProperty("class", "kpi-card")
+        self.setFixedHeight(100)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(15, 10, 15, 10)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(10)
 
-        # Верхняя строка с иконкой и заголовком
-        top_layout = QHBoxLayout()
+        # Иконка
+        self.icon_label = QLabel()
+        self.icon_path = icon_path
+        self._update_icon()
 
-        if icon:
-            icon_label = QLabel(icon)
-            icon_label.setStyleSheet("font-size: 24px;")
-            top_layout.addWidget(icon_label)
+        # Текстовая часть (виджет, а не layout)
+        text_widget = QWidget()
+        text_layout = QVBoxLayout(text_widget)
+        text_layout.setSpacing(4)
 
-        title_label = QLabel(title)
-        title_label.setStyleSheet("font-size: 12px; color: #888888;")
-        top_layout.addWidget(title_label)
-        top_layout.addStretch()
+        self.title_label = QLabel(title)
+        self.title_label.setStyleSheet("font-size: 12px; color: #888888;")
 
-        layout.addLayout(top_layout)
+        self.value_label = QLabel(value)
+        self.value_label.setStyleSheet("font-size: 24px; font-weight: bold;")
 
-        # Значение
-        value_label = QLabel(str(value))
-        value_label.setStyleSheet("font-size: 28px; font-weight: bold;")
-        value_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(value_label)
+        text_layout.addWidget(self.title_label)
+        text_layout.addWidget(self.value_label)
+        text_layout.addStretch()
 
-        self.setMinimumWidth(120)
+        layout.addWidget(self.icon_label)
+        layout.addWidget(text_widget)
+        layout.addStretch()
+
+    def _update_icon(self):
+        """Обновляет иконку"""
+        if self.icon_path:
+            pixmap = QPixmap(self.icon_path)
+            if not pixmap.isNull():
+                pixmap = pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.icon_label.setPixmap(pixmap)
+                return
+        self.icon_label.setText("📊")
+        self.icon_label.setStyleSheet("font-size: 32px;")
 
     def set_value(self, value: str):
         """Обновляет значение"""
-        value_label = self.findChild(QLabel, "value")
-        if value_label:
-            value_label.setText(str(value))
+        self.value_label.setText(value)
+
+    def set_title(self, title: str):
+        """Обновляет название"""
+        self.title_label.setText(title)
+
+    def set_icon(self, icon_path: str):
+        """Обновляет иконку"""
+        self.icon_path = icon_path
+        self._update_icon()
 
 
 class KpiRow(QWidget):
-    """
-    Строка с несколькими KPI карточками
-    """
+    """Ряд карточек KPI"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.layout = QHBoxLayout(self)
-        self.layout.setSpacing(15)
-        self.layout.setContentsMargins(0, 0, 0, 0)
+        layout = QHBoxLayout(self)
+        layout.setSpacing(15)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-    def add_card(self, title: str, value: str, icon: str = "") -> KpiCard:
-        """Добавляет карточку и возвращает её для обновления"""
-        card = KpiCard(title, value, icon)
-        self.layout.addWidget(card)
-        return card
+        # Создаём 6 карточек
+        self._cards = []
+        for i in range(6):
+            card = KpiCard()
+            self._cards.append(card)
+            layout.addWidget(card)
+
+        layout.addStretch()
+
+    def add_card(self, title: str, value: str, icon_path: str = None):
+        """Добавляет или обновляет карточку"""
+        for card in self._cards:
+            if card.title_label.text() == "" or card.title_label.text() == title:
+                card.set_title(title)
+                card.set_value(value)
+                if icon_path:
+                    card.set_icon(icon_path)
+                card.show()
+                return
 
     def clear(self):
-        """Очищает все карточки"""
-        while self.layout.count():
-            child = self.layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+        """Очищает все карточки (скрывает их)"""
+        for card in self._cards:
+            card.hide()
+            card.set_title("")
+            card.set_value("")
