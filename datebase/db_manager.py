@@ -101,10 +101,25 @@ class DatabaseManager:
                 end_time DATETIME,
                 duration_minutes INTEGER,
                 status TEXT DEFAULT 'active',
+                focus INTEGER DEFAULT 50,
+                energy INTEGER DEFAULT 50,
+                interest INTEGER DEFAULT 50,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
             )
         ''')
+
+        cursor.execute("PRAGMA table_info(sessions)")
+        columns = [row[1] for row in cursor.fetchall()]
+
+        if 'focus' not in columns:
+            cursor.execute("ALTER TABLE sessions ADD COLUMN focus INTEGER DEFAULT 50")
+        if 'energy' not in columns:
+            cursor.execute("ALTER TABLE sessions ADD COLUMN energy INTEGER DEFAULT 50")
+        if 'interest' not in columns:
+            cursor.execute("ALTER TABLE sessions ADD COLUMN interest INTEGER DEFAULT 50")
+        if 'elapsed_seconds' not in columns:
+            cursor.execute("ALTER TABLE sessions ADD COLUMN elapsed_seconds INTEGER DEFAULT 0")
 
         # session_state_logs (логи состояния во время сессий)
         cursor.execute('''
@@ -229,6 +244,18 @@ class DatabaseManager:
                 FOREIGN KEY (flashcard_id) REFERENCES flashcards(id) ON DELETE CASCADE
                 )
             ''')
+
+        # session_intervals (интервалы активной работы)
+        cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS session_intervals (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        session_id INTEGER NOT NULL,
+                        start_time DATETIME,
+                        end_time DATETIME,
+                        duration_seconds INTEGER DEFAULT 0,
+                        FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+                    )
+                ''')
 
         conn.commit()
 

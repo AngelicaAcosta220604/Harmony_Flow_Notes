@@ -107,24 +107,25 @@ class StateSliders(QWidget):
         layout.addLayout(self.interest_layout)
 
     def _connect_signals(self):
-        self.conc_slider.valueChanged.connect(lambda v: self._on_value_changed("concentration", v))
+        # 🆕 Изменяем "concentration" на "focus" для консистентности с БД
+        self.conc_slider.valueChanged.connect(lambda v: self._on_value_changed("focus", v))
         self.energy_slider.valueChanged.connect(lambda v: self._on_value_changed("energy", v))
         self.interest_slider.valueChanged.connect(lambda v: self._on_value_changed("interest", v))
 
     def _on_value_changed(self, metric: str, value: int):
-        if metric == "concentration":
+        if metric == "focus":
             self.conc_value_label.setText(str(value))
         elif metric == "energy":
             self.energy_value_label.setText(str(value))
         elif metric == "interest":
-            self.interest_value_label.setText(str(value))  # <-- ДОБАВИТЬ
+            self.interest_value_label.setText(str(value))
         self.state_changed.emit(metric, value)
 
     def get_values(self) -> dict:
         return {
-            'concentration': self.conc_slider.value(),
+            'focus': self.conc_slider.value(),  # 🆕 Было 'concentration'
             'energy': self.energy_slider.value(),
-            'interest': self.interest_slider.value()  # <-- ДОБАВИТЬ
+            'interest': self.interest_slider.value()
         }
 
     def reset(self):

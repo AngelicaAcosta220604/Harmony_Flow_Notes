@@ -1,19 +1,253 @@
-# modules/sessions/history_view.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox
+    QFrame, QScrollArea, QSizePolicy
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtGui import QIcon, QPixmap
 
+from widgets import SilentMessageBox
 from .controller import SessionController
+
+
+class SessionCard(QFrame):
+    """Карточка одной сессии"""
+
+    resume_clicked = Signal(int)  # session_id
+    delete_clicked = Signal(int)  # session_id
+    analytics_clicked = Signal(int)  # session_id
+    intervals_toggled = Signal(int, bool)  # session_id, is_expanded
+
+    def __init__(self, session_data: dict, parent=None):
+        super().__init__(parent)
+        self.session_id = session_data['id']
+        self.session_data = session_data
+        self._is_expanded = False
+        self._setup_ui()
+
+    def _setup_ui(self):
+        self.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border-radius: 12px;
+                border: 1px solid #E6EEF6;
+            }
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(8)
+
+        # Верхняя строка: статус + тема + длительность
+        top_layout = QHBoxLayout()
+        top_layout.setSpacing(12)
+
+        # Статус (цветной бейдж)
+        status = self.session_data.get('status', 'completed')
+        if status == 'active':
+            status_text = " Активна"
+            status_color = "#10B981"
+        elif status == 'paused':
+            status_text = " Пауза"
+            status_color = "#F59E0B"
+        elif status == 'completed':
+            status_text = "✅ Завершена"
+            status_color = "#3B82F6"
+        else:
+            status_text = "⚪ Авто"
+            status_color = "#6B7280"
+
+        status_label = QLabel(status_text)
+        status_label.setStyleSheet(f"color: {status_color}; font-weight: 600; font-size: 13px;")
+        top_layout.addWidget(status_label)
+
+        # Тема
+        topic_label = QLabel(self.session_data.get('topic_name', '—'))
+        topic_label.setStyleSheet("font-weight: 600; color: #1F2937; font-size: 14px;")
+        top_layout.addWidget(topic_label, 1)
+
+        # Длительность
+        duration_label = QLabel(self.session_data.get('duration_display', '—'))
+        duration_label.setStyleSheet("color: #6B7280; font-size: 13px;")
+        top_layout.addWidget(duration_label)
+
+        layout.addLayout(top_layout)
+
+        # Вторая строка: время начала/конца + статистика
+        middle_layout = QHBoxLayout()
+        middle_layout.setSpacing(16)
+
+        # Время
+        start_time = self.session_data.get('start_time', '')[:16] if self.session_data.get('start_time') else '—'
+        end_time = self.session_data.get('end_time', '')[:16] if self.session_data.get('end_time') else '—'
+        time_label = QLabel(f"🕐 {start_time} → {end_time}")
+        time_label.setStyleSheet("color: #6B7280; font-size: 12px;")
+        middle_layout.addWidget(time_label)
+
+        # Статистика ползунков (если есть)
+        avg_focus = self.session_data.get('avg_focus', 0)
+        avg_energy = self.session_data.get('avg_energy', 0)
+        avg_interest = self.session_data.get('avg_interest', 0)
+
+        if avg_focus or avg_energy or avg_interest:
+            stats_label = QLabel(f"🧠 {avg_focus} | ⚡ {avg_energy} | ❤️ {avg_interest}")
+            stats_label.setStyleSheet("color: #6B7280; font-size: 12px;")
+            middle_layout.addWidget(stats_label)
+
+        middle_layout.addStretch()
+        layout.addLayout(middle_layout)
+
+        # Кнопки
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(8)
+
+        # Кнопка "Интервалы" (раскрывающаяся)
+        intervals_count = self.session_data.get('intervals_count', 0)
+        if intervals_count > 0:
+            self.intervals_btn = QPushButton(f"📋 Интервалы ({intervals_count})")
+            self.intervals_btn.setIconSize(QSize(14, 14))
+            self.intervals_btn.setFixedHeight(32)
+            self.intervals_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(107, 114, 128, 0.1);
+                    color: #6B7280;
+                    border: 1px solid #E6EEF6;
+                    border-radius: 8px;
+                    padding: 4px 12px;
+                    font-size: 12px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(107, 114, 128, 0.2);
+                }
+            """)
+            self.intervals_btn.clicked.connect(self._on_intervals_clicked)
+            buttons_layout.addWidget(self.intervals_btn)
+
+        # Кнопка "Продолжить" (только для active/paused)
+        if status in ('active', 'paused'):
+            resume_btn = QPushButton("▶ Продолжить")
+            resume_btn.setIconSize(QSize(14, 14))
+            resume_btn.setFixedHeight(32)
+            resume_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(16, 185, 129, 0.15);
+                    color: #059669;
+                    border: 1px solid #10B981;
+                    border-radius: 8px;
+                    padding: 4px 12px;
+                    font-size: 12px;
+                    font-weight: 500;
+                }
+                QPushButton:hover {
+                    background-color: rgba(16, 185, 129, 0.25);
+                }
+            """)
+            resume_btn.clicked.connect(lambda: self.resume_clicked.emit(self.session_id))
+            buttons_layout.addWidget(resume_btn)
+
+        # Кнопка "Аналитика"
+        analytics_btn = QPushButton("📊 Аналитика")
+        analytics_btn.setIconSize(QSize(14, 14))
+        analytics_btn.setFixedHeight(32)
+        analytics_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(59, 130, 246, 0.15);
+                color: #3B82F6;
+                border: 1px solid #3B82F6;
+                border-radius: 8px;
+                padding: 4px 12px;
+                font-size: 12px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: rgba(59, 130, 246, 0.25);
+            }
+        """)
+        analytics_btn.clicked.connect(lambda: self.analytics_clicked.emit(self.session_id))
+        buttons_layout.addWidget(analytics_btn)
+
+        buttons_layout.addStretch()
+
+        # Кнопка "Удалить"
+        delete_btn = QPushButton("🗑")
+        delete_btn.setIconSize(QSize(14, 14))
+        delete_btn.setFixedSize(32, 32)
+        delete_btn.setToolTip("Удалить сессию")
+        delete_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(239, 68, 68, 0.15);
+                color: #EF4444;
+                border: 1px solid #EF4444;
+                border-radius: 8px;
+                padding: 4px;
+            }
+            QPushButton:hover {
+                background-color: rgba(239, 68, 68, 0.25);
+            }
+        """)
+        delete_btn.clicked.connect(self._on_delete_clicked)
+        buttons_layout.addWidget(delete_btn)
+
+        layout.addLayout(buttons_layout)
+
+        # Контейнер для интервалов (скрыт по умолчанию)
+        self.intervals_container = QFrame()
+        self.intervals_container.setVisible(False)
+        self.intervals_container.setStyleSheet("""
+            QFrame {
+                background-color: #F9FAFB;
+                border-radius: 8px;
+                border: 1px solid #E6EEF6;
+            }
+        """)
+        intervals_layout = QVBoxLayout(self.intervals_container)
+        intervals_layout.setContentsMargins(12, 8, 12, 8)
+        intervals_layout.setSpacing(4)
+
+        # Загружаем интервалы
+        intervals = self.session_data.get('intervals', [])
+        if intervals:
+            for i, interval in enumerate(intervals):
+                start = interval.get('start_time', '')[:16] if interval.get('start_time') else '—'
+                end = interval.get('end_time', '')[:16] if interval.get('end_time') else '—'
+                duration = interval.get('duration_seconds', 0)
+                duration_min = duration // 60
+                duration_sec = duration % 60
+
+                interval_label = QLabel(f"  #{i + 1}: {start} → {end} ({duration_min}м {duration_sec}с)")
+                interval_label.setStyleSheet("color: #4B5563; font-size: 12px;")
+                intervals_layout.addWidget(interval_label)
+        else:
+            no_intervals_label = QLabel("  Нет данных об интервалах")
+            no_intervals_label.setStyleSheet("color: #9CA3AF; font-size: 12px; font-style: italic;")
+            intervals_layout.addWidget(no_intervals_label)
+
+        layout.addWidget(self.intervals_container)
+
+    def _on_intervals_clicked(self):
+        """Переключает видимость интервалов"""
+        self._is_expanded = not self._is_expanded
+        self.intervals_container.setVisible(self._is_expanded)
+        self.intervals_toggled.emit(self.session_id, self._is_expanded)
+
+    def _on_delete_clicked(self):
+        """Удаление сессии"""
+        reply = SilentMessageBox.question(
+            self, "Удалить сессию?",
+            "Вы действительно хотите удалить эту сессию?\nЭто действие нельзя отменить."
+        )
+        if reply == SilentMessageBox.Yes:
+            self.delete_clicked.emit(self.session_id)
 
 
 class SessionsView(QWidget):
     """
     Экран истории сессий.
+    Показывает все сессии (активные, пауза, завершённые) в виде карточек.
     """
 
     session_selected = Signal(int)  # session_id
+    session_resumed = Signal(int)  # session_id
+    session_deleted = Signal()
 
     def __init__(self, controller: SessionController, parent=None):
         super().__init__(parent)
@@ -25,76 +259,133 @@ class SessionsView(QWidget):
     def _setup_ui(self):
         """Настраивает интерфейс"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(16)
 
         # Заголовок
-        header_layout = QHBoxLayout()
-        title_label = QLabel("⏱️ История сессий")
-        title_label.setStyleSheet("font-size: 18px; font-weight: bold;")
-        header_layout.addWidget(title_label)
+        header_widget = QWidget()
+        header_widget.setStyleSheet("""
+            QWidget {
+                background-color: #FFFFFF;
+                border-radius: 16px;
+                border: none;
+            }
+        """)
+        header_widget.setFixedHeight(80)
+
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(20, 0, 20, 0)
+        header_layout.setSpacing(12)
+        header_layout.setAlignment(Qt.AlignCenter)
+
+        header_icon = QLabel()
+        header_pixmap = QPixmap("resources/icons/session.png")
+        if not header_pixmap.isNull():
+            header_pixmap = header_pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            header_icon.setPixmap(header_pixmap)
+        header_layout.addWidget(header_icon)
+
+        header_title = QLabel("История сессий")
+        header_title.setStyleSheet("font-size: 20px; font-weight: bold; color: #1F2937;")
+        header_layout.addWidget(header_title)
 
         header_layout.addStretch()
 
         self.refresh_btn = QPushButton("🔄 Обновить")
+        self.refresh_btn.setFixedWidth(120)
+        self.refresh_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(59, 130, 246, 0.15);
+                color: #3B82F6;
+                border: 1px solid #3B82F6;
+                border-radius: 12px;
+                padding: 8px 14px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: rgba(59, 130, 246, 0.25);
+            }
+        """)
         header_layout.addWidget(self.refresh_btn)
 
-        layout.addLayout(header_layout)
+        layout.addWidget(header_widget)
 
-        # Таблица
-        self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["Дата", "Тема", "Длительность", "Статус", ""])
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        # Скроллируемая область с карточками
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet("background-color: transparent; border: none;")
 
-        layout.addWidget(self.table)
+        self.cards_container = QWidget()
+        self.cards_layout = QVBoxLayout(self.cards_container)
+        self.cards_layout.setContentsMargins(0, 0, 0, 0)
+        self.cards_layout.setSpacing(12)
+        self.cards_layout.addStretch()
+
+        scroll.setWidget(self.cards_container)
+        layout.addWidget(scroll)
 
     def _connect_signals(self):
         """Подключает сигналы"""
         self.refresh_btn.clicked.connect(self._load_sessions)
-        self.table.cellDoubleClicked.connect(self._on_cell_double_clicked)
 
     def _load_sessions(self):
-        """Загружает сессии в таблицу"""
-        sessions = self._controller.get_all_sessions()
+        """Загружает все сессии в виде карточек"""
+        # Очищаем старые карточки
+        while self.cards_layout.count() > 1:  # 1 = stretch
+            item = self.cards_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
 
-        self.table.setRowCount(len(sessions))
+        # Получаем все сессии
+        all_sessions = self._controller.get_all_sessions()
 
-        for row, session in enumerate(sessions):
-            # Дата
-            date_item = QTableWidgetItem(session['date'])
-            self.table.setItem(row, 0, date_item)
+        if not all_sessions:
+            no_sessions_label = QLabel("📭 Нет сессий. Начните первую сессию!")
+            no_sessions_label.setAlignment(Qt.AlignCenter)
+            no_sessions_label.setStyleSheet("color: #6B7280; font-size: 14px; padding: 40px;")
+            self.cards_layout.insertWidget(0, no_sessions_label)
+            return
 
-            # Тема
-            topic_item = QTableWidgetItem(session['topic_name'])
-            self.table.setItem(row, 1, topic_item)
+        # Сортируем: сначала active/paused, потом completed по дате
+        def sort_key(s):
+            if s['status'] in ('active', 'paused'):
+                return (0, s['date'])
+            return (1, s['date'])
 
-            # Длительность
-            duration_item = QTableWidgetItem(session['duration_display'])
-            self.table.setItem(row, 2, duration_item)
+        all_sessions.sort(key=sort_key, reverse=True)
 
-            # Статус
-            status_text = "✅ Завершена" if session['status'] == 'completed' else "🔄 Авто-завершена"
-            status_item = QTableWidgetItem(status_text)
-            self.table.setItem(row, 3, status_item)
+        for session_data in all_sessions:
+            # Получаем расширенную статистику
+            stats = self._controller.get_session_stats(session_data['id'])
+            session_data.update(stats)
 
-            # Кнопка "Аналитика"
-            btn = QPushButton("📊 Аналитика")
-            btn.clicked.connect(lambda checked, sid=session['id']: self.session_selected.emit(sid))
-            self.table.setCellWidget(row, 4, btn)
+            # Получаем интервалы
+            intervals = self._controller.get_session_intervals(session_data['id'])
+            session_data['intervals'] = intervals
 
-    def _on_cell_double_clicked(self, row: int, column: int):
-        """Обработчик двойного клика по строке"""
-        sessions = self._controller.get_all_sessions()
-        if row < len(sessions):
-            self.session_selected.emit(sessions[row]['id'])
+            # Создаём карточку
+            card = SessionCard(session_data)
+            card.resume_clicked.connect(self._on_resume_clicked)
+            card.delete_clicked.connect(self._on_delete_clicked)
+            card.analytics_clicked.connect(self._on_analytics_clicked)
+
+            self.cards_layout.insertWidget(self.cards_layout.count() - 1, card)
+
+    def _on_resume_clicked(self, session_id: int):
+        """Возобновление сессии"""
+        self.session_resumed.emit(session_id)
+
+    def _on_delete_clicked(self, session_id: int):
+        """Удаление сессии"""
+        self._controller.delete_session(session_id)
+        self._load_sessions()
+        self.session_deleted.emit()
+
+    def _on_analytics_clicked(self, session_id: int):
+        """Показать аналитику сессии"""
+        self.session_selected.emit(session_id)
 
     def refresh(self):
-        """Обновляет таблицу"""
+        """Обновляет список"""
         self._load_sessions()
