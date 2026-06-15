@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QPushButton, QFrame, QApplication, QTextEdit, QDialog
 )
 from PySide6.QtCore import Qt, QSize, QTimer, Signal
-from PySide6.QtGui import QFont, QKeySequence, QShortcut
+from PySide6.QtGui import QFont, QKeySequence, QShortcut, QIcon
 
 from core.navigation import Navigation, NavSection
 
@@ -31,7 +31,8 @@ from modules.settings.view import SettingsView
 from onboarding.wizard import OnboardingWizard
 
 #импорт иконок
-from PySide6.QtGui import QPixmap
+# импорт иконок
+from PySide6.QtGui import QPixmap, QIcon
 
 class MainWindow(QMainWindow):
     """
@@ -73,15 +74,15 @@ class MainWindow(QMainWindow):
 
         # Пункты меню
         self.menu_items = {
-            NavSection.DASHBOARD: self._add_menu_item("resources/icons/topic.png", "Главная"),
-            NavSection.TOPICS: self._add_menu_item("resources/icons/notes.png", "Темы"),
-            NavSection.FOCUS: self._add_menu_item("resources/icons/session.png", "Фокус"),
-            NavSection.TASKS: self._add_menu_item("resources/icons/tack.png", "Задачи"),
-            NavSection.CALENDAR: self._add_menu_item("resources/icons/calendar.png", "Календарь"),
-            NavSection.FLASHCARDS: self._add_menu_item("resources/icons/flashcard.png", "Карточки"),
-            NavSection.ANALYTICS: self._add_menu_item("resources/icons/analitics.png", "Аналитика"),
-            NavSection.SEARCH: self._add_menu_item("resources/icons/search.png", "Поиск"),
-            NavSection.SETTINGS: self._add_menu_item("resources/icons/settings.png", "Настройки"),
+            NavSection.DASHBOARD: self._add_menu_item("resources/icons/home1.png", "Главная"),
+            NavSection.TOPICS: self._add_menu_item("resources/icons/tema1.png", "Темы"),
+            NavSection.FOCUS: self._add_menu_item("resources/icons/session1.png", "Фокус"),
+            NavSection.TASKS: self._add_menu_item("resources/icons/task1.png", "Задачи"),
+            NavSection.CALENDAR: self._add_menu_item("resources/icons/calendar1.png", "Календарь"),
+            NavSection.FLASHCARDS: self._add_menu_item("resources/icons/flashcard1.png", "Карточки"),
+            NavSection.ANALYTICS: self._add_menu_item("resources/icons/analytics1.png", "Аналитика"),
+            NavSection.SEARCH: self._add_menu_item("resources/icons/search1.png", "Поиск"),
+            NavSection.SETTINGS: self._add_menu_item("resources/icons/setting1.png", "Настройки"),
         }
 
         main_layout.addWidget(self.sidebar)
@@ -135,7 +136,7 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         sidebar_width = self.sidebar.width()
-        new_size = max(14, min(20, sidebar_width // 12))
+        new_size = max(16, min(24, sidebar_width // 12))
         if new_size != getattr(self, '_last_icon_size', 0):
             self._last_icon_size = new_size
             self._update_menu_icons_size(new_size)
@@ -664,19 +665,23 @@ class MainWindow(QMainWindow):
             self._current_editor.create_new_note(value)
 
         # Кнопка "Назад к теме"
-        back_btn = QPushButton("← Назад к теме")
+        back_btn = QPushButton(" Назад к теме")
+        back_btn.setIcon(QIcon("resources/icons/left1.png"))
+        back_btn.setIconSize(QSize(16, 16))
         back_btn.clicked.connect(self._close_editor)
         back_btn.setStyleSheet("""
             QPushButton {
-                background-color: #1976d2;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 5px 10px;
-                margin: 2px;
+                background-color: rgba(59, 130, 246, 0.15);
+                color: #3B82F6;
+                border: 1px solid #3B82F6;
+                border-radius: 12px;
+                padding: 6px 12px;
+                font-weight: 500;
             }
             QPushButton:hover {
-                background-color: #1565c0;
+                background-color: rgba(59, 130, 246, 0.25);
+                border: 1px solid #2563EB;
+                color: #2563EB;
             }
         """)
         self._current_editor.toolbar.addWidget(back_btn)
