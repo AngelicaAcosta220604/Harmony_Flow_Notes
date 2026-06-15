@@ -109,6 +109,16 @@ class DatabaseManager:
             )
         ''')
 
+        cursor.execute("PRAGMA table_info(sessions)")
+        columns = [row[1] for row in cursor.fetchall()]
+
+        if 'focus' not in columns:
+            cursor.execute("ALTER TABLE sessions ADD COLUMN focus INTEGER DEFAULT 50")
+        if 'energy' not in columns:
+            cursor.execute("ALTER TABLE sessions ADD COLUMN energy INTEGER DEFAULT 50")
+        if 'interest' not in columns:
+            cursor.execute("ALTER TABLE sessions ADD COLUMN interest INTEGER DEFAULT 50")
+
         # session_state_logs (логи состояния во время сессий)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS session_state_logs (
