@@ -656,9 +656,8 @@ class MainWindow(QMainWindow):
         self.topic_view.refresh()
 
     def _open_note_editor(self, value):
-        """Открыть редактор заметок (как вкладку внутри приложения)"""
+        """Открыть редактор заметок"""
         from modules.notes.editor import NoteEditorView
-        from PySide6.QtWidgets import QPushButton
 
         # Удаляем старый редактор, если есть
         if hasattr(self, '_current_editor') and self._current_editor:
@@ -673,27 +672,8 @@ class MainWindow(QMainWindow):
         else:
             self._current_editor.create_new_note(value)
 
-        # Кнопка "Назад к теме"
-        back_btn = QPushButton(" Назад к теме")
-        back_btn.setIcon(QIcon("resources/icons/left1.png"))
-        back_btn.setIconSize(QSize(16, 16))
-        back_btn.clicked.connect(self._close_editor)
-        back_btn.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(59, 130, 246, 0.15);
-                color: #3B82F6;
-                border: 1px solid #3B82F6;
-                border-radius: 12px;
-                padding: 6px 12px;
-                font-weight: 500;
-            }
-            QPushButton:hover {
-                background-color: rgba(59, 130, 246, 0.25);
-                border: 1px solid #2563EB;
-                color: #2563EB;
-            }
-        """)
-        self._current_editor.toolbar.addWidget(back_btn)
+        # 🆕 Подключаем встроенную кнопку "Назад" редактора
+        self._current_editor.back_btn.clicked.connect(self._close_editor)
 
         self.content_stack.addWidget(self._current_editor)
         self.content_stack.setCurrentWidget(self._current_editor)

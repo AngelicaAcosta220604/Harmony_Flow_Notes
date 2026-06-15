@@ -15,6 +15,36 @@ from datebase.repositories.topic_repo import TopicRepository
 from widgets import SilentMessageBox
 
 
+class TaskListItem(QWidget):
+    """Кастомный виджет для элемента списка задач с обрезкой текста через ..."""
+
+    def __init__(self, text: str, parent=None):
+        super().__init__(parent)
+        self._full_text = text
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(8, 4, 8, 4)
+
+        self.label = QLabel(text)
+        self.label.setStyleSheet("color: #1F2937; font-size: 13px;")
+        layout.addWidget(self.label)
+
+    def setText(self, text: str):
+        self._full_text = text
+        self.label.setText(text)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._elide_text()
+
+    def _elide_text(self):
+        """Обрезает текст через ... если не влезает"""
+        metrics = self.label.fontMetrics()
+        # Оставляем запас для отступов
+        available_width = self.label.width() - 10
+        elided = metrics.elidedText(self._full_text, Qt.ElideRight, available_width)
+        self.label.setText(elided)
+
 class GlobalTasksView(QWidget):
     """
     Глобальный экран задач с фильтрацией.
@@ -573,7 +603,6 @@ class GlobalTasksView(QWidget):
             return
 
         for task in tasks:
-            item = QListWidgetItem()
             topic_name = self._controller.get_topic_name(task)
 
             if task.status == 'completed':
@@ -584,9 +613,16 @@ class GlobalTasksView(QWidget):
                 icon = "🟢"
 
             deadline_str = f" (до {task.deadline_display})" if task.deadline else ""
-            item.setText(f"{icon} {task.title} [{topic_name}]{deadline_str}")
+            full_text = f"{icon} {task.title} [{topic_name}]{deadline_str}"
+
+            # 🆕 Используем кастомный виджет вместо QListWidgetItem
+            item = QListWidgetItem()
+            item_widget = TaskListItem(full_text)
+            item.setSizeHint(item_widget.sizeHint())
             item.setData(Qt.UserRole, task.id)
+
             self.task_list.addItem(item)
+            self.task_list.setItemWidget(item, item_widget)
 
     def _filter_by_period(self, tasks, period):
         today = date.today()
@@ -641,8 +677,12 @@ class GlobalTasksView(QWidget):
         self._current_task = task
         self.stack.setCurrentIndex(1)
 
+        # 🆕 Настраиваем перенос текста
+        self.detail_title.setWordWrap(True)
         self.detail_title.setText(task.title)
+
         self.detail_desc.setPlainText(task.description or "Нет описания")
+        # QTextEdit уже переносит строки по умолчанию
 
         if task.deadline:
             deadline_dt = datetime.fromisoformat(task.deadline)

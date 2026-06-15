@@ -39,8 +39,27 @@ class NoteEditorView(QWidget):
         layout.addWidget(self.toolbar)
         layout.addWidget(self.editor)
 
+        # 🆕 Нижняя панель с заголовком и кнопками
         bottom_layout = QHBoxLayout()
         bottom_layout.setContentsMargins(10, 5, 10, 5)
+
+        # 🆕 Кнопка "Назад" слева
+        self.back_btn = QPushButton("← Назад")
+        self.back_btn.setFixedWidth(80)
+        self.back_btn.setStyleSheet("""
+               QPushButton {
+                   background-color: rgba(59, 130, 246, 0.15);
+                   color: #3B82F6;
+                   border: 1px solid #3B82F6;
+                   border-radius: 8px;
+                   padding: 6px 12px;
+                   font-weight: 500;
+               }
+               QPushButton:hover {
+                   background-color: rgba(59, 130, 246, 0.25);
+               }
+           """)
+        bottom_layout.addWidget(self.back_btn)
 
         self.title_edit = QLineEdit()
         self.title_edit.setPlaceholderText("Заголовок заметки...")
@@ -68,6 +87,7 @@ class NoteEditorView(QWidget):
         self.save_btn.clicked.connect(self.save_note)
         self.delete_btn.clicked.connect(self.delete_note)
         self.import_btn.clicked.connect(self.import_from_file)
+        self.back_btn.clicked.connect(self._on_back_clicked)  # 🆕 Сигнал кнопки "Назад"
         self.editor.content_changed.connect(self._on_content_changed)
         self.title_edit.textChanged.connect(self._on_content_changed)
 
@@ -75,21 +95,54 @@ class NoteEditorView(QWidget):
         self.editor.create_card_from_selection.connect(self._create_card_from_selection)
 
     def _setup_auto_save(self):
+        """Настраивает автосохранение с задержкой 2 секунды"""
+        self._auto_save_timer = QTimer()
+        self._auto_save_timer.setSingleShot(True)  # 🆕 Одноразовый таймер
         self._auto_save_timer.timeout.connect(self._auto_save)
-        self._auto_save_timer.setInterval(60000)
 
     def set_auto_save_interval(self, seconds: int):
         self._auto_save_timer.setInterval(seconds * 1000)
 
     def _on_content_changed(self):
+        """Обработчик изменений - запускает таймер автосохранения"""
         self._is_modified = True
         self.status_label.setText("✏️ Есть несохранённые изменения")
-        if not self._auto_save_timer.isActive():
-            self._auto_save_timer.start()
+
+        # 🆕 Перезапускаем таймер (debounce 2 секунды)
+        self._auto_save_timer.start(2000)
 
     def _auto_save(self):
-        if self._is_modified and self._current_note_id:
-            self.save_note(silent=True)
+        """Автосохранение с задержкой"""
+        if self._is_modified:
+            if self._current_note_id:
+                # Существующая заметка - обновляем
+                self.save_note(silent=True)
+            elif self._current_topic_id:
+                # 🆕 Новая заметка - создаём автоматически
+                self._create_note_and_save()
+
+    def _create_note_and_save(self):
+        """Создаёт новую заметку и сохраняет"""
+        title = self.title_edit.text().strip()
+        if not title:
+            title = f"Заметка от {self._get_current_date()}"
+
+        content = self.editor.get_html()
+
+        note_id = self._controller.create_note(
+            topic_id=self._current_topic_id,
+            title=title,
+            content=content
+        )
+
+        if note_id:
+            self._current_note_id = note_id
+            self._is_modified = False
+            self.status_label.setText(f"✅ Создано и сохранено (ID: {note_id})")
+            self.note_saved.emit(note_id)
+            QTimer.singleShot(2000, lambda: self.status_label.setText("Готов к работе"))
+        else:
+            self.status_label.setText("️ Не удалось создать заметку")
 
     def save_note(self, silent: bool = False):
         title = self.title_edit.text().strip()
@@ -277,3 +330,8 @@ class NoteEditorView(QWidget):
                 SilentMessageBox.information(self, "Успех", "Задача создана из заметки")
         except ValueError as e:
             SilentMessageBox.warning(self, "Ошибка", str(e))
+
+    def _on_back_clicked(self):
+        """Обработчик кнопки 'Назад'"""
+        # Сигнал будет подключён в main_window.py
+        pass
