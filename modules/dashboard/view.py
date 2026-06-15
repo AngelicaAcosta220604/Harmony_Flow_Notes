@@ -1,15 +1,13 @@
-# modules/dashboard/view.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QFrame, QMessageBox
+    QScrollArea, QFrame, QMessageBox, QGraphicsDropShadowEffect
 )
 from PySide6.QtCore import Qt, Signal, QSize
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QPixmap, QIcon, QColor
 
 from .controller import DashboardController
 from .widgets import KpiRow, KpiCard
 
-from PySide6.QtGui import QPixmap, QIcon
 
 class DashboardView(QWidget):
     """
@@ -45,7 +43,7 @@ class DashboardView(QWidget):
 
         content_widget = QWidget()
         self.content_layout = QVBoxLayout(content_widget)
-        self.content_layout.setSpacing(25)
+        self.content_layout.setSpacing(20)
 
         # Пустое состояние (будет показано если нет данных)
         self.empty_widget = self._create_empty_state()
@@ -55,29 +53,39 @@ class DashboardView(QWidget):
         self.greeting_widget = self._create_greeting_block()
         self.content_layout.addWidget(self.greeting_widget)
 
-        # Блок KPI (общая статистика)
+        # Блок KPI (общая статистика) — 6 карточек в ряд
         self.kpi_row = KpiRow()
         self.content_layout.addWidget(self.kpi_row)
 
-        # Блок активной темы
+        # Ряд 1: Активная тема + Последняя сессия (2 блока в строке)
+        row1_layout = QHBoxLayout()
+        row1_layout.setSpacing(20)
+
         self.active_topic_widget = self._create_active_topic_block()
-        self.content_layout.addWidget(self.active_topic_widget)
-
-        # Блок последней сессии
         self.last_session_widget = self._create_last_session_block()
-        self.content_layout.addWidget(self.last_session_widget)
 
-        # Блок срочных задач
+        # Даём обоим блокам одинаковый коэффициент растяжения
+        row1_layout.addWidget(self.active_topic_widget, 1)
+        row1_layout.addWidget(self.last_session_widget, 1)
+
+        self.content_layout.addLayout(row1_layout)
+
+        # Блок срочных задач (на всю ширину)
         self.urgent_tasks_widget = self._create_urgent_tasks_block()
         self.content_layout.addWidget(self.urgent_tasks_widget)
 
-        # Блок быстрого старта
-        self.quick_start_widget = self._create_quick_start_block()
-        self.content_layout.addWidget(self.quick_start_widget)
+        # Ряд 2: Быстрый старт + Сегодня (2 блока в строке)
+        row2_layout = QHBoxLayout()
+        row2_layout.setSpacing(20)
 
-        # Блок аналитики за сегодня
+        self.quick_start_widget = self._create_quick_start_block()
         self.today_analytics_widget = self._create_today_analytics_block()
-        self.content_layout.addWidget(self.today_analytics_widget)
+
+        # Даём обоим блокам одинаковый коэффициент растяжения
+        row2_layout.addWidget(self.quick_start_widget, 1)
+        row2_layout.addWidget(self.today_analytics_widget, 1)
+
+        self.content_layout.addLayout(row2_layout)
 
         self.content_layout.addStretch()
 
@@ -124,17 +132,49 @@ class DashboardView(QWidget):
         return widget
 
     def _create_greeting_block(self) -> QWidget:
-        """Создаёт блок приветствия"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(0, 0, 0, 0)
+        """Создаёт блок приветствия в стиле плашки"""
+        widget = QFrame()
+        widget.setFrameShape(QFrame.StyledPanel)
+        widget.setProperty("class", "dashboard-card")
 
+        widget.setStyleSheet("""
+            QFrame {
+                background-color: #ffffff;
+                border-radius: 16px;
+                border: none;
+            }
+        """)
+
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        shadow.setOffset(2, 2)
+        shadow.setColor(QColor(0, 0, 0, 30))
+        widget.setGraphicsEffect(shadow)
+
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(8)
+        layout.setAlignment(Qt.AlignCenter)
+
+        # Приветствие
         self.greeting_label = QLabel()
-        self.greeting_label.setStyleSheet("font-size: 24px; font-weight: bold;")
+        self.greeting_label.setAlignment(Qt.AlignCenter)
+        self.greeting_label.setStyleSheet("""
+            font-size: 22px; 
+            font-weight: bold; 
+            color: #1E2A3E; 
+            background-color: transparent;
+        """)
         layout.addWidget(self.greeting_label)
 
+        # Статистика
         self.stats_label = QLabel()
-        self.stats_label.setStyleSheet("color: #666666;")
+        self.stats_label.setAlignment(Qt.AlignCenter)
+        self.stats_label.setStyleSheet("""
+            font-size: 14px; 
+            color: #2C3E50; 
+            background-color: transparent;
+        """)
         layout.addWidget(self.stats_label)
 
         return widget
@@ -145,22 +185,63 @@ class DashboardView(QWidget):
         widget.setFrameShape(QFrame.StyledPanel)
         widget.setProperty("class", "dashboard-card")
 
+        widget.setStyleSheet("""
+            QFrame {
+                background-color: #ffffff;
+                border-radius: 16px;
+                border: none;
+                Color: #ffffff;
+            }
+        """)
+
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        shadow.setOffset(2, 2)
+        shadow.setColor(QColor(0, 0, 0, 30))
+        widget.setGraphicsEffect(shadow)
+
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(15, 12, 15, 12)
 
-        title_label = QLabel("resources/icons/activ_topic Активная тема") # канц.кнопка активная тема
-        title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1976d2;")
-        layout.addWidget(title_label)
+        header_layout = QHBoxLayout()
+        icon_label = QLabel()
+        pixmap = QPixmap("resources/icons/activ_topic.png")
+        if not pixmap.isNull():
+            pixmap = pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            icon_label.setPixmap(pixmap)
+        else:
+            icon_label.setText("📌")
+            icon_label.setStyleSheet("font-size: 16px; background-color: transparent;")
+
+        title_label = QLabel("Активная тема")
+        title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1E2A3E; background-color: transparent;")
+        header_layout.addWidget(icon_label)
+        header_layout.addWidget(title_label)
+        header_layout.addStretch()
+        layout.addLayout(header_layout)
 
         self.active_topic_name = QLabel("—")
-        self.active_topic_name.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.active_topic_name.setStyleSheet(
+            "font-size: 18px; font-weight: bold; color: #1E2A3E; background-color: transparent;")
         layout.addWidget(self.active_topic_name)
 
         self.active_topic_info = QLabel("")
-        self.active_topic_info.setStyleSheet("color: #888888; font-size: 12px;")
+        self.active_topic_info.setStyleSheet("color: #5A6B7C; font-size: 12px; background-color: transparent;")
         layout.addWidget(self.active_topic_info)
 
         open_btn = QPushButton("Открыть тему")
+        open_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(0, 0, 0, 0.08);
+                color: #1E2A3E;
+                border: none;
+                border-radius: 8px;
+                padding: 6px;
+            }
+            QPushButton:hover {
+                background-color: rgba(0, 0, 0, 0.15);
+            }
+        """)
         open_btn.clicked.connect(self._on_open_active_topic)
         layout.addWidget(open_btn)
 
@@ -173,10 +254,24 @@ class DashboardView(QWidget):
         widget.setFrameShape(QFrame.StyledPanel)
         widget.setProperty("class", "dashboard-card")
 
+        widget.setStyleSheet("""
+            QFrame {
+                background-color: #ffffff;
+                border-radius: 16px;
+                border: none;
+                Color: #ffffff;
+            }
+        """)
+
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        shadow.setOffset(2, 2)
+        shadow.setColor(QColor(0, 0, 0, 30))
+        widget.setGraphicsEffect(shadow)
+
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(15, 12, 15, 12)
 
-        # Заголовок с иконкой
         header_layout = QHBoxLayout()
         icon_label = QLabel()
         pixmap = QPixmap("resources/icons/session.png")
@@ -185,21 +280,25 @@ class DashboardView(QWidget):
             icon_label.setPixmap(pixmap)
         else:
             icon_label.setText("⏱️")
+            icon_label.setStyleSheet("font-size: 16px; background-color: transparent;")
 
         title_label = QLabel("Последняя сессия")
-        title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1976d2;")
+        title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1E2A3E; background-color: transparent;")
         header_layout.addWidget(icon_label)
         header_layout.addWidget(title_label)
         header_layout.addStretch()
         layout.addLayout(header_layout)
 
         self.last_session_topic = QLabel("—")
-        self.last_session_topic.setStyleSheet("font-size: 16px; font-weight: bold;")
+        self.last_session_topic.setStyleSheet(
+            "font-size: 16px; font-weight: bold; color: #1E2A3E; background-color: transparent;")
         layout.addWidget(self.last_session_topic)
 
         stats_layout = QHBoxLayout()
         self.last_session_duration = QLabel("")
+        self.last_session_duration.setStyleSheet("color: #5A6B7C; background-color: transparent;")
         self.last_session_conc = QLabel("")
+        self.last_session_conc.setStyleSheet("color: #5A6B7C; background-color: transparent;")
         stats_layout.addWidget(self.last_session_duration)
         stats_layout.addWidget(self.last_session_conc)
         stats_layout.addStretch()
@@ -214,10 +313,24 @@ class DashboardView(QWidget):
         widget.setFrameShape(QFrame.StyledPanel)
         widget.setProperty("class", "dashboard-card")
 
+        widget.setStyleSheet("""
+            QFrame {
+                background-color: #ffffff;
+                border-radius: 16px;
+                border: none;
+                Color: #ffffff;
+            }
+        """)
+
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        shadow.setOffset(2, 2)
+        shadow.setColor(QColor(0, 0, 0, 30))
+        widget.setGraphicsEffect(shadow)
+
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(15, 12, 15, 12)
 
-        # Заголовок с иконкой
         header_layout = QHBoxLayout()
         icon_label = QLabel()
         pixmap = QPixmap("resources/icons/rocket.png")
@@ -226,21 +339,33 @@ class DashboardView(QWidget):
             icon_label.setPixmap(pixmap)
         else:
             icon_label.setText("🚀")
+            icon_label.setStyleSheet("font-size: 16px; background-color: transparent;")
 
         title_label = QLabel("Быстрый старт")
-        title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1976d2;")
+        title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1E2A3E; background-color: transparent;")
         header_layout.addWidget(icon_label)
         header_layout.addWidget(title_label)
         header_layout.addStretch()
         layout.addLayout(header_layout)
 
-        # Кнопка с иконкой
         start_btn = QPushButton("Начать сессию")
         start_icon = QPixmap("resources/icons/play.png")
         if not start_icon.isNull():
             start_btn.setIcon(QIcon(start_icon))
             start_btn.setIconSize(QSize(20, 20))
-        start_btn.setStyleSheet("font-size: 16px; padding: 10px;")
+        start_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(0, 0, 0, 0.08);
+                color: #1E2A3E;
+                border: none;
+                border-radius: 8px;
+                padding: 8px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: rgba(0, 0, 0, 0.15);
+            }
+        """)
         start_btn.clicked.connect(self.start_session_requested.emit)
         layout.addWidget(start_btn)
 
@@ -252,10 +377,24 @@ class DashboardView(QWidget):
         widget.setFrameShape(QFrame.StyledPanel)
         widget.setProperty("class", "dashboard-card")
 
+        widget.setStyleSheet("""
+            QFrame {
+                background-color: #ffffff;
+                border-radius: 16px;
+                border: none;
+                Color: #ffffff;
+            }
+        """)
+
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        shadow.setOffset(2, 2)
+        shadow.setColor(QColor(0, 0, 0, 30))
+        widget.setGraphicsEffect(shadow)
+
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(15, 12, 15, 12)
 
-        # Заголовок с иконкой
         header_layout = QHBoxLayout()
         icon_label = QLabel()
         pixmap = QPixmap("resources/icons/warning.png")
@@ -264,71 +403,31 @@ class DashboardView(QWidget):
             icon_label.setPixmap(pixmap)
         else:
             icon_label.setText("⚠️")
+            icon_label.setStyleSheet("font-size: 16px; background-color: transparent;")
 
         title_label = QLabel("Срочные задачи")
-        title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #d32f2f;")
+        title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1E2A3E; background-color: transparent;")
         header_layout.addWidget(icon_label)
         header_layout.addWidget(title_label)
         header_layout.addStretch()
 
         all_tasks_btn = QPushButton("Все задачи")
         all_tasks_btn.setFlat(True)
-        all_tasks_btn.setStyleSheet("color: #1976d2;")
+        all_tasks_btn.setStyleSheet(
+            "color: #1E2A3E; background-color: rgba(0,0,0,0.08); border-radius: 8px; padding: 4px 8px;")
         all_tasks_btn.clicked.connect(self.open_tasks_requested.emit)
         header_layout.addWidget(all_tasks_btn)
 
         layout.addLayout(header_layout)
 
-        # Список задач
         self.tasks_layout = QVBoxLayout()
         self.tasks_layout.setSpacing(8)
         layout.addLayout(self.tasks_layout)
 
         self.no_tasks_label = QLabel("Нет срочных задач")
         self.no_tasks_label.setAlignment(Qt.AlignCenter)
-        self.no_tasks_label.setStyleSheet("color: #888888; padding: 10px;")
+        self.no_tasks_label.setStyleSheet("color: #5A6B7C; background-color: transparent; padding: 10px;")
         self.tasks_layout.addWidget(self.no_tasks_label)
-
-        widget.hide()
-        return widget
-
-    def _create_active_topic_block(self) -> QWidget:
-        """Создаёт блок активной темы"""
-        widget = QFrame()
-        widget.setFrameShape(QFrame.StyledPanel)
-        widget.setProperty("class", "dashboard-card")
-
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(15, 12, 15, 12)
-
-        # Заголовок с иконкой
-        header_layout = QHBoxLayout()
-        icon_label = QLabel()
-        pixmap = QPixmap("resources/icons/activ_topic.png")
-        if not pixmap.isNull():
-            pixmap = pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            icon_label.setPixmap(pixmap)
-        else:
-            icon_label.setText("📌")
-
-        title_label = QLabel("Активная тема")
-        title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1976d2;")
-        header_layout.addWidget(icon_label)
-        header_layout.addWidget(title_label)
-        header_layout.addStretch()
-        layout.addLayout(header_layout)
-
-        self.active_topic_name = QLabel("—")
-        self.active_topic_name.setStyleSheet("font-size: 18px; font-weight: bold;")
-        layout.addWidget(self.active_topic_name)
-
-        self.active_topic_info = QLabel("")
-        self.active_topic_info.setStyleSheet("color: #888888; font-size: 12px;")
-        layout.addWidget(self.active_topic_info)
-
-        open_btn = QPushButton("Открыть тему")
-        open_btn.clicked.connect(self._on_open_active_topic)
-        layout.addWidget(open_btn)
 
         widget.hide()
         return widget
@@ -339,10 +438,24 @@ class DashboardView(QWidget):
         widget.setFrameShape(QFrame.StyledPanel)
         widget.setProperty("class", "dashboard-card")
 
+        widget.setStyleSheet("""
+            QFrame {
+                background-color: #ffffff;
+                border-radius: 16px;
+                border: none;
+                Color: #ffffff;
+            }
+        """)
+
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        shadow.setOffset(2, 2)
+        shadow.setColor(QColor(0, 0, 0, 30))
+        widget.setGraphicsEffect(shadow)
+
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(15, 12, 15, 12)
 
-        # Заголовок с иконкой
         header_layout = QHBoxLayout()
         icon_label = QLabel()
         pixmap = QPixmap("resources/icons/analitics.png")
@@ -351,29 +464,31 @@ class DashboardView(QWidget):
             icon_label.setPixmap(pixmap)
         else:
             icon_label.setText("📊")
+            icon_label.setStyleSheet("font-size: 16px; background-color: transparent;")
 
         title_label = QLabel("Сегодня")
-        title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1976d2;")
+        title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1E2A3E; background-color: transparent;")
         header_layout.addWidget(icon_label)
         header_layout.addWidget(title_label)
         header_layout.addStretch()
 
         analytics_btn = QPushButton("Подробнее")
         analytics_btn.setFlat(True)
-        analytics_btn.setStyleSheet("color: #1976d2;")
+        analytics_btn.setStyleSheet(
+            "color: #1E2A3E; background-color: rgba(0,0,0,0.08); border-radius: 8px; padding: 4px 8px;")
         analytics_btn.clicked.connect(self.open_analytics_requested.emit)
         header_layout.addWidget(analytics_btn)
 
         layout.addLayout(header_layout)
 
-        # Статистика
         stats_layout = QHBoxLayout()
         stats_layout.setSpacing(20)
 
         self.today_time_label = QLabel("0 ч")
-        self.today_time_label.setStyleSheet("font-size: 20px; font-weight: bold;")
+        self.today_time_label.setStyleSheet(
+            "font-size: 20px; font-weight: bold; color: #1E2A3E; background-color: transparent;")
         self.today_time_desc = QLabel("времени")
-        self.today_time_desc.setStyleSheet("color: #888888; font-size: 12px;")
+        self.today_time_desc.setStyleSheet("color: #5A6B7C; font-size: 12px; background-color: transparent;")
 
         time_widget = QWidget()
         time_layout = QVBoxLayout(time_widget)
@@ -383,9 +498,10 @@ class DashboardView(QWidget):
         stats_layout.addWidget(time_widget)
 
         self.today_conc_label = QLabel("0")
-        self.today_conc_label.setStyleSheet("font-size: 20px; font-weight: bold;")
+        self.today_conc_label.setStyleSheet(
+            "font-size: 20px; font-weight: bold; color: #1E2A3E; background-color: transparent;")
         self.today_conc_desc = QLabel("концентрация")
-        self.today_conc_desc.setStyleSheet("color: #888888; font-size: 12px;")
+        self.today_conc_desc.setStyleSheet("color: #5A6B7C; font-size: 12px; background-color: transparent;")
 
         conc_widget = QWidget()
         conc_layout = QVBoxLayout(conc_widget)
@@ -395,9 +511,10 @@ class DashboardView(QWidget):
         stats_layout.addWidget(conc_widget)
 
         self.today_energy_label = QLabel("0")
-        self.today_energy_label.setStyleSheet("font-size: 20px; font-weight: bold;")
+        self.today_energy_label.setStyleSheet(
+            "font-size: 20px; font-weight: bold; color: #1E2A3E; background-color: transparent;")
         self.today_energy_desc = QLabel("энергия")
-        self.today_energy_desc.setStyleSheet("color: #888888; font-size: 12px;")
+        self.today_energy_desc.setStyleSheet("color: #5A6B7C; font-size: 12px; background-color: transparent;")
 
         energy_widget = QWidget()
         energy_layout = QVBoxLayout(energy_widget)
@@ -425,19 +542,16 @@ class DashboardView(QWidget):
         """Обновляет все данные на дашборде"""
         has_data = self._controller.has_data()
 
-        # Показываем/скрываем пустое состояние
         self.empty_widget.setVisible(not has_data)
 
         if not has_data:
             return
 
-        # Показываем остальные блоки
         for widget in [self.greeting_widget, self.kpi_row, self.active_topic_widget,
                        self.last_session_widget, self.urgent_tasks_widget,
                        self.quick_start_widget, self.today_analytics_widget]:
             widget.show()
 
-        # Обновляем приветствие
         greeting = self._controller.get_greeting()
         user_name = self._controller.get_user_name()
         self.greeting_label.setText(f"{greeting}, {user_name}!")
@@ -448,17 +562,16 @@ class DashboardView(QWidget):
             f"⏱️ Отработано: {today_stats['worked_hours_today']} ч"
         )
 
-        # Обновляем KPI
         total_stats = self._controller.get_total_stats()
         self.kpi_row.clear()
         self.kpi_row.add_card("Темы", str(total_stats['total_topics']), "resources/icons/tema_topic.png")
         self.kpi_row.add_card("Заметки", str(total_stats['total_notes']), "resources/icons/notes.png")
         self.kpi_row.add_card("Карточки", str(total_stats['total_flashcards']), "resources/icons/flashcard.png")
-        self.kpi_row.add_card("Задачи", f"{total_stats['completed_tasks']}/{total_stats['total_tasks']}", "resources/icons/task.png")
+        self.kpi_row.add_card("Задачи", f"{total_stats['completed_tasks']}/{total_stats['total_tasks']}",
+                              "resources/icons/tack.png")
         self.kpi_row.add_card("Сессии", str(total_stats['total_sessions']), "resources/icons/session.png")
         self.kpi_row.add_card("Время", f"{total_stats['total_hours']} ч", "resources/icons/time.png")
 
-        # Активная тема
         active_topic = self._controller.get_active_topic()
         if active_topic:
             self.active_topic_widget.show()
@@ -472,21 +585,18 @@ class DashboardView(QWidget):
         else:
             self.active_topic_widget.hide()
 
-        # Последняя сессия
         last_session = self._controller.get_last_session()
         if last_session and last_session.get('duration_minutes', 0) > 0:
             self.last_session_widget.show()
             self.last_session_topic.setText(last_session['topic_name'])
-            self.last_session_duration.setText(f"️resources/icons/session.png {last_session['duration_display']}")     #время последней сессии
-            self.last_session_conc.setText(f"resources/icons/brain.png {last_session['avg_concentration']}/5")
+            self.last_session_duration.setText(f"⏱️ {last_session['duration_display']}")
+            self.last_session_conc.setText(f"🧠 {last_session['avg_concentration']}/5")
         else:
             self.last_session_widget.hide()
 
-        # Срочные задачи
         urgent_tasks = self._controller.get_urgent_tasks()
         self._update_urgent_tasks(urgent_tasks)
 
-        # Аналитика за сегодня
         today_analytics = self._controller.get_today_analytics()
         if today_analytics['has_data']:
             self.today_analytics_widget.show()
@@ -499,12 +609,10 @@ class DashboardView(QWidget):
     def _update_urgent_tasks(self, tasks: list):
         """Обновляет список срочных задач"""
         try:
-            # Очищаем старые кнопки
             for btn in self._urgent_task_buttons.values():
                 btn.deleteLater()
             self._urgent_task_buttons.clear()
 
-            # Очищаем layout
             while self.tasks_layout.count():
                 child = self.tasks_layout.takeAt(0)
                 if child.widget():
@@ -526,7 +634,6 @@ class DashboardView(QWidget):
                 task_widget = self._create_task_widget(task)
                 self.tasks_layout.addWidget(task_widget)
         except RuntimeError:
-            # Виджет уже удалён, просто игнорируем
             pass
 
     def _create_task_widget(self, task: dict) -> QWidget:
@@ -538,12 +645,12 @@ class DashboardView(QWidget):
                 QPushButton {
                     text-align: left;
                     padding: 8px;
-                    background-color: #ffebee;
+                    background-color: rgba(0, 0, 0, 0.08);
                     border-left: 4px solid #d32f2f;
-                    border-radius: 4px;
+                    border-radius: 8px;
                 }
                 QPushButton:hover {
-                    background-color: #ffcdd2;
+                    background-color: rgba(0, 0, 0, 0.15);
                 }
             """
             prefix = "⚠️ "
@@ -552,12 +659,12 @@ class DashboardView(QWidget):
                 QPushButton {
                     text-align: left;
                     padding: 8px;
-                    background-color: #fff3e0;
+                    background-color: rgba(0, 0, 0, 0.05);
                     border-left: 4px solid #ff9800;
-                    border-radius: 4px;
+                    border-radius: 8px;
                 }
                 QPushButton:hover {
-                    background-color: #ffe0b2;
+                    background-color: rgba(0, 0, 0, 0.1);
                 }
             """
             prefix = "📋 "

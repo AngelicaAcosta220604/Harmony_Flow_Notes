@@ -10,36 +10,40 @@ class ThemeManager:
     LIGHT_STYLE = """
         /* Основные цвета */
         QMainWindow {
-            background-color: #E5F1FF;
+            background-color: #dee5ee;
         }
 
         QWidget {
-            background-color: #E5F1FF;
+            background-color: #dee5ee;
             color: #333333;
             font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
         }
 
         /* Сайдбар */
         QListWidget {
-            background-color: #5CA1F5;
+            background-color: #FFFFFF;
             border: none;
             outline: none;
-            color: #ffffff
+            border-radius: 12px;
+            margin: 6px;
         }
 
         QListWidget::item {
             padding: 8px;
-            border-radius: 4px;
+            border-radius: 8px;
+            margin: 2px 4px;
         }
 
         QListWidget::item:selected {
             background-color: #B6D4F9;
             color: #0F56DC;
+            border-radius: 8px;
         }
 
         QListWidget::item:hover {
             background-color: #B6D4F9;
             color: #0F56DC;
+            border-radius: 8px;
         }
 
         /* Кнопки */
