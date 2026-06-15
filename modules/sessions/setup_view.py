@@ -252,8 +252,43 @@ class FocusSetupView(QWidget):
             SilentMessageBox.warning(self, "Ошибка", "Выберите тему для сессии")
             return
 
-        interval = self.interval_combo.currentData()
-        self.start_session.emit(topic_id, interval)
+        # Проверяем, есть ли активная/пауза сессия для этой темы
+        from core.di.container import container
+        has_session, session_id, status, existing_topic_id = container.session_controller.has_active_or_paused_session(topic_id)
+
+        if has_session:
+            # Показываем диалог: продолжить или начать новую
+            reply = SilentMessageBox.question(
+                self,
+                "Незавершённая сессия",
+                f"У вас есть {status} сессия для этой темы.\n\n"
+                "• Нажмите «Да» — чтобы завершить её и начать новую\n"
+                "• Нажмите «Нет» — чтобы продолжить существующую сессию",
+                SilentMessageBox.Yes | SilentMessageBox.No,
+                SilentMessageBox.No
+            )
+
+            if reply == SilentMessageBox.Yes:
+                # Завершаем старую сессию
+                container.session_controller.end_session(session_id)
+                # Начинаем новую
+                interval = self.interval_combo.currentData()
+                self.start_session.emit(topic_id, interval)
+            else:
+                # Возобновляем старую сессию
+                from core.main_window import MainWindow
+                main_window = self.window()
+                if isinstance(main_window, MainWindow):
+                    topic = self._topic_controller.get_topic(topic_id)
+                    if topic:
+                        main_window.focus_active_view.resume_existing_session(
+                            session_id, topic_id, topic.name
+                        )
+                        main_window.content_stack.setCurrentWidget(main_window.focus_active_view)
+        else:
+            # Начинаем новую сессию
+            interval = self.interval_combo.currentData()
+            self.start_session.emit(topic_id, interval)
 
     def refresh_topics(self):
         self.topic_selector.refresh()

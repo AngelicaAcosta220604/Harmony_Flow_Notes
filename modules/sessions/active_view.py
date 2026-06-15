@@ -376,8 +376,8 @@ class FocusActiveView(QWidget):
             if current_seconds > 0:
                 from datebase.db_manager import db
                 db.execute(
-                    "UPDATE sessions SET total_active_seconds = ? WHERE id = ?",
-                    (current_seconds, session_id)
+                    "UPDATE sessions SET duration_minutes = ? WHERE id = ?",
+                    (current_seconds // 60, session_id)
                 )
 
     def force_save_state(self):
@@ -385,11 +385,10 @@ class FocusActiveView(QWidget):
         session_id = self._session_controller.get_current_session_id()
         if session_id:
             values = self.state_sliders.get_values()
-            from datebase.db_manager import db
-            db.execute(
-                """UPDATE sessions SET concentration = ?, energy = ?, interest = ? 
-                WHERE id = ?""",
-                (values['concentration'], values['energy'], values['interest'], session_id)
+            self._session_controller.save_slider_values(
+                values.get('focus', 50),
+                values.get('energy', 50),
+                values.get('interest', 50)
             )
 
     def hideEvent(self, event):
@@ -408,12 +407,19 @@ class FocusActiveView(QWidget):
         if not row:
             return
 
-        total_seconds = row.get('total_active_seconds', 0)
+        # Восстанавливаем время (duration_minutes * 60 = секунды)
+        duration_minutes = row.get('duration_minutes', 0) or 0
+        total_seconds = duration_minutes * 60
         self.timer.set_time(total_seconds)
 
-        self.state_sliders.conc_slider.setValue(row.get('concentration', 50))
-        self.state_sliders.energy_slider.setValue(row.get('energy', 50))
-        self.state_sliders.interest_slider.setValue(row.get('interest', 50))
+        # Восстанавливаем ползунки через контроллер
+        slider_values = self._session_controller.get_slider_values(session_id)
+        self.state_sliders.focus_slider.setValue(slider_values.get('focus', 50))
+        self.state_sliders.energy_slider.setValue(slider_values.get('energy', 50))
+        self.state_sliders.interest_slider.setValue(slider_values.get('interest', 50))
 
+        # Если сессия была активна — продолжаем
         if row['status'] == 'active':
             self._session_controller.resume_session()
+        else:
+            self.timer.pause()

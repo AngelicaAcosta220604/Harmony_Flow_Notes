@@ -1,10 +1,8 @@
-# modules/sessions/controller.py
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from PySide6.QtCore import QTimer, QObject, Signal
 
 from datebase.db_manager import db
-
 from datebase.repositories.session_repo import SessionRepository
 from datebase.repositories.session_state_log_repo import SessionStateLogRepository
 from datebase.repositories.quick_note_repo import QuickNoteRepository
@@ -17,7 +15,7 @@ from services.time_service import TimeService
 class SessionController(QObject):
     """
     Контроллер для управления фокус-сессиями.
-    Управляет таймером, паузами, состоянием сессии.
+    Управляет таймером, паузами, состоянием сессии, интервалами работы.
     """
 
     # Сигналы
@@ -47,10 +45,11 @@ class SessionController(QObject):
         self._is_paused: bool = False
         self._start_time: Optional[datetime] = None
 
+        # 🆕 Для ограничения сохранения ползунков (не чаще раза в минуту)
+        self._last_slider_save_time: Optional[datetime] = None
+
     def prepare_session(self, topic_id: int) -> bool:
-        """
-        Подготавливает сессию для темы
-        """
+        """Подготавливает сессию для темы"""
         topic = self._topic_repo.get_by_id(topic_id)
         if not topic:
             return False
@@ -61,11 +60,7 @@ class SessionController(QObject):
         return True
 
     def start_session(self) -> int:
-        """
-        Начинает сессию
-        Returns:
-            ID сессии
-        """
+        """Начинает сессию"""
         session_id = self._session_repo.create(self._current_topic_id)
         self._current_session = Session.from_row(
             self._session_repo.get_by_id(session_id)
@@ -75,7 +70,10 @@ class SessionController(QObject):
         # Запускаем таймер
         self._timer = QTimer()
         self._timer.timeout.connect(self._on_timer_tick)
-        self._timer.start(1000)  # каждую секунду
+        self._timer.start(1000)
+
+        # 🆕 Начинаем первый интервал работы
+        self.start_interval(session_id)
 
         return session_id
 
@@ -86,7 +84,11 @@ class SessionController(QObject):
             self.timer_updated.emit(self._elapsed_seconds)
 
     def pause_session(self):
+        """Ставит сессию на паузу"""
         if self._current_session and not self._is_paused:
+            # 🆕 Завершаем текущий интервал
+            self.end_interval(self._current_session.id)
+
             self._is_paused = True
             self._session_repo.update(self._current_session.id, status='paused')
             self.session_paused.emit()
@@ -96,21 +98,23 @@ class SessionController(QObject):
         if self._current_session and self._is_paused:
             self._is_paused = False
             self._session_repo.update(self._current_session.id, status='active')
+
+            # 🆕 Начинаем новый интервал работы
+            self.start_interval(self._current_session.id)
+
             self.session_resumed.emit()
 
     def end_session(self, auto: bool = False) -> int:
-        """
-        Завершает сессию
-
-        Returns:
-            Длительность в минутах
-        """
+        """Завершает сессию"""
         if not self._current_session:
             return 0
 
+        # 🆕 Завершаем последний интервал
+        self.end_interval(self._current_session.id)
+
         duration_minutes = self._elapsed_seconds // 60
         if duration_minutes == 0 and self._elapsed_seconds > 0:
-            duration_minutes = 1  # минимум 1 минута
+            duration_minutes = 1
 
         status = 'auto_completed' if auto else 'completed'
         self._session_repo.end_session(
@@ -130,6 +134,143 @@ class SessionController(QObject):
 
         return duration_minutes
 
+    # ==================== ИНТЕРВАЛЫ РАБОТЫ ====================
+
+    def start_interval(self, session_id: int) -> int:
+        """Начинает новый интервал активности"""
+        from utils.local_time import now_local_iso
+        now = now_local_iso()
+        cursor = db.execute(
+            "INSERT INTO session_intervals (session_id, start_time) VALUES (?, ?)",
+            (session_id, now)
+        )
+        return cursor.lastrowid
+
+    def end_interval(self, session_id: int) -> int:
+        """Завершает текущий интервал и возвращает его длительность"""
+        from utils.local_time import now_local_iso
+        row = db.fetchone(
+            "SELECT id, start_time FROM session_intervals WHERE session_id = ? AND end_time IS NULL ORDER BY id DESC",
+            (session_id,)
+        )
+        if row:
+            now = now_local_iso()
+            start_time = datetime.fromisoformat(row['start_time'])
+            duration = int((datetime.now() - start_time).total_seconds())
+            db.execute(
+                "UPDATE session_intervals SET end_time = ?, duration_seconds = ? WHERE id = ?",
+                (now, duration, row['id'])
+            )
+            return duration
+        return 0
+
+    def get_session_intervals(self, session_id: int) -> list:
+        """Возвращает все интервалы сессии"""
+        return db.fetchall(
+            "SELECT * FROM session_intervals WHERE session_id = ? ORDER BY start_time ASC",
+            (session_id,)
+        )
+
+    # ==================== ПОЛЗУНКИ СОСТОЯНИЯ ====================
+
+    def log_state(self, metric: str, value: int):
+        """Логирует изменение состояния с ограничением (не чаще раза в минуту)"""
+        if not self._current_session:
+            return
+
+        now = datetime.now()
+
+        # Проверяем, прошло ли больше минуты с последнего сохранения
+        should_save = False
+        if self._last_slider_save_time is None:
+            should_save = True
+        elif (now - self._last_slider_save_time).total_seconds() >= 60:
+            should_save = True
+
+        if should_save:
+            # Сохраняем в state_log
+            minute = self.get_duration_minutes()
+            self._state_log_repo.create(
+                session_id=self._current_session.id,
+                metric=metric,
+                value=value,
+                minute=minute
+            )
+
+            # Обновляем текущие значения в sessions
+            self.save_slider_value(metric, value)
+
+            # Обновляем время последнего сохранения
+            self._last_slider_save_time = now
+
+        self.state_changed.emit(metric, value)
+
+    def save_slider_value(self, metric: str, value: int):
+        """Сохраняет одно значение ползунка в БД"""
+        if not self._current_session:
+            return
+
+        column_map = {
+            'focus': 'focus',
+            'energy': 'energy',
+            'interest': 'interest'
+        }
+
+        column = column_map.get(metric)
+        if column:
+            db.execute(
+                f"UPDATE sessions SET {column} = ? WHERE id = ?",
+                (value, self._current_session.id)
+            )
+
+    def save_slider_values(self, focus: int, energy: int, interest: int):
+        """Сохраняет все значения ползунков в БД"""
+        if not self._current_session:
+            return
+
+        db.execute(
+            "UPDATE sessions SET focus = ?, energy = ?, interest = ? WHERE id = ?",
+            (focus, energy, interest, self._current_session.id)
+        )
+
+    def get_slider_values(self, session_id: int) -> dict:
+        """Возвращает сохранённые значения ползунков"""
+        row = db.fetchone(
+            "SELECT focus, energy, interest FROM sessions WHERE id = ?",
+            (session_id,)
+        )
+        if row:
+            return {
+                "focus": row.get("focus", 50),
+                "energy": row.get("energy", 50),
+                "interest": row.get("interest", 50)
+            }
+        return {"focus": 50, "energy": 50, "interest": 50}
+
+    # ==================== УПРАВЛЕНИЕ СЕССИЯМИ ====================
+
+    def delete_session(self, session_id: int):
+        """Удаляет сессию и все связанные данные"""
+        db.execute("DELETE FROM session_state_logs WHERE session_id = ?", (session_id,))
+        db.execute("DELETE FROM quick_notes WHERE session_id = ?", (session_id,))
+        db.execute("DELETE FROM session_intervals WHERE session_id = ?", (session_id,))
+        db.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+
+    def get_session(self, session_id: int) -> Optional[Session]:
+        """Возвращает объект Session по ID"""
+        row = self._session_repo.get_by_id(session_id)
+        return Session.from_row(row) if row else None
+
+    def get_sessions_by_topic(self, topic_id: int) -> List[Session]:
+        """Возвращает все сессии темы"""
+        rows = db.fetchall(
+            "SELECT * FROM sessions WHERE topic_id = ? ORDER BY start_time DESC",
+            (topic_id,)
+        )
+        return [Session.from_row(row) for row in rows]
+
+    # ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
+
     def get_elapsed_seconds(self) -> int:
         """Возвращает прошедшее время в секундах."""
         return self._elapsed_seconds
@@ -142,28 +283,8 @@ class SessionController(QObject):
         """Возвращает текущую длительность в минутах"""
         return self._elapsed_seconds // 60
 
-    def log_state(self, metric: str, value: int):
-        """
-        Логирует изменение состояния (концентрация/энергия/интерес)
-        """
-        if not self._current_session:
-            return
-
-        minute = self.get_duration_minutes()
-
-        self._state_log_repo.create(
-            session_id=self._current_session.id,
-            metric=metric,
-            value=value,
-            minute=minute
-        )
-
-        self.state_changed.emit(metric, value)
-
     def add_quick_note(self, content: str) -> int:
-        """
-        Добавляет быструю запись
-        """
+        """Добавляет быструю запись"""
         if not self._current_session or not self._current_topic_id:
             return -1
 
@@ -193,18 +314,49 @@ class SessionController(QObject):
         """Возвращает, на паузе ли сессия"""
         return self._current_session is not None and self._is_paused
 
-    def get_session_stats(self, session_id: int) -> Dict[str, Any]:
-        row = self._session_repo.get_by_id(session_id)
-        if not row:
-            return {}
+    def has_active_or_paused_session(self, topic_id: int = None) -> tuple:
+        """Проверяет, есть ли незавершённые сессии"""
+        if topic_id:
+            rows = db.fetchall(
+                """SELECT id, status, topic_id FROM sessions 
+                WHERE topic_id = ? AND status IN ('active', 'paused')
+                ORDER BY start_time DESC""",
+                (topic_id,)
+            )
+        else:
+            rows = db.fetchall(
+                """SELECT id, status, topic_id FROM sessions 
+                WHERE status IN ('active', 'paused')
+                ORDER BY start_time DESC""",
+            )
 
-        # Преобразуем в dict для безопасности
-        session = dict(row) if not isinstance(row, dict) else row
+        if rows:
+            session = rows[0]
+            return True, session['id'], session['status'], session['topic_id']
+        return False, None, None, None
+
+    def check_and_pause_active_session(self):
+        """При запуске приложения ставит на паузу все 'active' сессии"""
+        rows = db.fetchall(
+            """SELECT id FROM sessions WHERE status = 'active'"""
+        )
+        for row in rows:
+            db.execute(
+                "UPDATE sessions SET status = ? WHERE id = ?",
+                ('paused', row['id'])
+            )
+
+    def get_session_stats(self, session_id: int) -> Dict[str, Any]:
+        """Возвращает статистику по завершённой сессии"""
+        session = self._session_repo.get_by_id(session_id)
+        if not session:
+            return {}
 
         logs = self._state_log_repo.get_by_session(session_id)
         quick_notes = self._quick_note_repo.get_by_session(session_id)
+        intervals = self.get_session_intervals(session_id)
 
-        conc_vals = [log['value'] for log in logs if log['metric'] == 'concentration']
+        focus_vals = [log['value'] for log in logs if log['metric'] == 'focus']
         energy_vals = [log['value'] for log in logs if log['metric'] == 'energy']
         interest_vals = [log['value'] for log in logs if log['metric'] == 'interest']
 
@@ -216,69 +368,32 @@ class SessionController(QObject):
             'start_time': session.get('start_time'),
             'end_time': session.get('end_time'),
             'status': session.get('status'),
-            'avg_concentration': round(sum(conc_vals) / len(conc_vals), 1) if conc_vals else 0,
+            'avg_focus': round(sum(focus_vals) / len(focus_vals), 1) if focus_vals else 0,
             'avg_energy': round(sum(energy_vals) / len(energy_vals), 1) if energy_vals else 0,
             'avg_interest': round(sum(interest_vals) / len(interest_vals), 1) if interest_vals else 0,
             'quick_notes_count': len(quick_notes),
-            'state_logs_count': len(logs)
+            'intervals_count': len(intervals),
+            'total_active_seconds': sum(i.get('duration_seconds', 0) for i in intervals)
         }
 
     def get_all_sessions(self) -> List[Dict[str, Any]]:
+        """Возвращает все сессии"""
         rows = self._session_repo.get_all()
         sessions = []
         for row in rows:
-            row_dict = dict(row) if not isinstance(row, dict) else row
-            topic = self._topic_repo.get_by_id(row_dict['topic_id'])
+            topic = self._topic_repo.get_by_id(row['topic_id'])
             sessions.append({
-                'id': row_dict['id'],
+                'id': row['id'],
                 'topic_name': topic['name'] if topic else "—",
-                'date': row_dict['start_time'][:10] if row_dict['start_time'] else "—",
-                'duration_minutes': row_dict.get('duration_minutes') or 0,
-                'duration_display': TimeService.format_duration(row_dict.get('duration_minutes')),
-                'status': row_dict.get('status')
+                'date': row['start_time'][:10] if row['start_time'] else "—",
+                'duration_minutes': row.get('duration_minutes') or 0,
+                'duration_display': TimeService.format_duration(row.get('duration_minutes')),
+                'status': row.get('status')
             })
         return sessions
+
     def cleanup(self):
         """Очищает ресурсы"""
         if self._timer:
             self._timer.stop()
             self._timer = None
-
-    def has_active_or_paused_session(self, topic_id: int = None) -> tuple:
-        """
-        Проверяет, есть ли незавершённые сессии.
-        Возвращает (has_session, session_id, status, topic_id)
-        """
-        from datebase.db_manager import db
-
-        if topic_id:
-            rows = db.fetchall(
-                """SELECT id, status, topic_id FROM sessions 
-                WHERE topic_id = ? AND status IN ('active', 'paused', 'auto_paused')
-                ORDER BY start_time DESC""",
-                (topic_id,)
-            )
-        else:
-            rows = db.fetchall(
-                """SELECT id, status, topic_id FROM sessions 
-                WHERE status IN ('active', 'paused', 'auto_paused')
-                ORDER BY start_time DESC""",
-            )
-
-        if rows:
-            session = rows[0]
-            return True, session['id'], session['status'], session['topic_id']
-        return False, None, None, None
-
-    def check_and_pause_active_session(self):
-        """При запуске приложения ставит на паузу все 'active' сессии из БД"""
-        from datebase.db_manager import db
-
-        rows = db.fetchall(
-            """SELECT id FROM sessions WHERE status = 'active'"""
-        )
-        for row in rows:
-            db.execute(
-                "UPDATE sessions SET status = ? WHERE id = ?",
-                ('paused', row['id'])
-            )

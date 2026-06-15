@@ -101,6 +101,9 @@ class DatabaseManager:
                 end_time DATETIME,
                 duration_minutes INTEGER,
                 status TEXT DEFAULT 'active',
+                focus INTEGER DEFAULT 50,
+                energy INTEGER DEFAULT 50,
+                interest INTEGER DEFAULT 50,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
             )
@@ -229,6 +232,18 @@ class DatabaseManager:
                 FOREIGN KEY (flashcard_id) REFERENCES flashcards(id) ON DELETE CASCADE
                 )
             ''')
+
+        # session_intervals (интервалы активной работы)
+        cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS session_intervals (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        session_id INTEGER NOT NULL,
+                        start_time DATETIME,
+                        end_time DATETIME,
+                        duration_seconds INTEGER DEFAULT 0,
+                        FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+                    )
+                ''')
 
         conn.commit()
 
