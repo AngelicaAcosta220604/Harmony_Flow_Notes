@@ -1338,8 +1338,8 @@ class TopicView(QWidget):
         <h3>📊 Аналитика темы</h3>
         <p>📅 <b>Сессии:</b> {stats['session_count']}</p>
         <p>⏰ <b>Общее время:</b> {stats['total_hours']} ч</p>
-        <p>🧠 <b>Средняя концентрация:</b> {stats['avg_concentration']}/5</p>
-        <p>⚡ <b>Средняя энергия:</b> {stats['avg_energy']}/5</p>
+        <p>🧠 <b>Средняя концентрация:</b> {stats['avg_concentration']}/100</p>
+        <p>⚡ <b>Средняя энергия:</b> {stats['avg_energy']}/100</p>
         <p>❤️ <b>Средний интерес:</b> {stats['avg_interest']}/5</p>
         <p>✅ <b>Задачи:</b> {stats['completed_tasks']}/{stats['task_count']} выполнено</p>
         <p>📝 <b>Заметки:</b> {stats['note_count']}</p>
@@ -1352,8 +1352,8 @@ class TopicView(QWidget):
 
         self._update_stat_card_value("Сессии", str(stats['session_count']))
         self._update_stat_card_value("Время", f"{stats['total_hours']} ч")
-        self._update_stat_card_value("Концентрация", f"{stats['avg_concentration']}/5")
-        self._update_stat_card_value("Энергия", f"{stats['avg_energy']}/5")
+        self._update_stat_card_value("Концентрация", f"{stats['avg_concentration']}/100")
+        self._update_stat_card_value("Энергия", f"{stats['avg_energy']}/100")
 
         completed = stats.get('completed_tasks', 0)
         total = stats.get('task_count', 1)

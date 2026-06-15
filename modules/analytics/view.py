@@ -249,9 +249,9 @@ class AnalyticsView(QWidget):
         # Создаём карточки KPI
         self.kpi_layout.addWidget(self._create_kpi_card("🎯 Сессии", total_sessions))
         self.kpi_layout.addWidget(self._create_kpi_card("⏱️ Время", total_hours))
-        self.kpi_layout.addWidget(self._create_kpi_card("🧠 Концентрация", f"{avg_concentration}/5"))
-        self.kpi_layout.addWidget(self._create_kpi_card("⚡ Энергия", f"{avg_energy}/5"))
-        self.kpi_layout.addWidget(self._create_kpi_card("❤️ Интерес", f"{avg_interest}/5"))
+        self.kpi_layout.addWidget(self._create_kpi_card("🧠 Концентрация", f"{avg_concentration}/100"))
+        self.kpi_layout.addWidget(self._create_kpi_card("⚡ Энергия", f"{avg_energy}/100"))
+        self.kpi_layout.addWidget(self._create_kpi_card("❤️ Интерес", f"{avg_interest}/100"))
         self.kpi_layout.addWidget(self._create_kpi_card("✅ Задачи", f"{completion_rate}%"))
 
         # Формирование детальной статистики
@@ -304,15 +304,15 @@ class AnalyticsView(QWidget):
 
         if chart_type == 'concentration' and 'concentration' in trends:
             dates, values = trends['concentration']
-            self.charts_widget.plot_metric_trend(dates, values, "Динамика концентрации", "Концентрация (1-5)", '#1976d2')
+            self.charts_widget.plot_metric_trend(dates, values, "Динамика концентрации", "Концентрация (1-100)", '#1976d2')
 
         elif chart_type == 'energy' and 'energy' in trends:
             dates, values = trends['energy']
-            self.charts_widget.plot_metric_trend(dates, values, "Динамика энергии", "Энергия (1-5)", '#ff9800')
+            self.charts_widget.plot_metric_trend(dates, values, "Динамика энергии", "Энергия (1-100)", '#ff9800')
 
         elif chart_type == 'interest' and 'interest' in trends:
             dates, values = trends['interest']
-            self.charts_widget.plot_metric_trend(dates, values, "Динамика интереса", "Интерес (1-5)", '#4caf50')
+            self.charts_widget.plot_metric_trend(dates, values, "Динамика интереса", "Интерес (1-100)", '#4cafz0')
 
         elif chart_type == 'comparison':
             self.charts_widget.plot_comparison_trend(trends)
