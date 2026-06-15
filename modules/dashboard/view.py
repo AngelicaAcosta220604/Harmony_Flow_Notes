@@ -3,12 +3,13 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QFrame, QMessageBox
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QFont
 
 from .controller import DashboardController
 from .widgets import KpiRow, KpiCard
 
+from PySide6.QtGui import QPixmap, QIcon
 
 class DashboardView(QWidget):
     """
@@ -147,7 +148,7 @@ class DashboardView(QWidget):
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(15, 12, 15, 12)
 
-        title_label = QLabel("📌 Активная тема")
+        title_label = QLabel("resources/icons/activ_topic Активная тема") # канц.кнопка активная тема
         title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1976d2;")
         layout.addWidget(title_label)
 
@@ -175,9 +176,22 @@ class DashboardView(QWidget):
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(15, 12, 15, 12)
 
-        title_label = QLabel("⏱️ Последняя сессия")
+        # Заголовок с иконкой
+        header_layout = QHBoxLayout()
+        icon_label = QLabel()
+        pixmap = QPixmap("resources/icons/session.png")
+        if not pixmap.isNull():
+            pixmap = pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            icon_label.setPixmap(pixmap)
+        else:
+            icon_label.setText("⏱️")
+
+        title_label = QLabel("Последняя сессия")
         title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1976d2;")
-        layout.addWidget(title_label)
+        header_layout.addWidget(icon_label)
+        header_layout.addWidget(title_label)
+        header_layout.addStretch()
+        layout.addLayout(header_layout)
 
         self.last_session_topic = QLabel("—")
         self.last_session_topic.setStyleSheet("font-size: 16px; font-weight: bold;")
@@ -194,6 +208,44 @@ class DashboardView(QWidget):
         widget.hide()
         return widget
 
+    def _create_quick_start_block(self) -> QWidget:
+        """Создаёт блок быстрого старта"""
+        widget = QFrame()
+        widget.setFrameShape(QFrame.StyledPanel)
+        widget.setProperty("class", "dashboard-card")
+
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(15, 12, 15, 12)
+
+        # Заголовок с иконкой
+        header_layout = QHBoxLayout()
+        icon_label = QLabel()
+        pixmap = QPixmap("resources/icons/rocket.png")
+        if not pixmap.isNull():
+            pixmap = pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            icon_label.setPixmap(pixmap)
+        else:
+            icon_label.setText("🚀")
+
+        title_label = QLabel("Быстрый старт")
+        title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1976d2;")
+        header_layout.addWidget(icon_label)
+        header_layout.addWidget(title_label)
+        header_layout.addStretch()
+        layout.addLayout(header_layout)
+
+        # Кнопка с иконкой
+        start_btn = QPushButton("Начать сессию")
+        start_icon = QPixmap("resources/icons/play.png")
+        if not start_icon.isNull():
+            start_btn.setIcon(QIcon(start_icon))
+            start_btn.setIconSize(QSize(20, 20))
+        start_btn.setStyleSheet("font-size: 16px; padding: 10px;")
+        start_btn.clicked.connect(self.start_session_requested.emit)
+        layout.addWidget(start_btn)
+
+        return widget
+
     def _create_urgent_tasks_block(self) -> QWidget:
         """Создаёт блок срочных задач"""
         widget = QFrame()
@@ -203,10 +255,19 @@ class DashboardView(QWidget):
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(15, 12, 15, 12)
 
-        # Заголовок с кнопкой "Все задачи"
+        # Заголовок с иконкой
         header_layout = QHBoxLayout()
-        title_label = QLabel("⚠️ Срочные задачи")
+        icon_label = QLabel()
+        pixmap = QPixmap("resources/icons/warning.png")
+        if not pixmap.isNull():
+            pixmap = pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            icon_label.setPixmap(pixmap)
+        else:
+            icon_label.setText("⚠️")
+
+        title_label = QLabel("Срочные задачи")
         title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #d32f2f;")
+        header_layout.addWidget(icon_label)
         header_layout.addWidget(title_label)
         header_layout.addStretch()
 
@@ -223,7 +284,7 @@ class DashboardView(QWidget):
         self.tasks_layout.setSpacing(8)
         layout.addLayout(self.tasks_layout)
 
-        self.no_tasks_label = QLabel("✅ Нет срочных задач")
+        self.no_tasks_label = QLabel("Нет срочных задач")
         self.no_tasks_label.setAlignment(Qt.AlignCenter)
         self.no_tasks_label.setStyleSheet("color: #888888; padding: 10px;")
         self.tasks_layout.addWidget(self.no_tasks_label)
@@ -231,8 +292,8 @@ class DashboardView(QWidget):
         widget.hide()
         return widget
 
-    def _create_quick_start_block(self) -> QWidget:
-        """Создаёт блок быстрого старта"""
+    def _create_active_topic_block(self) -> QWidget:
+        """Создаёт блок активной темы"""
         widget = QFrame()
         widget.setFrameShape(QFrame.StyledPanel)
         widget.setProperty("class", "dashboard-card")
@@ -240,15 +301,36 @@ class DashboardView(QWidget):
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(15, 12, 15, 12)
 
-        title_label = QLabel("🚀 Быстрый старт")
+        # Заголовок с иконкой
+        header_layout = QHBoxLayout()
+        icon_label = QLabel()
+        pixmap = QPixmap("resources/icons/activ_topic.png")
+        if not pixmap.isNull():
+            pixmap = pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            icon_label.setPixmap(pixmap)
+        else:
+            icon_label.setText("📌")
+
+        title_label = QLabel("Активная тема")
         title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1976d2;")
-        layout.addWidget(title_label)
+        header_layout.addWidget(icon_label)
+        header_layout.addWidget(title_label)
+        header_layout.addStretch()
+        layout.addLayout(header_layout)
 
-        start_btn = QPushButton("▶ Начать сессию")
-        start_btn.setStyleSheet("font-size: 16px; padding: 10px;")
-        start_btn.clicked.connect(self.start_session_requested.emit)
-        layout.addWidget(start_btn)
+        self.active_topic_name = QLabel("—")
+        self.active_topic_name.setStyleSheet("font-size: 18px; font-weight: bold;")
+        layout.addWidget(self.active_topic_name)
 
+        self.active_topic_info = QLabel("")
+        self.active_topic_info.setStyleSheet("color: #888888; font-size: 12px;")
+        layout.addWidget(self.active_topic_info)
+
+        open_btn = QPushButton("Открыть тему")
+        open_btn.clicked.connect(self._on_open_active_topic)
+        layout.addWidget(open_btn)
+
+        widget.hide()
         return widget
 
     def _create_today_analytics_block(self) -> QWidget:
@@ -260,10 +342,19 @@ class DashboardView(QWidget):
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(15, 12, 15, 12)
 
-        # Заголовок с кнопкой "Аналитика"
+        # Заголовок с иконкой
         header_layout = QHBoxLayout()
-        title_label = QLabel("📊 Сегодня")
+        icon_label = QLabel()
+        pixmap = QPixmap("resources/icons/analitics.png")
+        if not pixmap.isNull():
+            pixmap = pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            icon_label.setPixmap(pixmap)
+        else:
+            icon_label.setText("📊")
+
+        title_label = QLabel("Сегодня")
         title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #1976d2;")
+        header_layout.addWidget(icon_label)
         header_layout.addWidget(title_label)
         header_layout.addStretch()
 
@@ -360,12 +451,12 @@ class DashboardView(QWidget):
         # Обновляем KPI
         total_stats = self._controller.get_total_stats()
         self.kpi_row.clear()
-        self.kpi_row.add_card("Темы", str(total_stats['total_topics']), "📁")
-        self.kpi_row.add_card("Заметки", str(total_stats['total_notes']), "📝")
-        self.kpi_row.add_card("Карточки", str(total_stats['total_flashcards']), "🃏")
-        self.kpi_row.add_card("Задачи", f"{total_stats['completed_tasks']}/{total_stats['total_tasks']}", "✅")
-        self.kpi_row.add_card("Сессии", str(total_stats['total_sessions']), "⏱️")
-        self.kpi_row.add_card("Время", f"{total_stats['total_hours']} ч", "📊")
+        self.kpi_row.add_card("Темы", str(total_stats['total_topics']), "resources/icons/tema_topic.png")
+        self.kpi_row.add_card("Заметки", str(total_stats['total_notes']), "resources/icons/notes.png")
+        self.kpi_row.add_card("Карточки", str(total_stats['total_flashcards']), "resources/icons/flashcard.png")
+        self.kpi_row.add_card("Задачи", f"{total_stats['completed_tasks']}/{total_stats['total_tasks']}", "resources/icons/task.png")
+        self.kpi_row.add_card("Сессии", str(total_stats['total_sessions']), "resources/icons/session.png")
+        self.kpi_row.add_card("Время", f"{total_stats['total_hours']} ч", "resources/icons/time.png")
 
         # Активная тема
         active_topic = self._controller.get_active_topic()
@@ -386,8 +477,8 @@ class DashboardView(QWidget):
         if last_session and last_session.get('duration_minutes', 0) > 0:
             self.last_session_widget.show()
             self.last_session_topic.setText(last_session['topic_name'])
-            self.last_session_duration.setText(f"⏱️ {last_session['duration_display']}")
-            self.last_session_conc.setText(f"🧠 {last_session['avg_concentration']}/5")
+            self.last_session_duration.setText(f"️resources/icons/session.png {last_session['duration_display']}")     #время последней сессии
+            self.last_session_conc.setText(f"resources/icons/brain.png {last_session['avg_concentration']}/5")
         else:
             self.last_session_widget.hide()
 
