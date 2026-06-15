@@ -407,6 +407,10 @@ class MainWindow(QMainWindow):
         self.flashcards_view.card_selected.connect(self._open_flashcard)
         self.flashcards_view.start_review_requested.connect(self._start_review_session)
 
+        # Review Session
+        self.review_session_view.session_completed.connect(self._on_review_session_completed)
+        self.review_session_view.session_cancelled.connect(self._on_review_session_cancelled)
+
         # Search
         self.search_view.topic_selected.connect(
             lambda topic_id: self.navigation.navigate_to(NavSection.TOPICS, topic_id)
@@ -743,3 +747,15 @@ class MainWindow(QMainWindow):
                 'topic_name': topic.name,
                 'interval': 15
             })
+
+    def _on_review_session_completed(self, completed: int, total: int):
+        """Обработчик завершения сессии повторения"""
+        self.statusBar().showMessage(f"Повторение завершено: {completed} из {total} карточек", 3000)
+        # Возвращаемся к карточкам
+        self.navigation.navigate_to(NavSection.FLASHCARDS)
+
+    def _on_review_session_cancelled(self):
+        """Обработчик отмены сессии повторения"""
+        self.statusBar().showMessage("Сессия повторения отменена", 2000)
+        # Возвращаемся к карточкам
+        self.navigation.navigate_to(NavSection.FLASHCARDS)

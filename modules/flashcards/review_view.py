@@ -193,7 +193,10 @@ class ReviewSessionView(QWidget):
         """Завершает сессию"""
         progress = self._controller.get_progress()
 
-        # Сначала эмитим сигнал
+        # Очищаем контроллер ПЕРЕД показом сообщения
+        self._controller.end_review_session()
+
+        # Эмитим сигнал
         self.session_completed.emit(
             progress['completed'],
             progress['total']
@@ -206,14 +209,6 @@ class ReviewSessionView(QWidget):
             f"Повторено карточек: {progress['completed']} из {progress['total']}"
         )
 
-        # Очищаем контроллер
-        self._controller.end_review_session()
-
-        # Возвращаемся назад - эмитим сигнал для main_window
-        from core.navigation import NavSection
-        from core.event_bus import event_bus
-        event_bus.navigate_to.emit(NavSection.FLASHCARDS)
-
     def _on_cancel(self):
         """Отмена сессии"""
         reply = SilentMessageBox.question(
@@ -225,7 +220,3 @@ class ReviewSessionView(QWidget):
         if reply == SilentMessageBox.Yes:
             self._controller.end_review_session()
             self.session_cancelled.emit()
-            # Возвращаемся назад
-            from core.navigation import NavSection
-            from core.event_bus import event_bus
-            event_bus.navigate_to.emit(NavSection.FLASHCARDS)

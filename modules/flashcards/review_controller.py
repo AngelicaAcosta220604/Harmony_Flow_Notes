@@ -123,8 +123,7 @@ class ReviewController:
 
         # Проверяем, завершена ли сессия
         if self._current_index >= len(self._current_cards):
-            self.end_review_session()
-            return False
+            return False  # Сессия завершена
 
         return True
 
