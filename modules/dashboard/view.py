@@ -810,10 +810,11 @@ class DashboardView(QWidget):
             self.active_topic_widget.hide()
 
         last_session = self._controller.get_last_session()
-        if True:
-            # показываем плашку даже без данных
+        if last_session is not None:
             self.last_session_widget.show()
-            self.last_session_topic.setText("Нет сессий")
+            self.last_session_topic.setText(last_session.get('topic_name', 'Нет данных'))
+            # ... остальной код ...
+
             # ... остальное
             self.last_session_widget.show()
             self.last_session_topic.setText(last_session['topic_name'])
@@ -899,6 +900,7 @@ class DashboardView(QWidget):
             conc_layout.addWidget(conc_label)
 
         else:
+
             self.last_session_widget.hide()
 
             def resizeEvent(self, event):
