@@ -26,12 +26,11 @@ class TopicCheckboxTree(QTreeWidget):
         self._active_first_level_id = None
         self._items_by_id = {}
         self._sort_mode = 'name_asc'
-        self._updating_children = 0  # 🆕 Счётчик вместо булевого флага
+        self._updating_children = 0
 
         self._load_topics()
 
     def _on_item_changed(self, item: QTreeWidgetItem, column: int):
-        # Если мы сами программно меняем галочки — игнорируем
         if self._updating_children > 0:
             return
 
@@ -63,8 +62,7 @@ class TopicCheckboxTree(QTreeWidget):
         self._emit_selection()
 
     def _check_all_children(self, item: QTreeWidgetItem, state):
-        """Рекурсивно отмечает/снимает галочки со всех дочерних элементов"""
-        self._updating_children += 1  # Увеличиваем счётчик
+        self._updating_children += 1
         try:
             for i in range(item.childCount()):
                 child = item.child(i)
@@ -72,26 +70,21 @@ class TopicCheckboxTree(QTreeWidget):
                 if child.childCount() > 0:
                     self._check_all_children(child, state)
         finally:
-            self._updating_children -= 1  # Уменьшаем только когда вся рекурсия завершена
+            self._updating_children -= 1
 
     def set_sort_mode(self, mode: str):
-        """Устанавливает режим сортировки"""
         self._sort_mode = mode
 
     def reload(self):
-        """Перезагружает дерево с текущей сортировкой"""
         self._load_topics()
 
     def _load_topics(self):
-        """Загружает темы из БД с правильной сортировкой"""
         self.clear()
         self._items_by_id.clear()
         self._active_first_level_id = None
 
-        # Получаем ВСЕ темы
         rows = db.fetchall("SELECT id, name, parent_id, created_at FROM topics")
 
-        # Создаём элементы (пока не добавляем в дерево)
         for row in rows:
             item = QTreeWidgetItem()
             item.setData(0, Qt.UserRole, row['id'])
@@ -100,9 +93,8 @@ class TopicCheckboxTree(QTreeWidget):
             item.setData(0, Qt.UserRole + 1, row.get('created_at', ''))
             self._items_by_id[row['id']] = item
 
-        # Разделяем на корневые и дочерние
         root_items = []
-        child_items = {}  # parent_id -> list of items
+        child_items = {}
 
         for row in rows:
             item = self._items_by_id[row['id']]
@@ -115,47 +107,29 @@ class TopicCheckboxTree(QTreeWidget):
                     child_items[parent_id] = []
                 child_items[parent_id].append(item)
 
-        # Сортируем корневые элементы: папки (с детьми) выше тем
         def is_folder(item):
             return item.data(0, Qt.UserRole) in child_items
 
-        def sort_key(item):
-            if self._sort_mode == 'name_asc':
-                return (0 if is_folder(item) else 1, item.text(0).lower())
-            elif self._sort_mode == 'name_desc':
-                return (0 if is_folder(item) else 1, item.text(0).lower(), True)  # True для reverse
-            elif self._sort_mode == 'date_new':
-                return (0 if is_folder(item) else 1, item.data(0, Qt.UserRole + 1) or '', True)
-            elif self._sort_mode == 'date_old':
-                return (0 if is_folder(item) else 1, item.data(0, Qt.UserRole + 1) or '')
-            return (0 if is_folder(item) else 1, item.text(0).lower())
-
-        # Сортируем
         reverse = self._sort_mode in ('name_desc', 'date_new')
         root_items.sort(key=lambda x: x.text(0).lower(), reverse=reverse)
-        root_items.sort(key=is_folder)  # папки (False=0) перед темами (True=1)
+        root_items.sort(key=is_folder)
 
-        # Сортируем детей каждого родителя
         for parent_id, children in child_items.items():
             children.sort(key=lambda x: x.text(0).lower(), reverse=reverse)
-            children.sort(key=lambda x: x.childCount() > 0)  # папки перед темами
+            children.sort(key=lambda x: x.childCount() > 0)
 
-        # Добавляем корневые элементы в дерево
         for item in root_items:
             self.addTopLevelItem(item)
             item_id = item.data(0, Qt.UserRole)
 
-            # Добавляем детей если есть
             if item_id in child_items:
                 for child in child_items[item_id]:
                     item.addChild(child)
-                    # Рекурсивно добавляем внуков
                     child_id = child.data(0, Qt.UserRole)
                     if child_id in child_items:
                         for grandchild in child_items[child_id]:
                             child.addChild(grandchild)
 
-        # Стилизация
         for item in self._items_by_id.values():
             if item.childCount() > 0:
                 self._style_as_folder(item)
@@ -163,57 +137,6 @@ class TopicCheckboxTree(QTreeWidget):
                 self._style_as_topic(item)
 
         self.collapseAll()
-
-    def _sort_tree_items(self):
-        """Сортирует элементы дерева: папки выше тем"""
-
-        def sort_children(parent_item: QTreeWidgetItem):
-            if parent_item.childCount() == 0:
-                return
-
-            # Забираем детей (takeChild НЕ удаляет C++ объект, только открепляет)
-            children = []
-            while parent_item.childCount() > 0:
-                children.append(parent_item.takeChild(0))
-
-            folders = [c for c in children if c.childCount() > 0]
-            topics = [c for c in children if c.childCount() == 0]
-
-            folders.sort(key=lambda x: self._get_sort_key(x))
-            topics.sort(key=lambda x: self._get_sort_key(x))
-
-            for folder in folders:
-                parent_item.addChild(folder)
-                sort_children(folder)  # рекурсия для вложенных папок
-
-            for topic in topics:
-                parent_item.addChild(topic)
-
-        # Сортируем корневые элементы
-        root_items = []
-        while self.topLevelItemCount() > 0:
-            root_items.append(self.takeTopLevelItem(0))
-
-        folders = [item for item in root_items if item.childCount() > 0]
-        topics = [item for item in root_items if item.childCount() == 0]
-
-        folders.sort(key=lambda x: self._get_sort_key(x))
-        topics.sort(key=lambda x: self._get_sort_key(x))
-
-        for folder in folders:
-            self.addTopLevelItem(folder)
-            sort_children(folder)
-
-        for topic in topics:
-            self.addTopLevelItem(topic)
-
-    def _get_sort_key(self, item: QTreeWidgetItem):
-        """Ключ сортировки для элемента"""
-        if self._sort_mode in ('name_asc', 'name_desc'):
-            return item.text(0).lower()
-        elif self._sort_mode in ('date_new', 'date_old'):
-            return item.data(0, Qt.UserRole + 1) or ''
-        return item.text(0).lower()
 
     def _style_as_folder(self, item: QTreeWidgetItem):
         font = item.font(0)
@@ -250,12 +173,7 @@ class TopicCheckboxTree(QTreeWidget):
 
         return check_recursive(container_item)
 
-
-
-
-
     def _emit_selection(self):
-        """Собирает ID всех отмеченных элементов"""
         selected_ids = []
         for item in self._items_by_id.values():
             if item.checkState(0) == Qt.Checked:
@@ -269,6 +187,7 @@ class TopicCheckboxTree(QTreeWidget):
         for item in self._items_by_id.values():
             item.setCheckState(0, Qt.Unchecked)
         self._active_first_level_id = None
+
 
 class GlobalCardsView(QWidget):
     card_selected = Signal(int)
@@ -288,7 +207,6 @@ class GlobalCardsView(QWidget):
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(15)
 
-        # Заголовок и сортировка
         header_layout = QHBoxLayout()
         title_label = QLabel("🃏 Глобальные карточки")
         title_label.setFont(QFont("Arial", 16, QFont.Bold))
@@ -296,7 +214,6 @@ class GlobalCardsView(QWidget):
 
         header_layout.addStretch()
 
-        # Сортировка
         self.sort_combo = QComboBox()
         self.sort_combo.addItem("По дате создания", "created_at")
         self.sort_combo.addItem("По названию темы", "topic")
@@ -312,10 +229,8 @@ class GlobalCardsView(QWidget):
         header_layout.addWidget(self.start_review_btn)
         layout.addLayout(header_layout)
 
-        # Сплиттер
         main_splitter = QSplitter(Qt.Horizontal)
 
-        # --- ЛЕВАЯ ЧАСТЬ: Дерево тем + Сортировка ---
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
@@ -323,7 +238,6 @@ class GlobalCardsView(QWidget):
 
         left_layout.addWidget(QLabel("Выберите темы:"))
 
-        # 🆕 ПЛАШКА СОРТИРОВКИ ДЕРЕВА
         tree_sort_widget = QWidget()
         tree_sort_layout = QHBoxLayout(tree_sort_widget)
         tree_sort_layout.setContentsMargins(0, 0, 0, 0)
@@ -333,7 +247,7 @@ class GlobalCardsView(QWidget):
 
         self.tree_sort_combo = QComboBox()
         self.tree_sort_combo.addItem("🔤 По имени (А-Я)", "name_asc")
-        self.tree_sort_combo.addItem("🔽 По имени (Я-А)", "name_desc")
+        self.tree_sort_combo.addItem(" По имени (Я-А)", "name_desc")
         self.tree_sort_combo.addItem(" Новые сверху", "date_new")
         self.tree_sort_combo.addItem("📅 Старые сверху", "date_old")
         tree_sort_layout.addWidget(sort_label)
@@ -346,13 +260,11 @@ class GlobalCardsView(QWidget):
 
         main_splitter.addWidget(left_panel)
 
-        # Правая часть: Аналитика + Список
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
 
-        # Аналитика
         self.analytics_frame = QFrame()
         self.analytics_frame.setFrameShape(QFrame.StyledPanel)
         self.analytics_frame.setStyleSheet("background-color: #f0f4f8; border-radius: 8px;")
@@ -360,7 +272,7 @@ class GlobalCardsView(QWidget):
 
         self.stat_total = QLabel("Всего: 0")
         self.stat_new = QLabel("Новые: 0")
-        self.stat_in_progress = QLabel("В процессе: 0")  # <-- ИСПРАВЛЕНО
+        self.stat_in_progress = QLabel("В процессе: 0")
         self.stat_mastered = QLabel("Выучено: 0")
 
         for lbl in (self.stat_total, self.stat_new, self.stat_in_progress, self.stat_mastered):
@@ -368,9 +280,24 @@ class GlobalCardsView(QWidget):
             analytics_layout.addWidget(lbl)
         right_layout.addWidget(self.analytics_frame)
 
-        # Список карточек
         self.card_list = QListWidget()
         self.card_list.setFixedHeight(250)
+        self.card_list.setStyleSheet("""
+            QListWidget {
+                background-color: white;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+            QListWidget::item {
+                padding: 5px;
+            }
+            QListWidget::item:hover {
+                background-color: #f0f8ff;
+            }
+            QListWidget::item:selected {
+                background-color: #e3f2fd;
+            }
+        """)
 
         self.card_display = QTextEdit()
         self.card_display.setReadOnly(True)
@@ -391,15 +318,12 @@ class GlobalCardsView(QWidget):
         self.tree_sort_combo.currentIndexChanged.connect(self._on_tree_sort_changed)
 
     def _subscribe_to_events(self):
-        """Подписывается на события создания/удаления тем и карточек"""
         from core.event_bus import event_bus
 
-        # При создании/удалении темы - обновляем всё
         event_bus.topic_created.connect(lambda tid: self.refresh())
         event_bus.topic_deleted.connect(lambda tid: self.refresh())
         event_bus.topic_updated.connect(lambda tid: self.refresh())
 
-        # При создании/удалении карточки - обновляем только список карточек
         event_bus.flashcard_created.connect(lambda cid: self._load_data())
         event_bus.flashcard_deleted.connect(lambda cid: self._load_data())
 
@@ -411,27 +335,19 @@ class GlobalCardsView(QWidget):
         self._update_cards_and_analytics(selected_ids)
 
     def _get_card_status(self, card) -> str:
-        """Определяет статус карточки"""
         progress = self._controller.get_card_progress(card.id)
         return progress['status']
 
     def _update_cards_and_analytics(self, topic_ids: list):
-        """Обновляет аналитику и список карточек на основе выбранных тем"""
-
-
         if not topic_ids:
             self.card_list.clear()
-            self.card_list.addItem("📭 Выберите хотя бы одну тему в дереве слева")
+            self.card_list.addItem(" Выберите хотя бы одну тему в дереве слева")
             self.card_display.clear()
             self._update_analytics_labels(0, 0, 0, 0)
             return
 
         cards = self._controller.get_cards_by_topics(topic_ids)
 
-
-        # ... остальной код
-
-        # Сортировка
         sort_by = self.sort_combo.currentData()
         if sort_by == "topic":
             cards.sort(key=lambda c: self._get_topic_name(c.topic_id))
@@ -458,23 +374,23 @@ class GlobalCardsView(QWidget):
             topic_name = self._get_topic_name(card.topic_id)
             status = self._get_card_status(card)
 
-            # Создаём виджет с чекбоксом и текстом
             widget = QWidget()
-            layout = QHBoxLayout(widget)
-            layout.setContentsMargins(5, 2, 5, 2)
+            widget_layout = QHBoxLayout(widget)
+            widget_layout.setContentsMargins(8, 5, 8, 5)
+            widget_layout.setSpacing(10)
 
             checkbox = QCheckBox()
             checkbox.setChecked(False)
+            checkbox.setStyleSheet("QCheckBox { spacing: 5px; }")
             checkbox.stateChanged.connect(lambda state, cid=card.id: self._on_card_checkbox_changed(cid, state))
 
-            # Цветной бейдж статуса
             if status == "new":
-                status_badge = "[🆕 Новое]"
+                status_badge = "[ Новое]"
                 status_color = "#2196f3"
             elif status == "in_progress":
                 status_badge = "[🔄 В процессе]"
                 status_color = "#ff9800"
-            else:  # mastered
+            else:
                 status_badge = "[✅ Выучено]"
                 status_color = "#4caf50"
 
@@ -486,21 +402,22 @@ class GlobalCardsView(QWidget):
                 text = f"{status_badge} ❓ [{topic_name}] {preview}"
 
             label = QLabel(text)
-            label.setStyleSheet(f"color: {status_color};")
+            label.setStyleSheet(f"color: {status_color}; font-size: 13px;")
+            label.setWordWrap(True)
 
-            layout.addWidget(checkbox)
-            layout.addWidget(label)
-            layout.addStretch()
+            widget_layout.addWidget(checkbox)
+            widget_layout.addWidget(label, 1)
+
+            widget.setMinimumHeight(35)
+            widget.setMaximumHeight(50)
 
             item.setSizeHint(widget.sizeHint())
             self.card_list.addItem(item)
             self.card_list.setItemWidget(item, widget)
 
-            # Сохраняем связь card_id -> item
             item.setData(Qt.UserRole, card.id)
 
     def _update_analytics_labels(self, total: int, new_count: int, in_progress_count: int, mastered_count: int):
-        """Обновляет текст в панели аналитики"""
         self.stat_total.setText(f"📚 Всего: {total}")
         self.stat_new.setText(f"🆕 Новые: {new_count}")
         self.stat_in_progress.setText(f"🔄 В процессе: {in_progress_count}")
@@ -536,8 +453,6 @@ class GlobalCardsView(QWidget):
             )
 
     def _on_card_checkbox_changed(self, card_id: int, state: int):
-        """Обработчик изменения чекбокса карточки"""
-        # Здесь можно добавить логику для массовых операций с выбранными карточками
         pass
 
     def _on_start_review_clicked(self):
@@ -549,15 +464,13 @@ class GlobalCardsView(QWidget):
         self.start_review_requested.emit(topic_ids, True, True, True)
 
     def refresh(self):
-        """Обновляет дерево и данные, сворачивает папки"""
         self.topic_tree.reset_selection()
         self.topic_tree.reload()
-        self.topic_tree.collapseAll()  # 🆕 Сворачиваем все папки
+        self.topic_tree.collapseAll()
         self._load_data()
 
     def _on_tree_sort_changed(self):
-        """Обработчик смены сортировки дерева"""
         sort_mode = self.tree_sort_combo.currentData()
         if sort_mode:
             self.topic_tree.set_sort_mode(sort_mode)
-            self.topic_tree.reload()  # перестроим дерево с новой сортировкой
+            self.topic_tree.reload()
