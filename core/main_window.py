@@ -408,7 +408,7 @@ class MainWindow(QMainWindow):
         self.calendar_view.task_clicked.connect(self._open_task)
 
         # Flashcards
-        self.flashcards_view.card_selected.connect(self._open_flashcard)
+
         self.flashcards_view.start_review_requested.connect(self._start_review_session)
 
         # Review Session
@@ -480,15 +480,17 @@ class MainWindow(QMainWindow):
         self.analytics_view.refresh()
         self.dashboard_view.refresh()
 
-    def _start_review_session(self, topic_ids: list, include_free: bool, include_qa: bool, skip_reviewed: bool):
-        """Запускает сессию повторения для выбранных тем"""
-        # Передаем все параметры в ReviewSessionView
+    def _start_review_session(self, topic_ids: list, include_free: bool,
+                              include_qa: bool, skip_reviewed: bool,
+                              card_ids: list = None):
+        """Запускает сессию повторения для выбранных тем/карточек"""
         self.review_session_view.start_session(
             topic_ids=topic_ids,
             mode='sequential',
             include_free=include_free,
             include_qa=include_qa,
-            skip_reviewed=skip_reviewed
+            skip_reviewed=skip_reviewed,
+            card_ids=card_ids  # 🆕 Передаём список конкретных карточек
         )
         self.content_stack.setCurrentWidget(self.review_session_view)
 

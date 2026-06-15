@@ -111,12 +111,13 @@ class ReviewSessionView(QWidget):
 
     def start_session(self, topic_ids: list, mode: str = 'sequential',
                       include_free: bool = True, include_qa: bool = True,
-                      skip_reviewed: bool = True):
+                      skip_reviewed: bool = True, card_ids: list = None):
         """
-        Начинает сессию повторения для нескольких тем
+        Начинает сессию повторения
+        card_ids: если передан — используются только эти карточки, иначе все из тем
         """
         session_id = self._controller.start_review_session(
-            topic_ids, mode, include_free, include_qa, skip_reviewed
+            topic_ids, mode, include_free, include_qa, skip_reviewed, card_ids
         )
 
         if not session_id:

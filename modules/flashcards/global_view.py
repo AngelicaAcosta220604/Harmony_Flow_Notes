@@ -191,12 +191,13 @@ class TopicCheckboxTree(QTreeWidget):
 
 class GlobalCardsView(QWidget):
     card_selected = Signal(int)
-    start_review_requested = Signal(list, bool, bool, bool)
+    start_review_requested = Signal(list, bool, bool, bool, object)
 
     def __init__(self, controller: FlashcardController, parent=None):
         super().__init__(parent)
         self._controller = controller
         self._current_card = None
+        self._selected_card_ids = set()
         self._setup_ui()
         self._connect_signals()
         self._subscribe_to_events()
@@ -312,7 +313,7 @@ class GlobalCardsView(QWidget):
 
     def _connect_signals(self):
         self.topic_tree.selection_changed.connect(self._on_topics_selection_changed)
-        self.card_list.itemClicked.connect(self._on_card_selected)
+        self.card_list.itemPressed.connect(self._on_card_selected)
         self.start_review_btn.clicked.connect(self._on_start_review_clicked)
         self.sort_combo.currentIndexChanged.connect(self._load_data)
         self.tree_sort_combo.currentIndexChanged.connect(self._on_tree_sort_changed)
@@ -369,6 +370,8 @@ class GlobalCardsView(QWidget):
             self.card_display.clear()
             return
 
+        self._selected_card_ids.clear()
+
         for card in cards:
             item = QListWidgetItem()
             topic_name = self._get_topic_name(card.topic_id)
@@ -380,8 +383,12 @@ class GlobalCardsView(QWidget):
             widget_layout.setSpacing(10)
 
             checkbox = QCheckBox()
-            checkbox.setChecked(False)
+            checkbox.setChecked(True)
             checkbox.setStyleSheet("QCheckBox { spacing: 5px; }")
+            self._selected_card_ids.add(card.id)
+            checkbox.stateChanged.connect(
+                lambda state, cid=card.id: self._on_card_checkbox_changed(cid, state)
+            )
             checkbox.stateChanged.connect(lambda state, cid=card.id: self._on_card_checkbox_changed(cid, state))
 
             if status == "new":
@@ -428,13 +435,16 @@ class GlobalCardsView(QWidget):
         return row['name'] if row else "Без темы"
 
     def _on_card_selected(self, item: QListWidgetItem):
+        """Показывает содержимое карточки без сброса списка и галочек"""
         card_id = item.data(Qt.UserRole)
+        if not card_id:
+            return
+
         card = self._controller.get_card(card_id)
         if not card:
             return
 
         self._current_card = card
-        self.card_selected.emit(card_id)
 
         status = self._get_card_status(card)
         status_html = f"<span style='color: #4caf50; font-weight: bold;'>{status}</span>"
@@ -453,7 +463,11 @@ class GlobalCardsView(QWidget):
             )
 
     def _on_card_checkbox_changed(self, card_id: int, state: int):
-        pass
+        """Обработчик изменения чекбокса карточки"""
+        if state == Qt.Checked:
+            self._selected_card_ids.add(card_id)
+        else:
+            self._selected_card_ids.discard(card_id)
 
     def _on_start_review_clicked(self):
         topic_ids = self.topic_tree.get_selected_topic_ids()
@@ -461,7 +475,9 @@ class GlobalCardsView(QWidget):
             QMessageBox.warning(self, "Внимание", "Выберите хотя бы одну тему в дереве слева.")
             return
 
-        self.start_review_requested.emit(topic_ids, True, True, True)
+        card_ids = list(self._selected_card_ids) if self._selected_card_ids else None
+
+        self.start_review_requested.emit(topic_ids, True, True, True, card_ids)
 
     def refresh(self):
         self.topic_tree.reset_selection()

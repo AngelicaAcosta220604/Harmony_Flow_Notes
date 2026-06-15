@@ -23,35 +23,43 @@ class ReviewController:
 
     def start_review_session(self, topic_ids: list, mode: str = 'sequential',
                              include_free: bool = True, include_qa: bool = True,
-                             skip_reviewed: bool = True) -> Optional[int]:
+                             skip_reviewed: bool = True,
+                             card_ids: list = None) -> Optional[int]:
         """
-        Начинает новую сессию повторения для нескольких тем
+        Начинает новую сессию повторения
 
         Args:
             topic_ids: Список ID тем
             mode: 'sequential' или 'random'
             include_free: Включать свободные карточки
             include_qa: Включать карточки вопрос-ответ
-            skip_reviewed: Пропускать выученные (с интервалом > 0)
-
-        Returns:
-            ID сессии
+            skip_reviewed: Пропускать выученные
+            card_ids: Если передан — использовать только эти карточки
         """
-        # Получаем карточки для всех выбранных тем
-        all_cards = []
-        for topic_id in topic_ids:
-            cards = self._get_cards_for_topic(topic_id)
-            all_cards.extend(cards)
+        # 🆕 Если переданы конкретные card_ids — берём только их
+        if card_ids:
+            all_cards = []
+            for cid in card_ids:
+                card = self._flashcard_repo.get_by_id(cid)
+                if card:
+                    from models.flashcard import Flashcard
+                    all_cards.append(Flashcard.from_row(card))
+        else:
+            # Получаем карточки для всех выбранных тем
+            all_cards = []
+            for topic_id in topic_ids:
+                cards = self._get_cards_for_topic(topic_id)
+                all_cards.extend(cards)
 
-        # Применяем фильтры
-        if include_free and not include_qa:
-            all_cards = [c for c in all_cards if c.is_free]
-        elif include_qa and not include_free:
-            all_cards = [c for c in all_cards if c.is_qa]
+        # Применяем фильтры (только если не переданы конкретные card_ids)
+        if not card_ids:
+            if include_free and not include_qa:
+                all_cards = [c for c in all_cards if c.is_free]
+            elif include_qa and not include_free:
+                all_cards = [c for c in all_cards if c.is_qa]
 
-        # Пропускаем выученные (если есть поле interval)
-        if skip_reviewed:
-            all_cards = [c for c in all_cards if getattr(c, 'interval', 0) == 0]
+            if skip_reviewed:
+                all_cards = [c for c in all_cards if getattr(c, 'interval', 0) == 0]
 
         if not all_cards:
             return None
@@ -60,14 +68,13 @@ class ReviewController:
             import random
             all_cards = random.sample(all_cards, len(all_cards))
 
-        # Создаём сессию (используем первый topic_id для записи в БД)
+        # Создаём сессию
         session_id = self._review_repo.create_review_session(
             topic_id=topic_ids[0] if topic_ids else 0,
             mode=mode,
             total_cards=len(all_cards)
         )
 
-        # Сохраняем состояние
         self._current_session = ReviewSession(
             id=session_id,
             topic_id=topic_ids[0] if topic_ids else 0,
