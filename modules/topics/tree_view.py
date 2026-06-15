@@ -179,6 +179,14 @@ class TopicsView(QWidget):
         self.delete_btn.clicked.connect(self._on_delete)
         self.tree.topic_double_clicked.connect(self._on_topic_double_clicked)
 
+        self.tree.itemClicked.connect(self._on_tree_item_clicked)
+
+    def _on_tree_item_clicked(self, item):
+        """Обновляет состояние кнопок при клике на элемент дерева"""
+        has_selection = self.tree.get_selected_topic_id() is not None
+        self.rename_btn.setEnabled(has_selection)
+        self.delete_btn.setEnabled(has_selection)
+
     def _on_topic_double_clicked(self, topic_id: int):
         topic = self._controller.get_topic(topic_id)
         if topic and topic.is_topic:
