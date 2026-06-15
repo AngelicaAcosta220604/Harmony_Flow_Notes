@@ -1,8 +1,7 @@
-# modules/topics/topic_view.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel,
     QPushButton, QScrollArea, QFrame, QMessageBox, QTextEdit, QListWidget, QListWidgetItem, QCheckBox,
-    QSizePolicy, QProgressBar
+    QSizePolicy, QProgressBar, QDialog, QDialogButtonBox, QTextBrowser
 )
 from PySide6.QtCore import Signal, Qt, QSize
 from PySide6.QtGui import QIcon, QPixmap, QColor
@@ -11,6 +10,7 @@ from widgets import SilentMessageBox
 from .controller import TopicController
 from .analytics_controller import TopicAnalyticsController
 import re
+
 
 def remove_emojis(text: str) -> str:
     emoji_pattern = re.compile("["
@@ -27,6 +27,7 @@ def remove_emojis(text: str) -> str:
                                u"\U000024C2-\U0001F251"
                                "]+", flags=re.UNICODE)
     return emoji_pattern.sub(r'', text).strip()
+
 
 class NoteListItemWidget(QWidget):
     """Виджет для отображения записи в списке с кнопками"""
@@ -167,6 +168,155 @@ class TaskListItemWidget(QWidget):
             self.complete_clicked.emit(self.task_id)
 
 
+class FlashcardListItemWidget(QWidget):
+    """Виджет для отображения карточки в списке с кнопками"""
+
+    view_clicked = Signal(int)
+    edit_clicked = Signal(int)
+    delete_clicked = Signal(int)
+
+    def __init__(self, card_id: int, preview: str, card_type: str, date_str: str, parent=None):
+        super().__init__(parent)
+        self.card_id = card_id
+        self._setup_ui(preview, card_type, date_str)
+
+    def _setup_ui(self, preview: str, card_type: str, date_str: str):
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(10)
+
+        # Тип карточки (иконка)
+        type_icon = QLabel()
+        if card_type == 'free':
+            type_icon.setText("📝")
+        else:
+            type_icon.setText("❓")
+        type_icon.setStyleSheet("font-size: 16px;")
+        layout.addWidget(type_icon)
+
+        # Превью текста
+        self.preview_label = QLabel(preview)
+        self.preview_label.setStyleSheet("color: #1F2937; font-weight: 500;")
+        self.preview_label.setWordWrap(True)
+        layout.addWidget(self.preview_label, 1)
+
+        # Дата
+        self.date_label = QLabel(date_str)
+        self.date_label.setStyleSheet("color: #6B7280; font-size: 11px;")
+        layout.addWidget(self.date_label)
+
+        # Кнопка просмотра
+        self.view_btn = QPushButton()
+        self.view_btn.setIcon(QIcon("resources/icons/open.png"))
+        self.view_btn.setIconSize(QSize(16, 16))
+        self.view_btn.setFixedSize(30, 30)
+        self.view_btn.setToolTip("Просмотр")
+        self.view_btn.clicked.connect(lambda: self.view_clicked.emit(self.card_id))
+        layout.addWidget(self.view_btn)
+
+        # Кнопка редактирования
+        self.edit_btn = QPushButton()
+        self.edit_btn.setIcon(QIcon("resources/icons/pen.png"))
+        self.edit_btn.setIconSize(QSize(16, 16))
+        self.edit_btn.setFixedSize(30, 30)
+        self.edit_btn.setToolTip("Редактировать")
+        self.edit_btn.clicked.connect(lambda: self.edit_clicked.emit(self.card_id))
+        layout.addWidget(self.edit_btn)
+
+        # Кнопка удаления
+        self.delete_btn = QPushButton()
+        self.delete_btn.setIcon(QIcon("resources/icons/urna.png"))
+        self.delete_btn.setIconSize(QSize(16, 16))
+        self.delete_btn.setFixedSize(30, 30)
+        self.delete_btn.setToolTip("Удалить")
+        self.delete_btn.clicked.connect(lambda: self.delete_clicked.emit(self.card_id))
+        layout.addWidget(self.delete_btn)
+
+        # ✅ УБРАНЫ все фоновые стили (подложки)
+        self.setFixedHeight(45)
+
+
+class FlashcardViewDialog(QDialog):
+    """Диалог для просмотра/редактирования карточки"""
+
+    def __init__(self, card, is_edit_mode: bool = True, parent=None):
+        super().__init__(parent)
+        self.card = card
+        self.is_edit_mode = is_edit_mode
+        self._setup_ui()
+
+    def _setup_ui(self):
+        self.setWindowTitle("Просмотр карточки" if not self.is_edit_mode else "Редактирование карточки")
+        self.resize(600, 500)
+
+        layout = QVBoxLayout(self)
+
+        if self.card.is_free:
+            # Свободная карточка
+            label = QLabel("📝 Свободная карточка")
+            label.setStyleSheet("font-size: 16px; font-weight: bold;")
+            layout.addWidget(label)
+
+            self.content_edit = QTextEdit()
+            self.content_edit.setPlainText(self.card.content)
+            if not self.is_edit_mode:
+                self.content_edit.setReadOnly(True)
+            layout.addWidget(self.content_edit)
+        else:
+            # Карточка вопрос-ответ
+            label = QLabel("❓ Карточка вопрос-ответ")
+            label.setStyleSheet("font-size: 16px; font-weight: bold;")
+            layout.addWidget(label)
+
+            layout.addWidget(QLabel("<b>Вопрос:</b>"))
+            self.question_edit = QTextEdit()
+            self.question_edit.setPlainText(self.card.question)
+            if not self.is_edit_mode:
+                self.question_edit.setReadOnly(True)
+            layout.addWidget(self.question_edit)
+
+            layout.addWidget(QLabel("<b>Ответ:</b>"))
+            self.answer_edit = QTextEdit()
+            self.answer_edit.setPlainText(self.card.answer)
+            if not self.is_edit_mode:
+                self.answer_edit.setReadOnly(True)
+            layout.addWidget(self.answer_edit)
+
+        # ✅ ИСПРАВЛЕНО: используем getattr для безопасного доступа
+        date_text = f"Создано: {self.card.created_at[:16] if self.card.created_at else '—'}"
+        # updated_at может не существовать в модели
+        updated_at = getattr(self.card, 'updated_at', None)
+        if updated_at and updated_at != self.card.created_at:
+            date_text += f"\nИзменено: {updated_at[:16]}"
+
+        date_label = QLabel(date_text)
+        date_label.setStyleSheet("color: #6B7280; font-size: 11px;")
+        layout.addWidget(date_label)
+
+        # Кнопки
+        if self.is_edit_mode:
+            button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+            button_box.accepted.connect(self.accept)
+            button_box.rejected.connect(self.reject)
+        else:
+            button_box = QDialogButtonBox(QDialogButtonBox.Close)
+            button_box.rejected.connect(self.reject)
+
+        layout.addWidget(button_box)
+
+    def get_card_data(self):
+        """Возвращает обновлённые данные карточки"""
+        if self.card.is_free:
+            return {
+                'content': self.content_edit.toPlainText()
+            }
+        else:
+            return {
+                'question': self.question_edit.toPlainText(),
+                'answer': self.answer_edit.toPlainText()
+            }
+
+
 class TopicView(QWidget):
     """
     Экран темы с вкладками:
@@ -190,6 +340,10 @@ class TopicView(QWidget):
     edit_task_requested = Signal(int)
     delete_task_requested = Signal(int)
     complete_task_requested = Signal(int)
+
+    # Новые сигналы для карточек
+    edit_flashcard_requested = Signal(int)
+    delete_flashcard_requested = Signal(int)
 
     back_requested = Signal()
 
@@ -799,6 +953,7 @@ class TopicView(QWidget):
     def _load_cards(self, topic_id: int):
         cards = self._topic_controller.get_cards_by_topic(topic_id)
         self.cards_list.clear()
+        self.cards_list.setSpacing(2)
 
         if not cards:
             item = QListWidgetItem("🃏 Нет карточек. Создайте первую карточку!")
@@ -807,15 +962,69 @@ class TopicView(QWidget):
             return
 
         for card in cards:
-            item = QListWidgetItem()
             if card.is_free:
                 preview = card.content[:50] + "..." if len(card.content) > 50 else card.content
-                item.setText(f"📝 {preview}")
+                card_type = 'free'
             else:
                 preview = card.question[:50] + "..." if len(card.question) > 50 else card.question
-                item.setText(f"❓ {preview}")
-            item.setData(Qt.UserRole, card.id)
+                card_type = 'qa'
+
+            # Форматируем дату
+            updated_at = getattr(card, 'updated_at', '')
+            created_at = getattr(card, 'created_at', '')
+            date_str = updated_at[:16] if updated_at else (created_at[:16] if created_at else "")
+
+            item_widget = FlashcardListItemWidget(card.id, preview, card_type, date_str)
+            item_widget.view_clicked.connect(lambda cid=card.id: self._view_card(cid))
+            item_widget.edit_clicked.connect(lambda cid=card.id: self._edit_card(cid))
+            item_widget.delete_clicked.connect(lambda cid=card.id: self._delete_card(cid))
+
+            item = QListWidgetItem()
+            item.setSizeHint(item_widget.sizeHint())
             self.cards_list.addItem(item)
+            self.cards_list.setItemWidget(item, item_widget)
+
+    def _view_card(self, card_id: int):
+        """Просмотр карточки (read-only)"""
+        from core.di.container import container
+        card = container.flashcard_controller.get_card(card_id)
+        if not card:
+            return
+
+        dialog = FlashcardViewDialog(card, is_edit_mode=False)
+        dialog.exec()
+
+    def _edit_card(self, card_id: int):
+        """Редактирование карточки"""
+        from core.di.container import container
+        card = container.flashcard_controller.get_card(card_id)
+        if not card:
+            return
+
+        dialog = FlashcardViewDialog(card, is_edit_mode=True)
+        if dialog.exec() == QDialog.Accepted:
+            # Сохраняем изменения
+            data = dialog.get_card_data()
+            if container.flashcard_controller.update_card(card_id, **data):
+                self._load_cards(self._current_topic_id)
+                SilentMessageBox.information(self, "Успех", "Карточка обновлена")
+
+    def _delete_card(self, card_id: int):
+        """Удаление карточки"""
+        from core.di.container import container
+        card = container.flashcard_controller.get_card(card_id)
+        if not card:
+            return
+
+        reply = SilentMessageBox.question(
+            self, "Подтверждение удаления",
+            f"Удалить карточку?"
+        )
+
+        if reply == SilentMessageBox.Yes:
+            if container.flashcard_controller.delete_card(card_id):
+                self._load_cards(self._current_topic_id)
+                SilentMessageBox.information(self, "Успех", "Карточка удалена")
 
     def _load_sessions(self, topic_id: int):
         sessions = self._topic_controller.get_sessions_by_topic(topic_id)
@@ -894,7 +1103,7 @@ class TopicView(QWidget):
     def _on_card_double_clicked(self, item):
         card_id = item.data(Qt.UserRole)
         if card_id:
-            self.show_all_cards_requested.emit(card_id)
+            self._view_card(card_id)
 
     def _on_session_double_clicked(self, item):
         session_id = item.data(Qt.UserRole)
