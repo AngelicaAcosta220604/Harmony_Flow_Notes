@@ -3,6 +3,8 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QScrollArea, QSizePolicy
 )
+
+from utils.ping_manager import PingManager
 from widgets import SilentMessageBox
 from PySide6.QtCore import Qt, QTimer, Signal, QSize
 from PySide6.QtGui import QIcon, QPixmap, QFont
@@ -32,10 +34,9 @@ class FocusActiveView(QWidget):
         self._session_controller = session_controller
         self._music_controller = music_controller
         self._activity_check_interval = 15  # минут
-        self._inactivity_timer = QTimer()
         self._setup_ui()
         self._connect_signals()
-        self._setup_inactivity_timer()
+        self._setup_ping_manager()
 
     def _setup_ui(self):
         """Настраивает интерфейс"""
@@ -242,17 +243,18 @@ class FocusActiveView(QWidget):
 
         self.state_sliders.state_changed.connect(self._on_state_changed)
 
-    def _setup_inactivity_timer(self):
-        """Настраивает таймер контроля активности"""
-        self._inactivity_timer.timeout.connect(self._on_inactivity_timeout)
-        self._reset_inactivity_timer()
+    def _setup_ping_manager(self):
+        """Настраивает менеджер контроля активности"""
+        self.ping_manager = PingManager(
+            idle_ms=self._activity_check_interval * 60 * 1000,
+            timeout_ms=90 * 60 * 1000,
+            parent=self
+        )
+        self.ping_manager.pingNeeded.connect(self._show_ping_dialog)
+        self.ping_manager.timeoutReached.connect(self._auto_pause_from_ping)
 
-    def _reset_inactivity_timer(self):
-        """Сбрасывает таймер бездействия"""
-        self._inactivity_timer.start(self._activity_check_interval * 60 * 1000)
-
-    def _on_inactivity_timeout(self):
-        """Обработчик бездействия - показываем пинг-диалог"""
+    def _show_ping_dialog(self):
+        """Показывает диалог 'Ты ещё тут?' и ставит сессию на паузу"""
         self._session_controller.pause_session()
 
         dialog = PingDialog(self)
@@ -262,16 +264,25 @@ class FocusActiveView(QWidget):
 
     def _on_continue_from_ping(self):
         """Продолжение сессии после пинга"""
+        self.ping_manager.user_confirmed()
         self._session_controller.resume_session()
-        self._reset_inactivity_timer()
 
     def _on_pause_from_ping(self):
         """Пауза после пинга"""
+        self.ping_manager.reset_idle()
         self.status_label.setText("Сессия на паузе")
         self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
         self.pause_btn.setText("Возобновить")
         self.pause_btn.setIcon(QIcon("resources/icons/play.png"))
-        self._inactivity_timer.stop()
+
+    def _auto_pause_from_ping(self):
+        """Авто-пауза, если пользователь вообще не ответил"""
+        if not self._session_controller.is_session_paused():
+            self._session_controller.pause_session()
+        self.status_label.setText("Авто-пауза (нет активности)")
+        self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
+        self.pause_btn.setText("Возобновить")
+        self.pause_btn.setIcon(QIcon("resources/icons/play.png"))
 
     def _on_paused(self):
         """Обработчик паузы"""
@@ -279,7 +290,6 @@ class FocusActiveView(QWidget):
         self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
         self.pause_btn.setText("Возобновить")
         self.pause_btn.setIcon(QIcon("resources/icons/play.png"))
-        self._inactivity_timer.stop()
         self.music_widget._controller.pause()
 
     def _on_resumed(self):
@@ -288,7 +298,7 @@ class FocusActiveView(QWidget):
         self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
         self.pause_btn.setText("Пауза")
         self.pause_btn.setIcon(QIcon("resources/icons/pause.png"))
-        self._reset_inactivity_timer()
+        self.ping_manager.reset_idle()
         self.music_widget._controller.resume()
 
     def _on_pause_clicked(self):
@@ -325,7 +335,7 @@ class FocusActiveView(QWidget):
     def _on_state_changed(self, metric: str, value: int):
         """Обработчик изменения состояния"""
         self._session_controller.log_state(metric, value)
-        self._reset_inactivity_timer()
+        self.ping_manager.reset_idle()
 
     def start(self, topic_id: int, topic_name: str, activity_check_interval: int):
         """
@@ -339,7 +349,14 @@ class FocusActiveView(QWidget):
 
         self.state_sliders.reset()
 
-        self._reset_inactivity_timer()
+        # Запускаем PingManager с новым интервалом
+        self.ping_manager = PingManager(
+            idle_ms=self._activity_check_interval * 60 * 1000,
+            timeout_ms=90 * 60 * 1000,
+            parent=self
+        )
+        self.ping_manager.pingNeeded.connect(self._show_ping_dialog)
+        self.ping_manager.timeoutReached.connect(self._auto_pause_from_ping)
 
         default_sound = self._music_controller.get_current_sound()
         if default_sound and default_sound != 'off':
@@ -347,4 +364,56 @@ class FocusActiveView(QWidget):
 
     def cleanup(self):
         """Очищает ресурсы"""
-        self._inactivity_timer.stop()
+        if hasattr(self, 'ping_manager'):
+            self.ping_manager._idle_timer.stop()
+            self.ping_manager._timeout_timer.stop()
+
+    def force_save_time(self):
+        """Принудительно сохраняет текущее время сессии в БД"""
+        session_id = self._session_controller.get_current_session_id()
+        if session_id and self.timer:
+            current_seconds = self._session_controller.get_elapsed_seconds()
+            if current_seconds > 0:
+                from datebase.db_manager import db
+                db.execute(
+                    "UPDATE sessions SET total_active_seconds = ? WHERE id = ?",
+                    (current_seconds, session_id)
+                )
+
+    def force_save_state(self):
+        """Принудительно сохраняет ползунки"""
+        session_id = self._session_controller.get_current_session_id()
+        if session_id:
+            values = self.state_sliders.get_values()
+            from datebase.db_manager import db
+            db.execute(
+                """UPDATE sessions SET concentration = ?, energy = ?, interest = ? 
+                WHERE id = ?""",
+                (values['concentration'], values['energy'], values['interest'], session_id)
+            )
+
+    def hideEvent(self, event):
+        """Сохраняем состояние при переключении вкладок"""
+        if self._session_controller.get_current_session_id():
+            self.force_save_time()
+            self.force_save_state()
+        super().hideEvent(event)
+
+    def resume_existing_session(self, session_id: int, topic_id: int, topic_name: str):
+        """Загружает старую сессию из БД"""
+        self.topic_label.setText(f"Работа над темой: {topic_name}")
+
+        from datebase.db_manager import db
+        row = db.fetchone("SELECT * FROM sessions WHERE id = ?", (session_id,))
+        if not row:
+            return
+
+        total_seconds = row.get('total_active_seconds', 0)
+        self.timer.set_time(total_seconds)
+
+        self.state_sliders.conc_slider.setValue(row.get('concentration', 50))
+        self.state_sliders.energy_slider.setValue(row.get('energy', 50))
+        self.state_sliders.interest_slider.setValue(row.get('interest', 50))
+
+        if row['status'] == 'active':
+            self._session_controller.resume_session()
