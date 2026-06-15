@@ -98,7 +98,7 @@ class FocusActiveView(QWidget):
         # Заголовок с иконкой
         state_title_layout = QHBoxLayout()
         state_icon = QLabel()
-        state_icon_pixmap = QPixmap("resources/icons/brain.png")
+        state_icon_pixmap = QPixmap("resources/icons/brain1.png")
         if not state_icon_pixmap.isNull():
             state_icon_pixmap = state_icon_pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             state_icon.setPixmap(state_icon_pixmap)
@@ -131,7 +131,7 @@ class FocusActiveView(QWidget):
         # Заголовок с иконкой
         music_title_layout = QHBoxLayout()
         music_icon = QLabel()
-        music_icon_pixmap = QPixmap("resources/icons/music.png")
+        music_icon_pixmap = QPixmap("resources/icons/music1.png")
         if not music_icon_pixmap.isNull():
             music_icon_pixmap = music_icon_pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             music_icon.setPixmap(music_icon_pixmap)
@@ -156,7 +156,7 @@ class FocusActiveView(QWidget):
 
         # Быстрая запись (жёлтая)
         self.quick_note_btn = QPushButton("Быстрая запись")
-        self.quick_note_btn.setIcon(QIcon("resources/icons/notes.png"))
+        self.quick_note_btn.setIcon(QIcon("resources/icons/new_notes1.png"))
         self.quick_note_btn.setIconSize(QSize(18, 18))
         self.quick_note_btn.setStyleSheet("""
             QPushButton {
@@ -177,7 +177,7 @@ class FocusActiveView(QWidget):
 
         # Возобновить/Пауза (зелёная)
         self.pause_btn = QPushButton("Пауза")
-        self.pause_btn.setIcon(QIcon("resources/icons/play.png"))
+        self.pause_btn.setIcon(QIcon("resources/icons/play1.png"))
         self.pause_btn.setIconSize(QSize(18, 18))
         self.pause_btn.setStyleSheet("""
             QPushButton {
@@ -198,7 +198,6 @@ class FocusActiveView(QWidget):
 
         # Завершить (красная)
         self.end_btn = QPushButton("Завершить")
-        self.end_btn.setIcon(QIcon("resources/icons/urna.png"))
         self.end_btn.setIconSize(QSize(18, 18))
         self.end_btn.setStyleSheet("""
             QPushButton {
@@ -273,7 +272,7 @@ class FocusActiveView(QWidget):
         self.status_label.setText("Сессия на паузе")
         self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
         self.pause_btn.setText("Возобновить")
-        self.pause_btn.setIcon(QIcon("resources/icons/play.png"))
+        self.pause_btn.setIcon(QIcon("resources/icons/play1.png"))
 
     def _auto_pause_from_ping(self):
         """Авто-пауза, если пользователь вообще не ответил"""
@@ -282,14 +281,14 @@ class FocusActiveView(QWidget):
         self.status_label.setText("Авто-пауза (нет активности)")
         self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
         self.pause_btn.setText("Возобновить")
-        self.pause_btn.setIcon(QIcon("resources/icons/play.png"))
+        self.pause_btn.setIcon(QIcon("resources/icons/play1.png"))
 
     def _on_paused(self):
         """Обработчик паузы"""
         self.status_label.setText("Сессия на паузе")
         self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
         self.pause_btn.setText("Возобновить")
-        self.pause_btn.setIcon(QIcon("resources/icons/play.png"))
+        self.pause_btn.setIcon(QIcon("resources/icons/play1.png"))
         self.music_widget._controller.pause()
 
     def _on_resumed(self):
@@ -297,7 +296,7 @@ class FocusActiveView(QWidget):
         self.status_label.setText("Сессия активна")
         self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
         self.pause_btn.setText("Пауза")
-        self.pause_btn.setIcon(QIcon("resources/icons/pause.png"))
+        self.pause_btn.setIcon(QIcon("resources/icons/pause1.png"))
         self.ping_manager.reset_idle()
         self.music_widget._controller.resume()
 
@@ -357,7 +356,7 @@ class FocusActiveView(QWidget):
         self.status_label.setText("Сессия активна")
         self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
         self.pause_btn.setText("Пауза")
-        self.pause_btn.setIcon(QIcon("resources/icons/pause.png"))
+        self.pause_btn.setIcon(QIcon("resources/icons/pause1.png"))
 
         # Запускаем PingManager
         self.ping_manager = PingManager(
@@ -432,12 +431,12 @@ class FocusActiveView(QWidget):
             self.status_label.setText("Сессия активна")
             self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
             self.pause_btn.setText("Пауза")
-            self.pause_btn.setIcon(QIcon("resources/icons/pause.png"))
+            self.pause_btn.setIcon(QIcon("resources/icons/pause1.png"))
         else:
             self.status_label.setText("Сессия на паузе")
             self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
             self.pause_btn.setText("Возобновить")
-            self.pause_btn.setIcon(QIcon("resources/icons/play.png"))
+            self.pause_btn.setIcon(QIcon("resources/icons/play1.png"))
 
         self.ping_manager = PingManager(
             idle_ms=self._activity_check_interval * 60 * 1000,
