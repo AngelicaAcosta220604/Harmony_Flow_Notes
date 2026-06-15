@@ -473,8 +473,15 @@ class MainWindow(QMainWindow):
         self.dashboard_view.refresh()
 
     def _start_review_session(self, topic_ids: list, include_free: bool, include_qa: bool, skip_reviewed: bool):
-        # Передаем данные в ReviewSessionView
-        self.review_session_view.start_session(topic_ids, include_free, include_qa, skip_reviewed)
+        """Запускает сессию повторения для выбранных тем"""
+        # Передаем все параметры в ReviewSessionView
+        self.review_session_view.start_session(
+            topic_ids=topic_ids,
+            mode='sequential',
+            include_free=include_free,
+            include_qa=include_qa,
+            skip_reviewed=skip_reviewed
+        )
         self.content_stack.setCurrentWidget(self.review_session_view)
 
     def _on_search_hotkey(self):

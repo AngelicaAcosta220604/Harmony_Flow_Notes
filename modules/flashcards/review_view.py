@@ -51,7 +51,16 @@ class ReviewSessionView(QWidget):
         self.card_display = QTextEdit()
         self.card_display.setReadOnly(True)
         self.card_display.setMinimumHeight(300)
-        self.card_display.setStyleSheet("font-size: 14px;")
+        self.card_display.setStyleSheet("""
+                    QTextEdit {
+                        font-size: 14px;
+                        padding: 30px;
+                        background-color: #ffffff;
+                        border: 2px solid #e0e0e0;
+                        border-radius: 12px;
+                    }
+                """)
+        self.card_display.setAlignment(Qt.AlignCenter)  # Центрируем текст!
         layout.addWidget(self.card_display)
 
         # Кнопки
@@ -100,14 +109,18 @@ class ReviewSessionView(QWidget):
         self.doubt_btn.setVisible(visible)
         self.didnt_know_btn.setVisible(visible)
 
-    def start_session(self, topic_id: int, mode: str = 'sequential'):
+    def start_session(self, topic_ids: list, mode: str = 'sequential',
+                      include_free: bool = True, include_qa: bool = True,
+                      skip_reviewed: bool = True):
         """
-        Начинает сессию повторения для темы
+        Начинает сессию повторения для нескольких тем
         """
-        session_id = self._controller.start_review_session(topic_id, mode)
+        session_id = self._controller.start_review_session(
+            topic_ids, mode, include_free, include_qa, skip_reviewed
+        )
 
         if not session_id:
-            SilentMessageBox.warning(self, "Ошибка", "Нет карточек для повторения в этой теме")
+            SilentMessageBox.warning(self, "Ошибка", "Нет карточек для повторения в выбранных темах")
             self.session_cancelled.emit()
             return
 
@@ -180,16 +193,26 @@ class ReviewSessionView(QWidget):
         """Завершает сессию"""
         progress = self._controller.get_progress()
 
+        # Сначала эмитим сигнал
         self.session_completed.emit(
             progress['completed'],
             progress['total']
         )
 
+        # Показываем сообщение
         SilentMessageBox.information(
             self, "Сессия завершена",
             f"Повторение завершено!\n\n"
             f"Повторено карточек: {progress['completed']} из {progress['total']}"
         )
+
+        # Очищаем контроллер
+        self._controller.end_review_session()
+
+        # Возвращаемся назад - эмитим сигнал для main_window
+        from core.navigation import NavSection
+        from core.event_bus import event_bus
+        event_bus.navigate_to.emit(NavSection.FLASHCARDS)
 
     def _on_cancel(self):
         """Отмена сессии"""
@@ -202,3 +225,7 @@ class ReviewSessionView(QWidget):
         if reply == SilentMessageBox.Yes:
             self._controller.end_review_session()
             self.session_cancelled.emit()
+            # Возвращаемся назад
+            from core.navigation import NavSection
+            from core.event_bus import event_bus
+            event_bus.navigate_to.emit(NavSection.FLASHCARDS)
