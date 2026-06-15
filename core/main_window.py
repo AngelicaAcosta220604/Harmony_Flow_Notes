@@ -2,7 +2,7 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QListWidget, QListWidgetItem, QStackedWidget, QLabel,
-    QPushButton, QFrame, QApplication
+    QPushButton, QFrame, QApplication, QTextEdit
 )
 from PySide6.QtCore import Qt, QSize, QTimer, Signal
 from PySide6.QtGui import QFont, QKeySequence, QShortcut
@@ -301,6 +301,8 @@ class MainWindow(QMainWindow):
         self.topic_view.start_session_requested.connect(
             lambda topic_id: self._start_focus_session_from_topic(topic_id)
         )
+        self.topic_view.edit_note_requested.connect(self._open_note_editor)
+        self.topic_view.show_all_notes_requested.connect(self._open_note_reader)
 
         # Dashboard
         self.dashboard_view.create_topic_requested.connect(
@@ -518,3 +520,33 @@ class MainWindow(QMainWindow):
             'topic_name': container.topic_controller.get_topic(topic_id).name,
             'interval': 15
         })
+
+    def _open_note_reader(self, note_id: int):
+        """Открыть запись в режиме чтения"""
+        from modules.notes.reader import NoteReader
+        from core.di.container import container
+        from PySide6.QtWidgets import QDialog
+
+        note = container.note_controller.get_note(note_id)
+        if not note:
+            return
+
+        reader = QDialog(self)  # <-- делаем диалог с родителем
+        reader.setWindowTitle(f"📖 Запись: {note.title}")
+        reader.setMinimumSize(600, 500)
+
+        layout = QVBoxLayout(reader)
+        title_label = QLabel(note.title)
+        title_label.setStyleSheet("font-size: 18px; font-weight: bold; padding: 10px;")
+        layout.addWidget(title_label)
+
+        content_text = QTextEdit()
+        content_text.setPlainText(note.content)
+        content_text.setReadOnly(True)
+        layout.addWidget(content_text)
+
+        close_btn = QPushButton("Закрыть")
+        close_btn.clicked.connect(reader.accept)
+        layout.addWidget(close_btn)
+
+        reader.exec()

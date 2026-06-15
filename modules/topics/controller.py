@@ -1,7 +1,15 @@
 # modules/topics/controller.py
 from typing import List, Optional, Dict, Any
 from datebase.repositories.topic_repo import TopicRepository
+from datebase.repositories.note_repo import NoteRepository
+from datebase.repositories.task_repo import TaskRepository
+from datebase.repositories.flashcard_repo import FlashcardRepository
+from datebase.repositories.session_repo import SessionRepository
 from models.topic import Topic
+from models.note import Note
+from models.task import Task
+from models.flashcard import Flashcard
+from models.session import Session
 
 
 class TopicController:
@@ -10,8 +18,19 @@ class TopicController:
     Обеспечивает CRUD операции и работу с деревом.
     """
 
-    def __init__(self, topic_repo: TopicRepository):
+    def __init__(
+        self,
+        topic_repo: TopicRepository,
+        note_repo: NoteRepository = None,
+        task_repo: TaskRepository = None,
+        flashcard_repo: FlashcardRepository = None,
+        session_repo: SessionRepository = None
+    ):
         self._repo = topic_repo
+        self._note_repo = note_repo
+        self._task_repo = task_repo
+        self._flashcard_repo = flashcard_repo
+        self._session_repo = session_repo
 
     def get_all_topics(self) -> List[Topic]:
         """Возвращает все темы в виде объектов Topic"""
@@ -137,3 +156,38 @@ class TopicController:
     def get_all_descendants_ids(self, topic_id: int) -> List[int]:
         """Возвращает ID всех потомков темы"""
         return self._repo.get_descendants_ids(topic_id)
+
+    def get_notes_by_topic(self, topic_id: int) -> List[Note]:
+        """Возвращает заметки темы"""
+        if not self._note_repo:
+            return []
+        rows = self._note_repo.get_by_topic(topic_id)
+        return [Note.from_row(row) for row in rows]
+
+    def get_tasks_by_topic(self, topic_id: int) -> List[Task]:
+        """Возвращает задачи темы"""
+        if not self._task_repo:
+            return []
+        rows = self._task_repo.get_by_topic(topic_id)
+        return [Task.from_row(row) for row in rows]
+
+    def get_cards_by_topic(self, topic_id: int) -> List[Flashcard]:
+        """Возвращает карточки темы"""
+        if not self._flashcard_repo:
+            return []
+        rows = self._flashcard_repo.get_by_topic(topic_id)
+        return [Flashcard.from_row(row) for row in rows]
+
+    def get_sessions_by_topic(self, topic_id: int) -> List[Session]:
+        """Возвращает сессии темы"""
+        if not self._session_repo:
+            return []
+        rows = self._session_repo.get_by_topic(topic_id)
+        return [Session.from_row(row) for row in rows]
+
+    def get_note_by_id(self, note_id: int) -> Optional[Note]:
+        """Возвращает заметку по ID"""
+        if not self._note_repo:
+            return None
+        row = self._note_repo.get_by_id(note_id)
+        return Note.from_row(row) if row else None
