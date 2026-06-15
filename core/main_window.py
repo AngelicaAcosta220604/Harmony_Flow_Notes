@@ -99,28 +99,23 @@ class MainWindow(QMainWindow):
 
     def _add_menu_item(self, icon_path: str, text: str) -> QListWidgetItem:
         """Добавляет пункт меню в сайдбар с иконкой из файла"""
-
-        # Создаём виджет для пункта меню
         widget = QWidget()
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(10, 5, 10, 5)
         layout.setSpacing(12)
 
-        # Загружаем иконку
         icon_label = QLabel()
         pixmap = QPixmap(icon_path)
         if not pixmap.isNull():
             pixmap = pixmap.scaled(16, 16, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             icon_label.setPixmap(pixmap)
-            icon_label.setProperty("icon_path", icon_path)  # сохраняем путь для обновления
+            icon_label.setProperty("icon_path", icon_path)
         else:
             icon_label.setText("◉")
             icon_label.setStyleSheet("font-size: 18px;")
 
-        # Убираем фон у иконки
         icon_label.setStyleSheet("background-color: transparent;")
 
-        # Текст пункта меню
         text_label = QLabel(text)
         text_label.setStyleSheet("font-size: 14px; background-color: transparent;")
 
@@ -128,22 +123,21 @@ class MainWindow(QMainWindow):
         layout.addWidget(text_label)
         layout.addStretch()
 
-        # Убираем фон у самого виджета
         widget.setStyleSheet("background-color: transparent;")
 
-        # Создаём QListWidgetItem и устанавливаем в него виджет
         item = QListWidgetItem()
         item.setSizeHint(QSize(0, 45))
         self.sidebar.addItem(item)
         self.sidebar.setItemWidget(item, widget)
-
         return item
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         sidebar_width = self.sidebar.width()
-        icon_size = max(14, min(24, int(sidebar_width * 0.09)))
-        self._update_menu_icons_size(icon_size)
+        new_size = max(14, min(20, sidebar_width // 12))
+        if new_size != getattr(self, '_last_icon_size', 0):
+            self._last_icon_size = new_size
+            self._update_menu_icons_size(new_size)
 
     def _update_menu_icons_size(self, icon_size: int):
         """Обновляет размер всех иконок в меню"""
@@ -151,16 +145,17 @@ class MainWindow(QMainWindow):
             item = self.sidebar.item(i)
             widget = self.sidebar.itemWidget(item)
             if widget:
-                # Ищем QLabel с иконкой внутри виджета
-                icon_label = widget.findChild(QLabel)
-                if icon_label and icon_label.pixmap():
-                    # Получаем текущий путь к иконке из свойства
-                    icon_path = icon_label.property("icon_path")
-                    if icon_path:
-                        pixmap = QPixmap(icon_path)
-                        if not pixmap.isNull():
-                            pixmap = pixmap.scaled(icon_size, icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                            icon_label.setPixmap(pixmap)
+                for child in widget.children():
+                    if isinstance(child, QLabel) and child.pixmap():
+                        icon_path = child.property("icon_path")
+                        if icon_path:
+                            pixmap = QPixmap(icon_path)
+                            if not pixmap.isNull():
+                                pixmap = pixmap.scaled(icon_size, icon_size, Qt.KeepAspectRatio,
+                                                       Qt.SmoothTransformation)
+                                child.setPixmap(pixmap)
+                        break
+
 
     def _create_views(self):
         """Создаёт все вьюхи модулей"""
