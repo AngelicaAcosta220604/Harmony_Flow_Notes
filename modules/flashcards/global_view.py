@@ -1,10 +1,12 @@
+# modules/flashcards/global_view.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QListWidget, QListWidgetItem, QTextEdit, QSplitter,
-    QTreeWidget, QTreeWidgetItem, QFrame, QMessageBox, QComboBox, QCheckBox
+    QTreeWidget, QTreeWidgetItem, QFrame, QMessageBox, QComboBox, QCheckBox,
+    QScrollArea, QSizePolicy
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtGui import QIcon, QPixmap, QFont, QColor
 
 from .controller import FlashcardController
 from datebase.db_manager import db
@@ -13,7 +15,6 @@ from datebase.db_manager import db
 class TopicCheckboxTree(QTreeWidget):
     """
     Дерево тем с чекбоксами.
-    Правило: можно выбирать только внутри ОДНОГО контейнера первого уровня.
     """
     selection_changed = Signal(list)
 
@@ -22,6 +23,20 @@ class TopicCheckboxTree(QTreeWidget):
         self.setHeaderHidden(True)
         self.setContextMenuPolicy(Qt.NoContextMenu)
         self.itemChanged.connect(self._on_item_changed)
+        self.setStyleSheet("""
+            QTreeWidget {
+                background-color: transparent;
+                border: none;
+                outline: none;
+            }
+            QTreeWidget::item {
+                padding: 6px;
+                border-radius: 6px;
+            }
+            QTreeWidget::item:hover {
+                background-color: #F9FAFB;
+            }
+        """)
 
         self._active_first_level_id = None
         self._items_by_id = {}
@@ -149,7 +164,7 @@ class TopicCheckboxTree(QTreeWidget):
         font = item.font(0)
         font.setBold(False)
         item.setFont(0, font)
-        text = item.text(0).replace(' ', '').replace('📝 ', '')
+        text = item.text(0).replace('📁 ', '').replace('📝 ', '')
         item.setText(0, f"📝 {text}")
 
     def _get_first_level_container_id(self, item: QTreeWidgetItem) -> int:
@@ -205,111 +220,233 @@ class GlobalCardsView(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
 
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet("background-color: transparent; border: none;")
+
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setSpacing(20)
+
+        # ========== ЗАГОЛОВОК ==========
         header_layout = QHBoxLayout()
         title_label = QLabel("🃏 Глобальные карточки")
-        title_label.setFont(QFont("Arial", 16, QFont.Bold))
+        title_label.setStyleSheet("font-size: 20px; font-weight: bold; color: #1F2937;")
         header_layout.addWidget(title_label)
-
         header_layout.addStretch()
+        content_layout.addLayout(header_layout)
+
+        # ========== ТРИ ПЛАШКИ В РЯД ==========
+        three_cols_layout = QHBoxLayout()
+        three_cols_layout.setSpacing(20)
+
+        # ----- ПЛАШКА 1: Выбор тем (левая) -----
+        left_widget = QFrame()
+        left_widget.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border-radius: 16px;
+                border: none;
+            }
+        """)
+        left_widget.setMinimumHeight(350)
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(16, 16, 16, 16)
+        left_layout.setSpacing(12)
+
+        left_title = QLabel("Выберите темы")
+        left_title.setStyleSheet("font-weight: 600; color: #1F2937; font-size: 14px;")
+        left_layout.addWidget(left_title)
+
+        # Сортировка дерева
+        tree_sort_layout = QHBoxLayout()
+        sort_label = QLabel("Сортировка тем:")
+        sort_label.setStyleSheet("color: #6B7280; font-size: 12px;")
+        self.tree_sort_combo = QComboBox()
+        self.tree_sort_combo.addItem("По имени (А-Я)", "name_asc")
+        self.tree_sort_combo.addItem("По имени (Я-А)", "name_desc")
+        self.tree_sort_combo.addItem("Новые сверху", "date_new")
+        self.tree_sort_combo.addItem("Старые сверху", "date_old")
+        self.tree_sort_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #F0F4F8;
+                border: 1px solid #E6EEF6;
+                border-radius: 8px;
+                padding: 4px 8px;
+                font-size: 12px;
+                min-width: 130px;
+            }
+        """)
+        tree_sort_layout.addWidget(sort_label)
+        tree_sort_layout.addWidget(self.tree_sort_combo)
+        tree_sort_layout.addStretch()
+        left_layout.addLayout(tree_sort_layout)
+
+        self.topic_tree = TopicCheckboxTree()
+        left_layout.addWidget(self.topic_tree)
+
+        three_cols_layout.addWidget(left_widget, 1)
+
+        # ----- ПЛАШКА 2: Карточки (центральная) -----
+        center_widget = QFrame()
+        center_widget.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border-radius: 16px;
+                border: none;
+            }
+        """)
+        center_widget.setMinimumHeight(350)
+        center_layout = QVBoxLayout(center_widget)
+        center_layout.setContentsMargins(16, 16, 16, 16)
+        center_layout.setSpacing(12)
+
+        center_title = QLabel("Карточки в выбранных темах")
+        center_title.setStyleSheet("font-weight: 600; color: #1F2937; font-size: 14px;")
+        center_layout.addWidget(center_title)
+
+        self.card_list = QListWidget()
+        self.card_list.setStyleSheet("""
+            QListWidget {
+                background-color: #F9FAFB;
+                border-radius: 12px;
+                border: none;
+                min-height: 250px;
+            }
+            QListWidget::item {
+                padding: 6px;
+                border-radius: 6px;
+            }
+            QListWidget::item:hover {
+                background-color: #F0F4F8;
+            }
+        """)
+        center_layout.addWidget(self.card_list)
+
+        three_cols_layout.addWidget(center_widget, 1)
+
+        # ----- ПЛАШКА 3: Сортировка и кнопка (правая) -----
+        right_widget = QFrame()
+        right_widget.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border-radius: 16px;
+                border: none;
+            }
+        """)
+        right_widget.setMinimumHeight(350)
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(16, 16, 16, 16)
+        right_layout.setSpacing(16)
+
+        # Сортировка карточек
+        sort_section = QWidget()
+        sort_section_layout = QVBoxLayout(sort_section)
+        sort_section_layout.setSpacing(8)
+        sort_section_title = QLabel("Сортировка карточек")
+        sort_section_title.setStyleSheet("font-weight: 600; color: #1F2937; font-size: 14px;")
+        sort_section_layout.addWidget(sort_section_title)
 
         self.sort_combo = QComboBox()
         self.sort_combo.addItem("По дате создания", "created_at")
         self.sort_combo.addItem("По названию темы", "topic")
         self.sort_combo.addItem("По статусу", "status")
-        header_layout.addWidget(QLabel("Сортировка:"))
-        header_layout.addWidget(self.sort_combo)
-
-        self.start_review_btn = QPushButton("▶ Начать повторение")
-        self.start_review_btn.setStyleSheet(
-            "background-color: #4caf50; color: white; font-weight: bold; "
-            "padding: 8px 16px; border-radius: 6px; font-size: 14px;"
-        )
-        header_layout.addWidget(self.start_review_btn)
-        layout.addLayout(header_layout)
-
-        main_splitter = QSplitter(Qt.Horizontal)
-
-        left_panel = QWidget()
-        left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(8)
-
-        left_layout.addWidget(QLabel("Выберите темы:"))
-
-        tree_sort_widget = QWidget()
-        tree_sort_layout = QHBoxLayout(tree_sort_widget)
-        tree_sort_layout.setContentsMargins(0, 0, 0, 0)
-
-        sort_label = QLabel("Сортировка:")
-        sort_label.setStyleSheet("font-size: 12px; color: #555;")
-
-        self.tree_sort_combo = QComboBox()
-        self.tree_sort_combo.addItem("🔤 По имени (А-Я)", "name_asc")
-        self.tree_sort_combo.addItem(" По имени (Я-А)", "name_desc")
-        self.tree_sort_combo.addItem(" Новые сверху", "date_new")
-        self.tree_sort_combo.addItem("📅 Старые сверху", "date_old")
-        tree_sort_layout.addWidget(sort_label)
-        tree_sort_layout.addWidget(self.tree_sort_combo, 1)
-
-        left_layout.addWidget(tree_sort_widget)
-
-        self.topic_tree = TopicCheckboxTree()
-        left_layout.addWidget(self.topic_tree)
-
-        main_splitter.addWidget(left_panel)
-
-        right_panel = QWidget()
-        right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(10)
-
-        self.analytics_frame = QFrame()
-        self.analytics_frame.setFrameShape(QFrame.StyledPanel)
-        self.analytics_frame.setStyleSheet("background-color: #f0f4f8; border-radius: 8px;")
-        analytics_layout = QHBoxLayout(self.analytics_frame)
-
-        self.stat_total = QLabel("Всего: 0")
-        self.stat_new = QLabel("Новые: 0")
-        self.stat_in_progress = QLabel("В процессе: 0")
-        self.stat_mastered = QLabel("Выучено: 0")
-
-        for lbl in (self.stat_total, self.stat_new, self.stat_in_progress, self.stat_mastered):
-            lbl.setFont(QFont("Arial", 11, QFont.Bold))
-            analytics_layout.addWidget(lbl)
-        right_layout.addWidget(self.analytics_frame)
-
-        self.card_list = QListWidget()
-        self.card_list.setFixedHeight(250)
-        self.card_list.setStyleSheet("""
-            QListWidget {
-                background-color: white;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-            }
-            QListWidget::item {
-                padding: 5px;
-            }
-            QListWidget::item:hover {
-                background-color: #f0f8ff;
-            }
-            QListWidget::item:selected {
-                background-color: #e3f2fd;
+        self.sort_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #F0F4F8;
+                border: 1px solid #E6EEF6;
+                border-radius: 8px;
+                padding: 6px 12px;
+                font-size: 13px;
             }
         """)
+        sort_section_layout.addWidget(self.sort_combo)
+        right_layout.addWidget(sort_section)
+
+        # Разделитель
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setStyleSheet("background-color: #E6EEF6;")
+        right_layout.addWidget(sep)
+
+        # Статистика
+        stats_section = QWidget()
+        stats_layout = QVBoxLayout(stats_section)
+        stats_layout.setSpacing(10)
+        stats_title = QLabel("Статистика")
+        stats_title.setStyleSheet("font-weight: 600; color: #1F2937; font-size: 14px;")
+        stats_layout.addWidget(stats_title)
+
+        self.stat_total = QLabel("📚 Всего: 0")
+        self.stat_new = QLabel("🆕 Новые: 0")
+        self.stat_in_progress = QLabel("🔄 В процессе: 0")
+        self.stat_mastered = QLabel("✅ Выучено: 0")
+        for lbl in (self.stat_total, self.stat_new, self.stat_in_progress, self.stat_mastered):
+            lbl.setStyleSheet("font-size: 13px; color: #374151;")
+            stats_layout.addWidget(lbl)
+        right_layout.addWidget(stats_section)
+
+        right_layout.addStretch()
+
+        # Кнопка "Начать повторение"
+        self.start_review_btn = QPushButton("Начать повторение")
+        self.start_review_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3B82F6;
+                color: white;
+                border: none;
+                border-radius: 12px;
+                padding: 10px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: #2563EB;
+            }
+        """)
+        right_layout.addWidget(self.start_review_btn)
+
+        three_cols_layout.addWidget(right_widget, 1)
+        content_layout.addLayout(three_cols_layout)
+
+        # ========== ДЕМОНСТРАЦИЯ КАРТОЧКИ (внизу на всю ширину) ==========
+        preview_widget = QFrame()
+        preview_widget.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border-radius: 16px;
+                border: none;
+            }
+        """)
+        preview_layout = QVBoxLayout(preview_widget)
+        preview_layout.setContentsMargins(20, 16, 20, 16)
+        preview_layout.setSpacing(8)
+
+        preview_title = QLabel("Просмотр карточки")
+        preview_title.setStyleSheet("font-weight: 600; color: #1F2937; font-size: 14px;")
+        preview_layout.addWidget(preview_title)
 
         self.card_display = QTextEdit()
         self.card_display.setReadOnly(True)
-        self.card_display.setStyleSheet("font-size: 14px; padding: 10px;")
+        self.card_display.setStyleSheet("""
+            QTextEdit {
+                background-color: #F9FAFB;
+                border-radius: 12px;
+                border: none;
+                padding: 16px;
+                font-size: 14px;
+                min-height: 120px;
+            }
+        """)
+        preview_layout.addWidget(self.card_display)
 
-        right_layout.addWidget(self.card_list)
-        right_layout.addWidget(self.card_display)
-        main_splitter.addWidget(right_panel)
+        content_layout.addWidget(preview_widget)
 
-        main_splitter.setSizes([350, 850])
-        layout.addWidget(main_splitter, 1)
+        scroll.setWidget(content)
+        layout.addWidget(scroll)
 
     def _connect_signals(self):
         self.topic_tree.selection_changed.connect(self._on_topics_selection_changed)
@@ -320,11 +457,9 @@ class GlobalCardsView(QWidget):
 
     def _subscribe_to_events(self):
         from core.event_bus import event_bus
-
         event_bus.topic_created.connect(lambda tid: self.refresh())
         event_bus.topic_deleted.connect(lambda tid: self.refresh())
         event_bus.topic_updated.connect(lambda tid: self.refresh())
-
         event_bus.flashcard_created.connect(lambda cid: self._load_data())
         event_bus.flashcard_deleted.connect(lambda cid: self._load_data())
 
@@ -342,7 +477,6 @@ class GlobalCardsView(QWidget):
     def _update_cards_and_analytics(self, topic_ids: list):
         if not topic_ids:
             self.card_list.clear()
-            self.card_list.addItem(" Выберите хотя бы одну тему в дереве слева")
             self.card_display.clear()
             self._update_analytics_labels(0, 0, 0, 0)
             return
@@ -365,12 +499,14 @@ class GlobalCardsView(QWidget):
         self._update_analytics_labels(total, new_count, in_progress_count, mastered_count)
 
         self.card_list.clear()
+        self._selected_card_ids.clear()
+
         if not cards:
-            self.card_list.addItem("📭 В выбранных темах нет карточек")
+            empty_item = QListWidgetItem("📭 В выбранных темах нет карточек")
+            empty_item.setForeground(Qt.gray)
+            self.card_list.addItem(empty_item)
             self.card_display.clear()
             return
-
-        self._selected_card_ids.clear()
 
         for card in cards:
             item = QListWidgetItem()
@@ -389,17 +525,16 @@ class GlobalCardsView(QWidget):
             checkbox.stateChanged.connect(
                 lambda state, cid=card.id: self._on_card_checkbox_changed(cid, state)
             )
-            checkbox.stateChanged.connect(lambda state, cid=card.id: self._on_card_checkbox_changed(cid, state))
 
             if status == "new":
-                status_badge = "[ Новое]"
-                status_color = "#2196f3"
+                status_badge = "[🆕 Новое]"
+                status_color = "#3B82F6"
             elif status == "in_progress":
                 status_badge = "[🔄 В процессе]"
-                status_color = "#ff9800"
+                status_color = "#F59E0B"
             else:
                 status_badge = "[✅ Выучено]"
-                status_color = "#4caf50"
+                status_color = "#10B981"
 
             if card.is_free:
                 preview = card.content[:50] + "..." if len(card.content) > 50 else card.content
@@ -409,7 +544,7 @@ class GlobalCardsView(QWidget):
                 text = f"{status_badge} ❓ [{topic_name}] {preview}"
 
             label = QLabel(text)
-            label.setStyleSheet(f"color: {status_color}; font-size: 13px;")
+            label.setStyleSheet(f"color: {status_color}; font-size: 13px; background-color: transparent;")
             label.setWordWrap(True)
 
             widget_layout.addWidget(checkbox)
@@ -421,7 +556,6 @@ class GlobalCardsView(QWidget):
             item.setSizeHint(widget.sizeHint())
             self.card_list.addItem(item)
             self.card_list.setItemWidget(item, widget)
-
             item.setData(Qt.UserRole, card.id)
 
     def _update_analytics_labels(self, total: int, new_count: int, in_progress_count: int, mastered_count: int):
@@ -435,7 +569,6 @@ class GlobalCardsView(QWidget):
         return row['name'] if row else "Без темы"
 
     def _on_card_selected(self, item: QListWidgetItem):
-        """Показывает содержимое карточки без сброса списка и галочек"""
         card_id = item.data(Qt.UserRole)
         if not card_id:
             return
@@ -445,25 +578,41 @@ class GlobalCardsView(QWidget):
             return
 
         self._current_card = card
-
         status = self._get_card_status(card)
-        status_html = f"<span style='color: #4caf50; font-weight: bold;'>{status}</span>"
+        status_color = {
+            "new": "#3B82F6",
+            "in_progress": "#F59E0B",
+            "mastered": "#10B981"
+        }.get(status, "#6B7280")
 
         if card.is_free:
-            self.card_display.setHtml(
-                f"<h3>📝 Свободная карточка <small>({status_html})</small></h3>"
-                f"<hr><p style='font-size: 16px;'>{card.content}</p>"
-            )
+            self.card_display.setHtml(f"""
+                <style>
+                    h3 {{ color: #1F2937; margin-bottom: 8px; }}
+                    small {{ color: {status_color}; }}
+                    hr {{ border: 1px solid #E6EEF6; }}
+                    p {{ color: #374151; line-height: 1.5; }}
+                </style>
+                <h3>📝 Свободная карточка <small>({status})</small></h3>
+                <hr>
+                <p>{card.content}</p>
+            """)
         else:
-            self.card_display.setHtml(
-                f"<h3>❓ Карточка Вопрос-Ответ <small>({status_html})</small></h3>"
-                f"<p><b>Вопрос:</b><br>{card.question}</p>"
-                f"<hr>"
-                f"<p><b>Ответ:</b><br>{card.answer}</p>"
-            )
+            self.card_display.setHtml(f"""
+                <style>
+                    h3 {{ color: #1F2937; margin-bottom: 8px; }}
+                    small {{ color: {status_color}; }}
+                    hr {{ border: 1px solid #E6EEF6; }}
+                    p {{ color: #374151; line-height: 1.5; }}
+                    b {{ color: #1F2937; }}
+                </style>
+                <h3>❓ Карточка Вопрос-Ответ <small>({status})</small></h3>
+                <p><b>Вопрос:</b><br>{card.question}</p>
+                <hr>
+                <p><b>Ответ:</b><br>{card.answer}</p>
+            """)
 
     def _on_card_checkbox_changed(self, card_id: int, state: int):
-        """Обработчик изменения чекбокса карточки"""
         if state == Qt.Checked:
             self._selected_card_ids.add(card_id)
         else:
@@ -476,7 +625,6 @@ class GlobalCardsView(QWidget):
             return
 
         card_ids = list(self._selected_card_ids) if self._selected_card_ids else None
-
         self.start_review_requested.emit(topic_ids, True, True, True, card_ids)
 
     def refresh(self):
