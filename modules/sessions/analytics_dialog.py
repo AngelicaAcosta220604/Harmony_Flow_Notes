@@ -1,7 +1,6 @@
-# modules/sessions/analytics_dialog.py
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTabWidget,
-    QWidget, QTextEdit, QTableWidget, QTableWidgetItem, QHeaderView
+    QWidget, QTextEdit, QTableWidget, QTableWidgetItem, QHeaderView, QDialogButtonBox
 )
 from PySide6.QtCore import Qt
 
@@ -68,7 +67,6 @@ class SessionAnalyticsDialog(QDialog):
         layout.addWidget(self.tab_widget)
 
         # Кнопка закрытия
-        from PySide6.QtWidgets import QDialogButtonBox
         button_box = QDialogButtonBox(QDialogButtonBox.Close)
         button_box.rejected.connect(self.accept)
         layout.addWidget(button_box)
@@ -77,25 +75,30 @@ class SessionAnalyticsDialog(QDialog):
         """Загружает данные для аналитики"""
         stats = self._session_controller.get_session_stats(self._session_id)
 
+        # 🆕 Форматируем время
+        from utils.local_time import format_datetime
+        start_time_formatted = format_datetime(stats.get('start_time', '')) if stats.get('start_time') else '—'
+
         # Обзор
         overview = f"""
         <h2>📊 Обзор сессии</h2>
 
-        <p><b>📅 Дата:</b> {stats.get('start_time', '—')[:16]}</p>
+        <p><b>📅 Дата:</b> {start_time_formatted}</p>
         <p><b>⏱️ Длительность:</b> {stats.get('duration_display', '—')}</p>
         <p><b>✅ Статус:</b> {'Завершена' if stats.get('status') == 'completed' else 'Авто-завершена'}</p>
 
         <h3>📈 Средние показатели</h3>
         <ul>
-            <li><b>🧠 Концентрация:</b> {stats.get('avg_concentration', 0)}/5</li>
-            <li><b>⚡ Энергия:</b> {stats.get('avg_energy', 0)}/5</li>
-            <li><b>❤️ Интерес:</b> {stats.get('avg_interest', 0)}/5</li>
+            <li><b>🧠 Концентрация:</b> {stats.get('avg_focus', 0)}/100</li>
+            <li><b>⚡ Энергия:</b> {stats.get('avg_energy', 0)}/100</li>
+            <li><b>❤️ Интерес:</b> {stats.get('avg_interest', 0)}/100</li>
         </ul>
 
         <h3>📝 Активность</h3>
         <ul>
             <li><b>✏️ Быстрых записей:</b> {stats.get('quick_notes_count', 0)}</li>
-            <li><b>📊 Изменений состояния:</b> {stats.get('state_logs_count', 0)}</li>
+            <li><b>📋 Интервалов работы:</b> {stats.get('intervals_count', 0)}</li>
+            <li><b>⏱️ Активное время:</b> {TimeService.format_time(stats.get('total_active_seconds', 0))}</li>
         </ul>
         """
         self.overview_text.setHtml(overview)
@@ -104,8 +107,9 @@ class SessionAnalyticsDialog(QDialog):
         logs = self._state_log_controller.get_logs_for_session(self._session_id)
         self.timeline_table.setRowCount(len(logs))
 
+        # 🆕 Используем 'focus' вместо 'concentration'
         metrics_names = {
-            'concentration': '🧠 Концентрация',
+            'focus': '🧠 Концентрация',
             'energy': '⚡ Энергия',
             'interest': '❤️ Интерес'
         }
@@ -122,13 +126,13 @@ class SessionAnalyticsDialog(QDialog):
             self.timeline_table.setItem(row, 2, value_item)
 
         # Быстрые записи
-        from database.repositories.quick_note_repo import QuickNoteRepository
-        quick_note_repo = QuickNoteRepository()
-        quick_notes = quick_note_repo.get_by_session(self._session_id)
+        quick_notes = self._session_controller._quick_note_repo.get_by_session(self._session_id)
 
         notes_text = "<h3>✏️ Быстрые записи во время сессии</h3><ul>"
         for note in quick_notes:
-            notes_text += f"<li><b>{note['created_at'][:16]}</b><br>{note['content']}</li><br>"
+            # 🆕 Форматируем время
+            time = format_datetime(note.get('created_at', '')) if note.get('created_at') else '—'
+            notes_text += f"<li><b>{time}</b><br>{note.get('content', '')}</li><br>"
         notes_text += "</ul>"
 
         if not quick_notes:

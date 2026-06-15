@@ -90,8 +90,9 @@ class TopicSessionCard(QFrame):
         middle_layout = QHBoxLayout()
         middle_layout.setSpacing(14)
 
-        start_time = self.session_data.get('start_time', '')[:16] if self.session_data.get('start_time') else '—'
-        end_time = self.session_data.get('end_time', '')[:16] if self.session_data.get('end_time') else '—'
+        # 🆕 Время уже отформатировано, просто показываем
+        start_time = self.session_data.get('start_time', '—')
+        end_time = self.session_data.get('end_time', '—')
         time_label = QLabel(f"🕐 {start_time} → {end_time}")
         time_label.setStyleSheet("color: #6B7280; font-size: 12px;")
         middle_layout.addWidget(time_label)
@@ -211,8 +212,10 @@ class TopicSessionCard(QFrame):
         intervals = self.session_data.get('intervals', [])
         if intervals:
             for i, interval in enumerate(intervals):
-                start = interval.get('start_time', '')[:16] if interval.get('start_time') else '—'
-                end = interval.get('end_time', '')[:16] if interval.get('end_time') else '—'
+                # 🆕 Форматируем время интервалов
+                from utils.local_time import format_datetime
+                start = format_datetime(interval.get('start_time', '')) if interval.get('start_time') else '—'
+                end = format_datetime(interval.get('end_time', '')) if interval.get('end_time') else '—'
                 duration = interval.get('duration_seconds', 0)
                 duration_min = duration // 60
                 duration_sec = duration % 60
@@ -1263,24 +1266,41 @@ class TopicView(QWidget):
             return
 
         def sort_key(s):
-            if s.status in ('active', 'paused'):
-                return (0, s.start_time or '')
-            return (1, s.start_time or '')
+            # Приоритет: active=0, paused=1, остальные=2
+            if s.status == 'active':
+                priority = 0
+            elif s.status == 'paused':
+                priority = 1
+            else:
+                priority = 2
 
-        sessions.sort(key=sort_key, reverse=True)
+            # Внутри каждой группы сортируем по дате (новые сверху)
+            # Используем отрицание для обратного порядка
+            start_time = s.start_time or ''
+            return (priority, start_time)
+
+        # Сортируем: сначала по приоритету, потом по дате (обратный порядок для новых сверху)
+        sessions.sort(key=lambda s: s.start_time or '', reverse=True)  # Сначала по дате
+        sessions.sort(
+            key=lambda s: 0 if s.status == 'active' else (1 if s.status == 'paused' else 2))  # Потом по статусу
 
         for session in sessions:
             from core.di.container import container
             stats = container.session_controller.get_session_stats(session.id)
             intervals = container.session_controller.get_session_intervals(session.id)
 
+            # 🆕 Форматируем время правильно
+            from utils.local_time import format_datetime
+            start_time_formatted = format_datetime(session.start_time) if session.start_time else '—'
+            end_time_formatted = format_datetime(session.end_time) if session.end_time else '—'
+
             session_data = {
                 'id': session.id,
                 'status': session.status or 'completed',
                 'duration_display': TimeService.format_duration(
                     session.duration_minutes) if session.duration_minutes else '—',
-                'start_time': session.start_time,
-                'end_time': session.end_time,
+                'start_time': start_time_formatted,  # 🆕 Уже отформатировано
+                'end_time': end_time_formatted,  # 🆕 Уже отформатировано
                 'avg_focus': stats.get('avg_focus', 0),
                 'avg_energy': stats.get('avg_energy', 0),
                 'avg_interest': stats.get('avg_interest', 0),

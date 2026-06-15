@@ -19,13 +19,13 @@ class SessionStateLogController:
         """Возвращает сводку по метрикам сессии"""
         return self._repo.get_metrics_summary(session_id)
 
-    def get_concentration_timeline(self, session_id: int) -> List[Dict[str, Any]]:
+    def get_focus_timeline(self, session_id: int) -> List[Dict[str, Any]]:
         """Возвращает таймлайн концентрации"""
         logs = self.get_logs_for_session(session_id)
 
         result = []
         for log in logs:
-            if log['metric'] == 'concentration':
+            if log['metric'] == 'focus':
                 result.append({
                     'minute': log['minute'],
                     'value': log['value']
@@ -64,7 +64,7 @@ class SessionStateLogController:
     def get_all_metrics_timeline(self, session_id: int) -> Dict[str, List[Dict[str, Any]]]:
         """Возвращает таймлайны всех метрик"""
         return {
-            'concentration': self.get_concentration_timeline(session_id),
+            'focus': self.get_focus_timeline(session_id),
             'energy': self.get_energy_timeline(session_id),
             'interest': self.get_interest_timeline(session_id)
         }

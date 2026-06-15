@@ -316,7 +316,7 @@ class MainWindow(QMainWindow):
                 interval = data.get('interval', 15)
 
                 # 🆕 Проверяем, есть ли уже активная сессия
-                if not self._session_controller.is_session_active() and not self._session_controller.is_session_paused():
+                if not container.session_controller.is_session_active() and not container.session_controller.is_session_paused():
                     self.focus_active_view.start(topic_id, topic_name, interval)
 
                 self.content_stack.setCurrentWidget(self.focus_active_view)
@@ -882,40 +882,160 @@ class MainWindow(QMainWindow):
     # ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ДЛЯ АНАЛИТИКИ ====================
 
     def _build_analytics_text(self, stats: dict, intervals: list, quick_notes: list, topic_name: str) -> str:
-        """Формирует HTML-текст аналитики сессии"""
+        """Формирует HTML-текст аналитики сессии с анализом пиков"""
+        from utils.local_time import format_datetime
+        start_time_formatted = format_datetime(stats.get('start_time', '')) if stats.get('start_time') else '—'
+
+        # Получаем таймлайн метрик
+        logs = container.session_controller._state_log_repo.get_by_session(stats['id'])
+
+        # Анализируем каждый показатель
+        focus_data = [log for log in logs if log['metric'] == 'focus']
+        energy_data = [log for log in logs if log['metric'] == 'energy']
+        interest_data = [log for log in logs if log['metric'] == 'interest']
+
+        def analyze_metric(data: list, metric_name: str) -> dict:
+            """Анализирует метрику и возвращает статистику"""
+            if not data:
+                return {
+                    'name': metric_name,
+                    'avg': 0,
+                    'max': 0,
+                    'min': 0,
+                    'max_minute': 0,
+                    'min_minute': 0,
+                    'trend': 'нет данных'
+                }
+
+            values = [log['value'] for log in data]
+            minutes = [log['minute'] for log in data]
+
+            max_val = max(values)
+            min_val = min(values)
+            max_minute = minutes[values.index(max_val)]
+            min_minute = minutes[values.index(min_val)]
+            avg_val = sum(values) / len(values)
+
+            # Определяем тренд
+            if len(values) >= 2:
+                first_half = values[:len(values) // 2]
+                second_half = values[len(values) // 2:]
+                first_avg = sum(first_half) / len(first_half)
+                second_avg = sum(second_half) / len(second_half)
+
+                if second_avg > first_avg + 5:
+                    trend = '📈 растёт'
+                elif second_avg < first_avg - 5:
+                    trend = '📉 падает'
+                else:
+                    trend = '➡️ стабильно'
+            else:
+                trend = 'недостаточно данных'
+
+            return {
+                'name': metric_name,
+                'avg': round(avg_val, 1),
+                'max': max_val,
+                'min': min_val,
+                'max_minute': max_minute,
+                'min_minute': min_minute,
+                'trend': trend
+            }
+
+        focus_analysis = analyze_metric(focus_data, '🧠 Концентрация')
+        energy_analysis = analyze_metric(energy_data, '⚡ Энергия')
+        interest_analysis = analyze_metric(interest_data, '❤️ Интерес')
+
+        # Генерируем рекомендацию
+        recommendations = []
+
+        # Анализируем синергию
+        all_avgs = [focus_analysis['avg'], energy_analysis['avg'], interest_analysis['avg']]
+        overall_avg = sum(all_avgs) / len(all_avgs) if all_avgs else 0
+
+        if overall_avg >= 70:
+            recommendations.append("🌟 <b>Отличная сессия!</b> Все показатели на высоком уровне.")
+        elif overall_avg >= 50:
+            recommendations.append("✅ <b>Хорошая сессия.</b> Есть потенциал для улучшения.")
+        else:
+            recommendations.append("💡 <b>Сессия была сложной.</b> Попробуйте сделать перерыв перед следующей.")
+
+        # Рекомендации по конкретным показателям
+        if focus_analysis['trend'] == '📉 падает':
+            recommendations.append(
+                f"🧠 Концентрация падала (пик на {focus_analysis['max_minute']} мин). Попробуйте технику Pomodoro: 25 мин работа + 5 мин отдых.")
+
+        if energy_analysis['avg'] < 40:
+            recommendations.append("⚡ Низкая энергия. Перед сессией проверьте сон, питание и физическую активность.")
+
+        if interest_analysis['max_minute'] < 5 and len(interest_data) > 3:
+            recommendations.append(
+                "❤️ Интерес был высоким только в начале. Разбейте тему на подтемы для поддержания вовлечённости.")
+
+        if focus_analysis['max'] - focus_analysis['min'] > 40:
+            recommendations.append("📊 Сильные колебания концентрации. Найдите оптимальное время суток для работы.")
+
         analytics_text = f"""
         <style>
             body {{ font-family: Arial, sans-serif; }}
             h2 {{ color: #1F2937; margin-bottom: 16px; }}
             h3 {{ color: #3B82F6; margin-top: 20px; margin-bottom: 12px; }}
             .stat {{ margin: 8px 0; padding: 8px; background-color: #F9FAFB; border-radius: 8px; }}
+            .metric {{ margin: 12px 0; padding: 12px; background-color: #EFF6FF; border-radius: 8px; border-left: 4px solid #3B82F6; }}
             .interval {{ margin: 4px 0; padding: 6px; background-color: #F0F4F8; border-radius: 6px; font-size: 13px; }}
             .note {{ margin: 8px 0; padding: 10px; background-color: #FEF3C7; border-radius: 8px; }}
+            .recommendation {{ margin: 8px 0; padding: 12px; background-color: #D1FAE5; border-radius: 8px; border-left: 4px solid #10B981; }}
         </style>
 
         <h2>📊 Аналитика сессии</h2>
 
         <div class="stat">
             <b>Тема:</b> {topic_name}<br>
-            <b>Дата:</b> {stats.get('start_time', '—')[:16]}<br>
+            <b>Дата:</b> {start_time_formatted}<br>
             <b>Длительность:</b> {stats.get('duration_display', '—')}<br>
             <b>Статус:</b> {stats.get('status', '—')}
         </div>
 
-        <h3>📈 Средние показатели</h3>
-        <div class="stat">
-            🧠 <b>Концентрация:</b> {stats.get('avg_focus', 0)}/100<br>
-            ⚡ <b>Энергия:</b> {stats.get('avg_energy', 0)}/100<br>
-            ❤️ <b>Интерес:</b> {stats.get('avg_interest', 0)}/100
+        <h3>📈 Анализ показателей</h3>
+
+        <div class="metric">
+            <b>{focus_analysis['name']}</b><br>
+            Среднее: <b>{focus_analysis['avg']}/100</b> | 
+            Пик: <b>{focus_analysis['max']}</b> (на {focus_analysis['max_minute']} мин) | 
+            Мин: <b>{focus_analysis['min']}</b> (на {focus_analysis['min_minute']} мин)<br>
+            Тренд: {focus_analysis['trend']}
         </div>
 
+        <div class="metric">
+            <b>{energy_analysis['name']}</b><br>
+            Среднее: <b>{energy_analysis['avg']}/100</b> | 
+            Пик: <b>{energy_analysis['max']}</b> (на {energy_analysis['max_minute']} мин) | 
+            Мин: <b>{energy_analysis['min']}</b> (на {energy_analysis['min_minute']} мин)<br>
+            Тренд: {energy_analysis['trend']}
+        </div>
+
+        <div class="metric">
+            <b>{interest_analysis['name']}</b><br>
+            Среднее: <b>{interest_analysis['avg']}/100</b> | 
+            Пик: <b>{interest_analysis['max']}</b> (на {interest_analysis['max_minute']} мин) | 
+            Мин: <b>{interest_analysis['min']}</b> (на {interest_analysis['min_minute']} мин)<br>
+            Тренд: {interest_analysis['trend']}
+        </div>
+
+        <h3>💡 Рекомендации</h3>
+        """
+
+        for rec in recommendations:
+            analytics_text += f'<div class="recommendation">{rec}</div>'
+
+        analytics_text += f"""
         <h3>📋 Интервалы работы ({len(intervals)})</h3>
         """
 
         if intervals:
             for i, interval in enumerate(intervals):
-                start = interval.get('start_time', '')[:16] if interval.get('start_time') else '—'
-                end = interval.get('end_time', '')[:16] if interval.get('end_time') else '—'
+                start = format_datetime(interval.get('start_time', '')) if interval.get('start_time') else '—'
+                end = format_datetime(interval.get('end_time', '')) if interval.get('end_time') else '—'
                 duration = interval.get('duration_seconds', 0)
                 duration_min = duration // 60
                 duration_sec = duration % 60
@@ -931,7 +1051,7 @@ class MainWindow(QMainWindow):
 
         if quick_notes:
             for note in quick_notes:
-                time = note.get('created_at', '')[:16] if note.get('created_at') else '—'
+                time = format_datetime(note.get('created_at', '')) if note.get('created_at') else '—'
                 content = note.get('content', '')
                 analytics_text += f"""
                 <div class="note">

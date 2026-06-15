@@ -97,6 +97,17 @@ class SessionController(QObject):
         self._current_session = Session.from_row(
             self._session_repo.get_by_id(session_id)
         )
+
+        # 🆕 Используем локальное время для start_time
+        from utils.local_time import now_local_iso
+        start_time = now_local_iso()
+
+        # Обновляем start_time в БД
+        db.execute(
+            "UPDATE sessions SET start_time = ? WHERE id = ?",
+            (start_time, session_id)
+        )
+
         self._start_time = datetime.now()
 
         # Начинаем первый интервал работы
@@ -169,18 +180,28 @@ class SessionController(QObject):
         # Завершаем последний интервал
         self.end_interval(self._current_session.id)
 
-        duration_minutes = self._elapsed_seconds // 60
-        if duration_minutes == 0 and self._elapsed_seconds > 0:
+        # 🆕 Вычисляем длительность из активных интервалов
+        intervals = self.get_session_intervals(self._current_session.id)
+        total_active_seconds = sum(i.get('duration_seconds', 0) for i in intervals)
+        duration_minutes = total_active_seconds // 60
+
+        if duration_minutes == 0 and total_active_seconds > 0:
             duration_minutes = 1
 
         status = 'auto_completed' if auto else 'completed'
-        self._session_repo.end_session(
-            self._current_session.id,
-            duration_minutes,
-            status
+
+        # Используем локальное время для end_time
+        from utils.local_time import now_local_iso
+        end_time = now_local_iso()
+
+        # Обновляем end_time и другие поля напрямую
+        db.execute(
+            """UPDATE sessions SET end_time = ?, duration_minutes = ?, status = ? 
+            WHERE id = ?""",
+            (end_time, duration_minutes, status, self._current_session.id)
         )
 
-        # 🆕 Останавливаем таймер (но не удаляем)
+        # Останавливаем таймер (но не удаляем)
         self._stop_timer()
 
         self.session_completed.emit(duration_minutes)
