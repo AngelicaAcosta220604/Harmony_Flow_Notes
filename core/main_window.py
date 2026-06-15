@@ -271,6 +271,10 @@ class MainWindow(QMainWindow):
             self.content_stack.setCurrentWidget(view)
             self._handle_navigation_data(section, data)
 
+            # 🆕 При переключении на вкладку карточек - обновляем и сворачиваем папки
+            if section == NavSection.FLASHCARDS:
+                self.flashcards_view.refresh()
+
     def _get_view_for_section(self, section: NavSection):
         """Возвращает вьюху для секции"""
         views = {

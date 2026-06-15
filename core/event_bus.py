@@ -25,6 +25,9 @@ class EventBus(QObject):
     flashcard_created = Signal(int)  # (flashcard_id)
     flashcard_deleted = Signal(int)  # (flashcard_id)
 
+    # Навигация
+    navigate_to = Signal(str, object)  # section_name, data
+
     session_started = Signal(int)  # (session_id)
     session_ended = Signal(int)  # (session_id)
 

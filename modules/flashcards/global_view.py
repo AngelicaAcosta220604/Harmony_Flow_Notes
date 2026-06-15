@@ -247,6 +247,7 @@ class GlobalCardsView(QWidget):
         self._current_card = None
         self._setup_ui()
         self._connect_signals()
+        self._subscribe_to_events()
         self._load_data()
 
     def _setup_ui(self):
@@ -354,6 +355,19 @@ class GlobalCardsView(QWidget):
         self.start_review_btn.clicked.connect(self._on_start_review_clicked)
         self.sort_combo.currentIndexChanged.connect(self._load_data)
         self.tree_sort_combo.currentIndexChanged.connect(self._on_tree_sort_changed)
+
+    def _subscribe_to_events(self):
+        """Подписывается на события создания/удаления тем и карточек"""
+        from core.event_bus import event_bus
+
+        # При создании/удалении темы - обновляем всё
+        event_bus.topic_created.connect(lambda tid: self.refresh())
+        event_bus.topic_deleted.connect(lambda tid: self.refresh())
+        event_bus.topic_updated.connect(lambda tid: self.refresh())
+
+        # При создании/удалении карточки - обновляем только список карточек
+        event_bus.flashcard_created.connect(lambda cid: self._load_data())
+        event_bus.flashcard_deleted.connect(lambda cid: self._load_data())
 
     def _load_data(self):
         selected_ids = self.topic_tree.get_selected_topic_ids()
@@ -471,8 +485,10 @@ class GlobalCardsView(QWidget):
         self.start_review_requested.emit(topic_ids, True, True, True)
 
     def refresh(self):
+        """Обновляет дерево и данные, сворачивает папки"""
         self.topic_tree.reset_selection()
-        self.topic_tree._load_topics()
+        self.topic_tree.reload()
+        self.topic_tree.collapseAll()  # 🆕 Сворачиваем все папки
         self._load_data()
 
     def _on_tree_sort_changed(self):

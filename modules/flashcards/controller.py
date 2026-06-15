@@ -39,11 +39,19 @@ class FlashcardController:
 
     def create_free_card(self, topic_id: int, content: str) -> int:
         """Создаёт свободную карточку"""
-        return self._repo.create_free(topic_id, content)
+        card_id = self._repo.create_free(topic_id, content)
+        if card_id > 0:
+            from core.event_bus import event_bus
+            event_bus.flashcard_created.emit(card_id)
+        return card_id
 
     def create_qa_card(self, topic_id: int, question: str, answer: str) -> int:
         """Создаёт карточку вопрос-ответ"""
-        return self._repo.create_qa(topic_id, question, answer)
+        card_id = self._repo.create_qa(topic_id, question, answer)
+        if card_id > 0:
+            from core.event_bus import event_bus
+            event_bus.flashcard_created.emit(card_id)
+        return card_id
 
     def create_from_selection(self, topic_id: int, selected_text: str) -> int:
         """
@@ -64,8 +72,11 @@ class FlashcardController:
 
     def delete_card(self, card_id: int) -> bool:
         """Удаляет карточку"""
-        rows_affected = self._repo.delete(card_id)
-        return rows_affected > 0
+        success = self._repo.delete(card_id)
+        if success:
+            from core.event_bus import event_bus
+            event_bus.flashcard_deleted.emit(card_id)
+        return success
 
     def delete_cards_by_topic(self, topic_id: int) -> int:
         """Удаляет все карточки темы"""
