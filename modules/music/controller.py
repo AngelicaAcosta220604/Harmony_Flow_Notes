@@ -85,3 +85,35 @@ class MusicController:
         """Очищает ресурсы"""
         self.stop()
         self._sound_service.cleanup()
+
+    def toggle_loop(self) -> bool:
+        """Переключает зацикливание. Возвращает новое состояние."""
+        current = self._sound_service.is_loop_enabled()
+        self._sound_service.set_loop_enabled(not current)
+        return not current
+
+    def is_loop_enabled(self) -> bool:
+        """Возвращает, включено ли зацикливание"""
+        return self._sound_service.is_loop_enabled()
+
+    def get_position(self) -> int:
+        """Текущая позиция в мс"""
+        return self._sound_service.get_position()
+
+    def get_duration(self) -> int:
+        """Длительность в мс"""
+        return self._sound_service.get_duration()
+
+    def set_position(self, position_ms: int):
+        """Устанавливает позицию"""
+        self._sound_service.set_position(position_ms)
+
+    def toggle_play_pause(self):
+        """Переключает play/pause"""
+        self._sound_service.toggle_play_pause()
+        self._is_playing = self._sound_service.is_playing()
+
+    @property
+    def position_changed(self):
+        """Прокси для сигнала позиции"""
+        return self._sound_service.position_changed

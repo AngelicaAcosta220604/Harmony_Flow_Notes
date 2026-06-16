@@ -1,13 +1,12 @@
 # modules/sessions/setup_view.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
-    QPushButton, QFrame, QScrollArea, QCheckBox, QSizePolicy, QSlider
+    QPushButton, QFrame, QScrollArea, QSizePolicy
 )
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QIcon, QPixmap
 
 from modules.topics.widgets import TopicTreeSelector
-from modules.music.controller import MusicController
 from widgets import SilentMessageBox
 
 
@@ -16,10 +15,10 @@ class FocusSetupView(QWidget):
 
     start_session = Signal(int, int)
 
-    def __init__(self, topic_controller, music_controller: MusicController, settings_controller, parent=None):
+    def __init__(self, topic_controller, music_controller=None, settings_controller=None, parent=None):
         super().__init__(parent)
         self._topic_controller = topic_controller
-        self._music_controller = music_controller
+        self._music_controller = music_controller  # Оставлен опционально, чтобы не сломать DI
         self._settings_controller = settings_controller
         self._setup_ui()
         self._load_settings()
@@ -164,119 +163,12 @@ class FocusSetupView(QWidget):
 
         main_row_layout.addWidget(left_col, 1)
 
-        # ----- ПРАВАЯ КОЛОНКА: Фоновые звуки -----
-        sound_widget = QFrame()
-        sound_widget.setStyleSheet("""
-            QFrame {
-                background-color: #FFFFFF;
-                border-radius: 16px;
-                border: none;
-            }
-        """)
-        sound_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # ----- ПРАВАЯ КОЛОНКА: ПУСТОЕ МЕСТО (звуки убраны) -----
+        # Добавляем спейсер, чтобы левая колонка не растягивалась на всю ширину
+        right_spacer = QWidget()
+        right_spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        main_row_layout.addWidget(right_spacer, 1)
 
-        sound_layout = QVBoxLayout(sound_widget)
-        sound_layout.setContentsMargins(20, 16, 20, 16)
-        sound_layout.setSpacing(12)
-
-        sound_title_layout = QHBoxLayout()
-        sound_icon = QLabel()
-        sound_icon_pixmap = QPixmap("resources/icons/music1.png")
-        if not sound_icon_pixmap.isNull():
-            sound_icon_pixmap = sound_icon_pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            sound_icon.setPixmap(sound_icon_pixmap)
-        else:
-            sound_icon.setText("🎵")
-        sound_title = QLabel("Фоновые звуки (опционально):")
-        sound_title.setStyleSheet("font-weight: 600; color: #1F2937; font-size: 14px;")
-        sound_title_layout.addWidget(sound_icon)
-        sound_title_layout.addWidget(sound_title)
-        sound_title_layout.addStretch()
-        sound_layout.addLayout(sound_title_layout)
-
-        self.sound_combo = QComboBox()
-        self.sound_combo.addItems([
-            "Отключено",
-            "Белый шум",
-            "Дождь",
-            "Лес",
-            "Кафе"
-        ])
-        self.sound_combo.setStyleSheet("""
-            QComboBox {
-                background-color: #F0F4F8;
-                border: 1px solid #E6EEF6;
-                border-radius: 8px;
-                padding: 8px 12px;
-                min-height: 36px;
-                font-size: 13px;
-                color: #1F2937;
-            }
-            QComboBox:hover {
-                border: 1px solid #3B82F6;
-            }
-        """)
-        sound_layout.addWidget(self.sound_combo)
-
-        # Громкость
-        volume_layout = QHBoxLayout()
-        volume_layout.setSpacing(8)
-
-        self.volume_slider = QSlider(Qt.Horizontal)
-        self.volume_slider.setRange(0, 100)
-        self.volume_slider.setValue(50)
-        self.volume_slider.setStyleSheet("""
-            QSlider::groove:horizontal {
-                height: 4px;
-                background-color: #E6EEF6;
-                border-radius: 2px;
-            }
-            QSlider::handle:horizontal {
-                background-color: #3B82F6;
-                width: 14px;
-                height: 14px;
-                margin: -5px 0;
-                border-radius: 7px;
-            }
-            QSlider::sub-page:horizontal {
-                background-color: #3B82F6;
-                border-radius: 2px;
-            }
-        """)
-        volume_layout.addWidget(self.volume_slider)
-
-        self.volume_label = QLabel("50%")
-        self.volume_label.setStyleSheet("color: #6B7280; font-size: 12px; min-width: 40px;")
-        volume_layout.addWidget(self.volume_label)
-
-        sound_layout.addLayout(volume_layout)
-
-        # Чекбокс
-        self.sound_checkbox = QCheckBox("Включить фоновые звуки")
-        self.sound_checkbox.setChecked(False)
-        self.sound_checkbox.setStyleSheet("""
-            QCheckBox {
-                spacing: 8px;
-                color: #1F2937;
-                font-size: 13px;
-            }
-            QCheckBox::indicator {
-                width: 16px;
-                height: 16px;
-                border-radius: 4px;
-                border: 1px solid #E6EEF6;
-                background-color: #F0F4F8;
-            }
-            QCheckBox::indicator:checked {
-                background-color: #3B82F6;
-                border-color: #3B82F6;
-            }
-        """)
-        sound_layout.addWidget(self.sound_checkbox)
-
-        sound_layout.addStretch()
-
-        main_row_layout.addWidget(sound_widget, 1)
         content_layout.addLayout(main_row_layout)
 
         # ========== КНОПКА НАЧАТЬ СЕССИЮ ==========
@@ -315,28 +207,14 @@ class FocusSetupView(QWidget):
 
         # Подключаем сигналы
         self.start_btn.clicked.connect(self._on_start)
-        self.sound_checkbox.toggled.connect(self._on_sound_toggled)
-        self.volume_slider.valueChanged.connect(self._on_volume_changed)
 
     def _load_settings(self):
         """Загружает настройки"""
-        default_interval = self._settings_controller.get_activity_check_interval()
-        index = self.interval_combo.findData(default_interval)
-        if index >= 0:
-            self.interval_combo.setCurrentIndex(index)
-
-        default_sound = self._settings_controller.get_default_sound()
-        if default_sound != 'off':
-            sound_map = {
-                'white_noise': "Белый шум",
-                'rain': "Дождь",
-                'forest': "Лес",
-                'cafe': "Кафе"
-            }
-            sound_name = sound_map.get(default_sound, "Отключено")
-            idx = self.sound_combo.findText(sound_name)
-            if idx >= 0:
-                self.sound_combo.setCurrentIndex(idx)
+        if self._settings_controller:
+            default_interval = self._settings_controller.get_activity_check_interval()
+            index = self.interval_combo.findData(default_interval)
+            if index >= 0:
+                self.interval_combo.setCurrentIndex(index)
 
     def _on_start(self):
         """Запуск сессии"""
@@ -347,17 +225,6 @@ class FocusSetupView(QWidget):
 
         interval = self.interval_combo.currentData()
         self.start_session.emit(topic_id, interval)
-
-    def _on_sound_toggled(self, checked: bool):
-        """Включение/выключение звука"""
-        self.sound_combo.setEnabled(checked)
-        self.volume_slider.setEnabled(checked)
-        self.volume_label.setEnabled(checked)
-
-    def _on_volume_changed(self, value: int):
-        """Изменение громкости"""
-        self.volume_label.setText(f"{value}%")
-        self._music_controller.set_volume(value)
 
     def refresh_topics(self):
         """Обновляет список тем"""

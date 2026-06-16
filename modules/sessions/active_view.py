@@ -367,10 +367,13 @@ class FocusActiveView(QWidget):
         self.ping_manager.pingNeeded.connect(self._show_ping_dialog)
         self.ping_manager.timeoutReached.connect(self._auto_pause_from_ping)
 
-        # Запускаем музыку если настроена
+        # 🎵 Запускаем музыку, если выбран звук
         default_sound = self._music_controller.get_current_sound()
         if default_sound and default_sound != 'off':
-            self.music_widget._controller.resume()
+            # Обновляем виджет и запускаем
+            self.music_widget.refresh()
+            self._music_controller.play(default_sound)
+            self.music_widget._update_play_button()
 
     def cleanup(self):
         """Очищает ресурсы"""
@@ -445,3 +448,10 @@ class FocusActiveView(QWidget):
         )
         self.ping_manager.pingNeeded.connect(self._show_ping_dialog)
         self.ping_manager.timeoutReached.connect(self._auto_pause_from_ping)
+
+        # 🎵 Возобновляем музыку, если она была включена
+        current_sound = self._music_controller.get_current_sound()
+        if current_sound and current_sound != 'off':
+            self.music_widget.refresh()
+            self._music_controller.resume()
+            self.music_widget._update_play_button()
