@@ -242,14 +242,14 @@ class DatabaseManager:
                 ('auto_save_interval_seconds', '60'),
                 ('notifications_enabled', 'true'),
                 ('default_sound', 'off'),
-                ('onboarding_completed', 'false'),  # Флаг прохождения онбординга
+                ('onboarding_completed', 'false'),  # 🆕 Флаг прохождения онбординга
             ]
             cursor.executemany(
                 "INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?)",
                 default_settings
             )
         else:
-            # Для уже существующих БД добавляем флаг, если его нет
+            # 🆕 Для уже существующих БД добавляем флаг, если его нет
             cursor.execute(
                 "SELECT COUNT(*) FROM app_settings WHERE setting_key = 'onboarding_completed'"
             )

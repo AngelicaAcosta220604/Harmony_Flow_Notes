@@ -441,6 +441,19 @@ class MainWindow(QMainWindow):
         # Event bus
         event_bus.topic_created.connect(lambda tid: self._refresh_topics())
         event_bus.topic_deleted.connect(lambda tid: self._refresh_topics())
+        event_bus.topic_updated.connect(lambda tid: self._refresh_topics())
+        event_bus.note_created.connect(lambda nid: self._refresh_notes())
+        event_bus.note_deleted.connect(lambda nid: self._refresh_notes())
+        event_bus.note_updated.connect(lambda nid: self._refresh_notes())
+        # 🆕 Event bus - задачи
+        event_bus.task_created.connect(lambda tid: self._refresh_tasks())
+        event_bus.task_deleted.connect(lambda tid: self._refresh_tasks())
+        event_bus.task_completed.connect(lambda tid: self._refresh_tasks())
+        event_bus.task_updated.connect(lambda tid: self._refresh_tasks())
+
+        # 🆕 Event bus - карточки
+        event_bus.flashcard_created.connect(lambda cid: self._refresh_flashcards())
+        event_bus.flashcard_deleted.connect(lambda cid: self._refresh_flashcards())
         event_bus.task_created.connect(lambda tid: self._refresh_dashboard())
         event_bus.task_completed.connect(lambda tid: self._refresh_dashboard())
 
@@ -546,8 +559,9 @@ class MainWindow(QMainWindow):
         self.dashboard_view.refresh()
 
     def _refresh_topics(self):
-        """Обновляет дерево тем"""
+        """Обновляет дерево тем и экран подготовки к сессии"""
         self.topics_view.refresh()
+        self.focus_setup_view.refresh_topics()  # 🆕 Обновляем темы на экране старта сессии
 
     def _open_note(self, note_id: int):
         """Открывает заметку для редактирования"""
@@ -563,7 +577,7 @@ class MainWindow(QMainWindow):
 
     def _check_onboarding(self):
         """Проверяет, нужно ли показать онбординг при первом запуске"""
-        # Проверяем флаг onboarding_completed
+        # 🆕 Проверяем флаг onboarding_completed через новый метод
         onboarding_completed = container.settings_controller.get_onboarding_completed()
 
         # Если онбординг не пройден — показываем мастер
@@ -1092,3 +1106,48 @@ class MainWindow(QMainWindow):
                     self.statusBar().showMessage(f"✅ Задача «{data['title']}» создана!", 3000)
             except ValueError as e:
                 SilentMessageBox.warning(self, "Ошибка", str(e))
+
+    def _refresh_notes(self):
+        """Обновляет все view, связанные с заметками"""
+        # Обновляем тему (если открыта)
+        if self.content_stack.currentWidget() == self.topic_view:
+            self.topic_view.refresh()
+
+        # Обновляем поиск
+        self.search_view.refresh()
+
+        # Обновляем дашборд (там есть статистика по заметкам)
+        self.dashboard_view.refresh()
+
+    def _refresh_tasks(self):
+        """Обновляет все view, связанные с задачами"""
+        # Обновляем глобальные задачи
+        self.tasks_view.refresh()
+
+        # Обновляем календарь
+        self.calendar_view.refresh()
+
+        # Обновляем тему (если открыта)
+        if self.content_stack.currentWidget() == self.topic_view:
+            self.topic_view.refresh()
+
+        # Обновляем поиск
+        self.search_view.refresh()
+
+        # Обновляем дашборд (там есть срочные задачи)
+        self.dashboard_view.refresh()
+
+    def _refresh_flashcards(self):
+        """Обновляет все view, связанные с карточками"""
+        # Обновляем глобальные карточки
+        self.flashcards_view.refresh()
+
+        # Обновляем тему (если открыта)
+        if self.content_stack.currentWidget() == self.topic_view:
+            self.topic_view.refresh()
+
+        # Обновляем поиск
+        self.search_view.refresh()
+
+        # Обновляем дашборд (там есть статистика по карточкам)
+        self.dashboard_view.refresh()

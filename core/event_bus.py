@@ -21,9 +21,11 @@ class EventBus(QObject):
     task_created = Signal(int)  # (task_id)
     task_completed = Signal(int)  # (task_id)
     task_deleted = Signal(int)  # (task_id)
+    task_updated = Signal(int)  # task_id
 
     flashcard_created = Signal(int)  # (flashcard_id)
     flashcard_deleted = Signal(int)  # (flashcard_id)
+    flashcard_updated = Signal(int)  # flashcard_id
 
     # Навигация
     navigate_to = Signal(str, object)  # section_name, data

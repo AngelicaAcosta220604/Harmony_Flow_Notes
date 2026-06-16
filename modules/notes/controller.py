@@ -3,7 +3,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from datebase.repositories.note_repo import NoteRepository
 from models.note import Note
-
+from core.event_bus import event_bus
 
 class NoteController:
     """
@@ -40,7 +40,10 @@ class NoteController:
         """Создаёт новую заметку"""
         if not title.strip():
             title = f"Заметка от {datetime.now().strftime('%d.%m.%Y %H:%M')}"
-        return self._repo.create(topic_id, title.strip(), content)
+        note_id = self._repo.create(topic_id, title.strip(), content)
+        if note_id:
+            event_bus.note_created.emit(note_id)  # 🆕 ДОБАВИТЬ
+        return note_id
 
     def update_note(self, note_id: int, title: str = None, content: str = None) -> bool:
         """Обновляет заметку"""
@@ -54,6 +57,8 @@ class NoteController:
             return True
 
         rows_affected = self._repo.update(note_id, **updates)
+        if rows_affected > 0:
+            event_bus.note_updated.emit(note_id)  # 🆕 ДОБАВИТЬ
         return rows_affected > 0
 
     def update_content(self, note_id: int, new_content: str) -> bool:
@@ -67,6 +72,8 @@ class NoteController:
     def delete_note(self, note_id: int) -> bool:
         """Удаляет заметку"""
         rows_affected = self._repo.delete(note_id)
+        if rows_affected > 0:
+            event_bus.note_deleted.emit(note_id)  # 🆕 ДОБАВИТЬ
         return rows_affected > 0
 
     def delete_notes_by_topic(self, topic_id: int) -> int:

@@ -10,6 +10,7 @@ from models.note import Note
 from models.task import Task
 from models.flashcard import Flashcard
 from models.session import Session
+from core.event_bus import event_bus
 
 
 class TopicController:
@@ -71,11 +72,17 @@ class TopicController:
 
     def create_folder(self, name: str, parent_id: Optional[int] = None, description: str = "") -> int:
         """Создаёт новую папку"""
-        return self._repo.create(name, 'folder', parent_id, description)
+        folder_id = self._repo.create(name, 'folder', parent_id, description)
+        if folder_id:
+            event_bus.topic_created.emit(folder_id)  # 🆕 Уведомляем UI
+        return folder_id
 
     def create_topic(self, name: str, parent_id: Optional[int] = None, description: str = "") -> int:
         """Создаёт новую тему"""
-        return self._repo.create(name, 'topic', parent_id, description)
+        topic_id = self._repo.create(name, 'topic', parent_id, description)
+        if topic_id:
+            event_bus.topic_created.emit(topic_id)  # 🆕 Уведомляем UI
+        return topic_id
 
     def update_topic(self, topic_id: int, **kwargs) -> bool:
         """Обновляет тему/папку"""
@@ -84,7 +91,26 @@ class TopicController:
 
     def rename(self, topic_id: int, new_name: str) -> bool:
         """Переименовывает тему/папку"""
-        return self.update_topic(topic_id, name=new_name)
+        success = self.update_topic(topic_id, name=new_name)
+        if success:
+            event_bus.topic_created.emit(topic_id)  # 🆕 Триггерим обновление
+        return success
+
+    def move(self, topic_id: int, new_parent_id: Optional[int]) -> bool:
+        """
+        Перемещает тему/папку в другое место.
+        """
+        if new_parent_id is not None:
+            if topic_id == new_parent_id:
+                return False
+            descendants = self._repo.get_descendants_ids(topic_id)
+            if new_parent_id in descendants:
+                return False
+
+        success = self.update_topic(topic_id, parent_id=new_parent_id)
+        if success:
+            event_bus.topic_created.emit(topic_id)  # 🆕 Триггерим обновление
+        return success
 
     def move(self, topic_id: int, new_parent_id: Optional[int]) -> bool:
         """
@@ -109,13 +135,15 @@ class TopicController:
         Удаляет тему/папку и все связанные данные.
         Возвращает True если успешно.
         """
-        # Проверяем, существует ли тема
         topic = self.get_topic(topic_id)
         if not topic:
             return False
 
         rows_affected = self._repo.delete(topic_id)
-        return rows_affected > 0
+        if rows_affected > 0:
+            event_bus.topic_deleted.emit(topic_id)  # 🆕 Уведомляем UI
+            return True
+        return False
 
     def get_topic_count(self) -> int:
         """Возвращает количество тем (не папок)"""

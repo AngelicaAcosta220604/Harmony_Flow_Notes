@@ -79,6 +79,9 @@ class TaskController:
             return True
 
         rows_affected = self._task_repo.update(task_id, **updates)
+        if rows_affected > 0:
+            from core.event_bus import event_bus
+            event_bus.task_updated.emit(task_id)  # 🆕 ДОБАВИТЬ
         return rows_affected > 0
 
     def delete_task(self, task_id: int) -> bool:
@@ -101,7 +104,11 @@ class TaskController:
         if not task:
             return False
 
-        return self._task_repo.complete(task_id)
+        success = self._task_repo.complete(task_id)
+        if success:
+            from core.event_bus import event_bus
+            event_bus.task_completed.emit(task_id)  # 🆕 ДОБАВИТЬ
+        return success
 
     def reopen_task(self, task_id: int) -> bool:
         """Возвращает задачу в активный статус"""

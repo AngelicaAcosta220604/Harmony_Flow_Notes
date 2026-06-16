@@ -154,12 +154,14 @@ class OnboardingWizard(QDialog):
 
     def _complete_onboarding(self):
         """Завершает онбординг"""
-        # Сохраняем настройку, что онбординг пройден
-        self._settings_controller.set('onboarding_completed', 'true')
+        # 🆕 Сохраняем флаг, что онбординг пройден
+        self._settings_controller.set_onboarding_completed(True)
+
+        # Сохраняем имя пользователя (если ввели)
+        if self._user_name:
+            self._settings_controller.set_user_name(self._user_name)
 
         # Показываем финальное сообщение
-
-
         message = f"✨ Добро пожаловать, {self._user_name}!\n\n"
         message += "HFlow готов к работе.\n"
         message += "Вы можете:\n"
