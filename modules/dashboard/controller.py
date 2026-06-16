@@ -133,9 +133,11 @@ class DashboardController:
 
         conc_values = [log['value'] for log in logs if log['metric'] == 'concentration']
         energy_values = [log['value'] for log in logs if log['metric'] == 'energy']
+        interest_values = [log['value'] for log in logs if log['metric'] == 'interest']
 
         avg_concentration = sum(conc_values) / len(conc_values) if conc_values else 0
         avg_energy = sum(energy_values) / len(energy_values) if energy_values else 0
+        avg_interest = sum(interest_values) / len(interest_values) if interest_values else 0
 
         # Получаем название темы
         topic_name = "—"
@@ -151,6 +153,7 @@ class DashboardController:
             'duration_display': TimeService.format_duration(last_session.get('duration_minutes') or 0),
             'avg_concentration': round(avg_concentration, 1),
             'avg_energy': round(avg_energy, 1),
+            'avg_interest': round(avg_interest, 1),
             'start_time': last_session.get('start_time')
         }
 
@@ -283,6 +286,8 @@ class DashboardController:
             'total_hours': round(total_minutes / 60, 1),
             'completion_rate': round(completed_tasks / len(tasks) * 100, 1) if tasks else 0
         }
+
+
 
     def has_data(self) -> bool:
         """Проверяет, есть ли какие-либо данные в приложении"""
