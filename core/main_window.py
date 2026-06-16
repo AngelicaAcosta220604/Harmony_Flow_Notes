@@ -563,9 +563,15 @@ class MainWindow(QMainWindow):
 
     def _check_onboarding(self):
         """Проверяет, нужно ли показать онбординг при первом запуске"""
-        topics = container.topic_repo.get_all()
-        user_name = container.settings_controller.get_user_name()
-        if len(topics) == 0 and user_name == "Пользователь":
+        from datebase.db_manager import db
+
+        # Проверяем флаг onboarding_completed
+        row = db.fetchone(
+            "SELECT setting_value FROM app_settings WHERE setting_key = 'onboarding_completed'"
+        )
+
+        # Если флага нет или он равен 'false' — показываем онбординг
+        if row is None or row['setting_value'].lower() != 'true':
             self._show_onboarding()
 
     def _show_onboarding(self):

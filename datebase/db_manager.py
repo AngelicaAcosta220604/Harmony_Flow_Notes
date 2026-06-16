@@ -1,7 +1,22 @@
 # database/db_manager.py
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Optional, List, Tuple, Any
+
+
+def get_base_path() -> Path:
+    """
+    Определяет базовый путь приложения.
+    - При запуске из EXE: папка, где лежит HarmonyFlowNotes.exe
+    - При запуске из PyCharm: папка, где лежит db_manager.py
+    """
+    if getattr(sys, 'frozen', False):
+        # Запущено как EXE — путь к папке с исполняемым файлом
+        return Path(sys.executable).parent
+    else:
+        # Запущено как Python-скрипт — папка с этим файлом
+        return Path(__file__).parent
 
 
 class DatabaseManager:
@@ -20,8 +35,8 @@ class DatabaseManager:
             return
         self._initialized = True
 
-        # Путь к БД в папке с приложением
-        self.db_path = Path(__file__).parent / "hflow.db"
+        # 🆕 Путь к БД — рядом с EXE (или со скриптом при разработке)
+        self.db_path = get_base_path() / "hflow.db"
         self._connection: Optional[sqlite3.Connection] = None
         self._create_tables()
 
@@ -220,18 +235,29 @@ class DatabaseManager:
         cursor.execute("SELECT COUNT(*) FROM app_settings")
         if cursor.fetchone()[0] == 0:
             default_settings = [
-                ('user_name', 'Пользователь'),
+                ('user_name', ''),  # 🆕 Пустое имя — онбординг покажется
                 ('theme', 'light'),
                 ('activity_check_interval_minutes', '15'),
                 ('auto_pause_minutes', '10'),
                 ('auto_save_interval_seconds', '60'),
                 ('notifications_enabled', 'true'),
                 ('default_sound', 'off'),
+                ('onboarding_completed', 'false'),  # 🆕 Флаг прохождения онбординга
             ]
             cursor.executemany(
                 "INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?)",
                 default_settings
             )
+        else:
+            # 🆕 Для уже существующих БД добавляем флаг, если его нет
+            cursor.execute(
+                "SELECT COUNT(*) FROM app_settings WHERE setting_key = 'onboarding_completed'"
+            )
+            if cursor.fetchone()[0] == 0:
+                cursor.execute(
+                    "INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?)",
+                    ('onboarding_completed', 'true')  # Старые пользователи уже прошли онбординг
+                )
         # flashcard_progress (прогресс повторения карточек)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS flashcard_progress (
