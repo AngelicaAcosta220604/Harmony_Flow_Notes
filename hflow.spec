@@ -2,13 +2,12 @@
 
 a = Analysis(
     ['main.py'],
-    pathex=['.'],  # 🆕 Искать модули в текущей директории
+    pathex=['.'],
     binaries=[],
     datas=[
         ('resources/icons', 'resources/icons'),
         ('resources/sounds', 'resources/sounds'),
         ('resources/styles', 'resources/styles'),
-        ('datebase/hflow.db', 'datebase'),
     ],
     hiddenimports=[
         'PySide6.QtMultimedia',
