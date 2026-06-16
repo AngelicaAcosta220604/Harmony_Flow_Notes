@@ -234,3 +234,9 @@ class SearchView(QWidget):
         """
         self.search_bar.set_query(query)
         self._on_search(query)
+
+    def refresh(self):
+        """Обновляет результаты поиска"""
+        # Если есть активный поисковый запрос - переделываем поиск
+        if hasattr(self, 'search_bar') and self.search_bar.text():
+            self._perform_search(self.search_bar.text())

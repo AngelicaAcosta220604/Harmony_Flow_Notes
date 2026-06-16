@@ -140,3 +140,8 @@ class CalendarController:
             current += timedelta(days=1)
 
         return result
+
+    def refresh(self):
+        """Обновляет календарь и список задач"""
+        self._load_tasks()  # или как у вас называется метод загрузки задач
+        self._highlight_deadline_dates()  # если есть такой метод

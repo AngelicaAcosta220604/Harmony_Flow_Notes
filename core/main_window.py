@@ -455,7 +455,6 @@ class MainWindow(QMainWindow):
         event_bus.flashcard_created.connect(lambda cid: self._refresh_flashcards())
         event_bus.flashcard_deleted.connect(lambda cid: self._refresh_flashcards())
         event_bus.task_created.connect(lambda tid: self._refresh_dashboard())
-        event_bus.task_completed.connect(lambda tid: self._refresh_dashboard())
 
         # Sessions History
         self.sessions_history_view.session_resumed.connect(self._resume_session_from_history)
@@ -1109,45 +1108,47 @@ class MainWindow(QMainWindow):
 
     def _refresh_notes(self):
         """Обновляет все view, связанные с заметками"""
-        # Обновляем тему (если открыта)
         if self.content_stack.currentWidget() == self.topic_view:
             self.topic_view.refresh()
 
-        # Обновляем поиск
-        self.search_view.refresh()
+        if hasattr(self, 'search_view') and hasattr(self.search_view, 'refresh'):
+            self.search_view.refresh()
 
-        # Обновляем дашборд (там есть статистика по заметкам)
-        self.dashboard_view.refresh()
+        if hasattr(self, 'dashboard_view') and hasattr(self.dashboard_view, 'refresh'):
+            self.dashboard_view.refresh()
 
     def _refresh_tasks(self):
         """Обновляет все view, связанные с задачами"""
         # Обновляем глобальные задачи
-        self.tasks_view.refresh()
+        if hasattr(self, 'tasks_view') and hasattr(self.tasks_view, 'refresh'):
+            self.tasks_view.refresh()
 
         # Обновляем календарь
-        self.calendar_view.refresh()
+        if hasattr(self, 'calendar_view') and hasattr(self.calendar_view, 'refresh'):
+            self.calendar_view.refresh()
 
         # Обновляем тему (если открыта)
         if self.content_stack.currentWidget() == self.topic_view:
             self.topic_view.refresh()
 
         # Обновляем поиск
-        self.search_view.refresh()
+        if hasattr(self, 'search_view') and hasattr(self.search_view, 'refresh'):
+            self.search_view.refresh()
 
         # Обновляем дашборд (там есть срочные задачи)
-        self.dashboard_view.refresh()
+        if hasattr(self, 'dashboard_view') and hasattr(self.dashboard_view, 'refresh'):
+            self.dashboard_view.refresh()
 
     def _refresh_flashcards(self):
         """Обновляет все view, связанные с карточками"""
-        # Обновляем глобальные карточки
-        self.flashcards_view.refresh()
+        if hasattr(self, 'flashcards_view') and hasattr(self.flashcards_view, 'refresh'):
+            self.flashcards_view.refresh()
 
-        # Обновляем тему (если открыта)
         if self.content_stack.currentWidget() == self.topic_view:
             self.topic_view.refresh()
 
-        # Обновляем поиск
-        self.search_view.refresh()
+        if hasattr(self, 'search_view') and hasattr(self.search_view, 'refresh'):
+            self.search_view.refresh()
 
-        # Обновляем дашборд (там есть статистика по карточкам)
-        self.dashboard_view.refresh()
+        if hasattr(self, 'dashboard_view') and hasattr(self.dashboard_view, 'refresh'):
+            self.dashboard_view.refresh()
