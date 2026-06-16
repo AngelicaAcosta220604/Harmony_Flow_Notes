@@ -563,15 +563,11 @@ class MainWindow(QMainWindow):
 
     def _check_onboarding(self):
         """Проверяет, нужно ли показать онбординг при первом запуске"""
-        from datebase.db_manager import db
-
         # Проверяем флаг onboarding_completed
-        row = db.fetchone(
-            "SELECT setting_value FROM app_settings WHERE setting_key = 'onboarding_completed'"
-        )
+        onboarding_completed = container.settings_controller.get_onboarding_completed()
 
-        # Если флага нет или он равен 'false' — показываем онбординг
-        if row is None or row['setting_value'].lower() != 'true':
+        # Если онбординг не пройден — показываем мастер
+        if not onboarding_completed:
             self._show_onboarding()
 
     def _show_onboarding(self):

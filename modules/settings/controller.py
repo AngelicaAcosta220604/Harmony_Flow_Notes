@@ -121,3 +121,11 @@ class SettingsController:
         default_settings = Settings()
         self._settings = default_settings
         return self.save_all()
+
+    def get_onboarding_completed(self) -> bool:
+        """Возвращает True, если онбординг уже пройден"""
+        return self._settings_repo.get_bool('onboarding_completed', False)
+
+    def set_onboarding_completed(self, completed: bool) -> bool:
+        """Устанавливает флаг прохождения онбординга"""
+        return self._settings_repo.set_bool('onboarding_completed', completed)
