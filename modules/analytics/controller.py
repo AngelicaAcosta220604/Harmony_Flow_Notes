@@ -40,33 +40,37 @@ class AnalyticsController:
     def get_sessions_for_topics(self, topic_ids: List[int]) -> List[Session]:
         """Возвращает все сессии для указанных тем"""
         if not topic_ids:
-            return []
-
-        rows = self._session_repo.get_by_topics(topic_ids)
+            # Если список пустой - возвращаем ВСЕ сессии
+            rows = self._session_repo.get_all()
+        else:
+            rows = self._session_repo.get_by_topics(topic_ids)
         return [Session.from_row(row) for row in rows]
 
     def get_tasks_for_topics(self, topic_ids: List[int], include_general: bool = False) -> List[Task]:
         """Возвращает задачи для указанных тем"""
-        if not topic_ids and not include_general:
-            return []
-
-        rows = self._task_repo.get_by_topics(topic_ids, include_general)
+        if not topic_ids:
+            # Если список пустой - возвращаем ВСЕ задачи
+            rows = self._task_repo.get_all()
+        else:
+            rows = self._task_repo.get_by_topics(topic_ids, include_general)
         return [Task.from_row(row) for row in rows]
 
     def get_notes_for_topics(self, topic_ids: List[int]) -> List[Note]:
         """Возвращает заметки для указанных тем"""
         if not topic_ids:
-            return []
-
-        rows = self._note_repo.get_by_topics(topic_ids)
+            # Если список пустой - возвращаем ВСЕ заметки
+            rows = self._note_repo.get_all()
+        else:
+            rows = self._note_repo.get_by_topics(topic_ids)
         return [Note.from_row(row) for row in rows]
 
     def get_flashcards_for_topics(self, topic_ids: List[int]) -> List[Flashcard]:
         """Возвращает карточки для указанных тем"""
         if not topic_ids:
-            return []
-
-        rows = self._flashcard_repo.get_by_topics(topic_ids)
+            # Если список пустой - возвращаем ВСЕ карточки
+            rows = self._flashcard_repo.get_all()
+        else:
+            rows = self._flashcard_repo.get_by_topics(topic_ids)
         return [Flashcard.from_row(row) for row in rows]
 
     # ==================== СТАТИСТИКА ПО СЕССИЯМ ====================
@@ -388,3 +392,527 @@ class AnalyticsController:
             "notes": notes,
             "flashcards": flashcards
         }
+
+    def get_topic_analytics(self) -> List[Dict[str, Any]]:
+        """
+        Возвращает аналитику, сгруппированную по темам (как в дереве карточек).
+        """
+        # 1. Получаем все сессии с названиями тем
+        sessions = db.fetchall("""
+               SELECT s.id, s.topic_id, s.duration_minutes, t.name as topic_name
+               FROM sessions s
+               LEFT JOIN topics t ON s.topic_id = t.id
+           """)
+
+        # 2. Получаем все логи состояний
+        logs = db.fetchall("SELECT session_id, metric, value FROM session_state_logs")
+
+        # 3. Создаем маппинг session_id -> topic_id для быстрой связи
+        session_to_topic = {
+            s['id']: {'topic_id': s['topic_id'], 'topic_name': s['topic_name'] or 'Без темы'}
+            for s in sessions
+        }
+
+        # 4. Агрегируем данные по темам
+        stats = {}
+        for s in sessions:
+            tid = s['topic_id']
+            tname = s['topic_name'] or 'Без темы'
+            if tid not in stats:
+                stats[tid] = {
+                    'topic_id': tid,
+                    'topic_name': tname,
+                    'session_count': 0,
+                    'total_minutes': 0,
+                    'conc': [], 'energy': [], 'interest': []
+                }
+            stats[tid]['session_count'] += 1
+            stats[tid]['total_minutes'] += s.get('duration_minutes') or 0
+
+        for log in logs:
+            sid = log['session_id']
+            if sid in session_to_topic:
+                tid = session_to_topic[sid]['topic_id']
+                metric = log['metric']
+                val = log['value']
+                if metric == 'concentration':
+                    stats[tid]['conc'].append(val)
+                elif metric == 'energy':
+                    stats[tid]['energy'].append(val)
+                elif metric == 'interest':
+                    stats[tid]['interest'].append(val)
+
+        # 5. Форматируем итоговый результат
+        result = []
+        for tid, data in stats.items():
+            result.append({
+                'topic_id': tid,
+                'topic_name': data['topic_name'],
+                'session_count': data['session_count'],
+                'total_minutes': data['total_minutes'],
+                'total_hours': round(data['total_minutes'] / 60, 1),
+                'avg_concentration': round(sum(data['conc']) / len(data['conc']), 1) if data['conc'] else 0,
+                'avg_energy': round(sum(data['energy']) / len(data['energy']), 1) if data['energy'] else 0,
+                'avg_interest': round(sum(data['interest']) / len(data['interest']), 1) if data['interest'] else 0,
+            })
+
+        # Сортируем по затраченному времени (по убыванию)
+        result.sort(key=lambda x: x['total_minutes'], reverse=True)
+        return result
+
+    def _get_all_topics(self) -> List[Dict]:
+        """Получает все темы и папки из БД для построения дерева"""
+        return db.fetchall("SELECT id, name, parent_id, type FROM topics")
+
+    def get_sessions_table_data(self, topic_ids: List[int]) -> List[Dict[str, Any]]:
+        """Данные для таблицы сессий (как в истории)"""
+        sessions = self.get_sessions_for_topics(topic_ids)
+        topics_map = {t['id']: t for t in self._get_all_topics()}
+
+        result = []
+        for s in sessions:
+            logs = self._get_session_logs(s.id)
+            conc = [l['value'] for l in logs if l['metric'] == 'concentration']
+            energy = [l['value'] for l in logs if l['metric'] == 'energy']
+            interest = [l['value'] for l in logs if l['metric'] == 'interest']
+
+            topic_name = "—"
+            if s.topic_id and s.topic_id in topics_map:
+                topic_name = topics_map[s.topic_id]['name']
+
+            result.append({
+                'date': datetime.fromisoformat(s.start_time).strftime("%d.%m.%Y %H:%M") if s.start_time else "—",
+                'topic_name': topic_name,
+                'duration': f"{s.duration_minutes} мин",
+                'avg_concentration': round(sum(conc) / len(conc), 1) if conc else 0,
+                'avg_energy': round(sum(energy) / len(energy), 1) if energy else 0,
+                'avg_interest': round(sum(interest) / len(interest), 1) if interest else 0,
+            })
+        # Сортируем по дате (новые сверху)
+        result.sort(key=lambda x: x['date'], reverse=True)
+        return result
+
+    def get_topics_table_data(self, topic_ids: List[int]) -> List[Dict[str, Any]]:
+        """Данные для таблицы тем (агрегация по topic_id)"""
+        sessions = self.get_sessions_for_topics(topic_ids)
+        topics_map = {t['id']: t for t in self._get_all_topics()}
+
+        stats = {}
+        for s in sessions:
+            tid = s.topic_id if s.topic_id is not None else -1
+            if tid not in stats:
+                tname = topics_map.get(tid, {}).get('name', 'Без темы') if tid != -1 else 'Без темы'
+                stats[tid] = {
+                    'topic_name': tname,
+                    'session_count': 0,
+                    'total_minutes': 0,
+                    'conc': [], 'energy': [], 'interest': []
+                }
+            stats[tid]['session_count'] += 1
+            stats[tid]['total_minutes'] += s.duration_minutes or 0
+
+            logs = self._get_session_logs(s.id)
+            for log in logs:
+                if log['metric'] == 'concentration':
+                    stats[tid]['conc'].append(log['value'])
+                elif log['metric'] == 'energy':
+                    stats[tid]['energy'].append(log['value'])
+                elif log['metric'] == 'interest':
+                    stats[tid]['interest'].append(log['value'])
+
+        result = []
+        for tid, data in stats.items():
+            result.append({
+                'topic_name': data['topic_name'],
+                'session_count': data['session_count'],
+                'duration': f"{data['total_minutes']} мин",
+                'avg_concentration': round(sum(data['conc']) / len(data['conc']), 1) if data['conc'] else 0,
+                'avg_energy': round(sum(data['energy']) / len(data['energy']), 1) if data['energy'] else 0,
+                'avg_interest': round(sum(data['interest']) / len(data['interest']), 1) if data['interest'] else 0,
+            })
+        result.sort(key=lambda x: x['session_count'], reverse=True)
+        return result
+
+    def get_folders_table_data(self, topic_ids: List[int]) -> List[Dict[str, Any]]:
+        """Данные для таблицы папок (с учётом вложенности, как в дереве карточек)"""
+        sessions = self.get_sessions_for_topics(topic_ids)
+        all_topics = self._get_all_topics()
+        topics_map = {t['id']: t for t in all_topics}
+        folders = {t['id']: t for t in all_topics if t['type'] == 'folder'}
+
+        # Маппинг topic_id -> folder_id (ищем ближайшую папку в иерархии родителей)
+        topic_to_folder = {}
+        for t in all_topics:
+            if t['type'] == 'topic':
+                current = t
+                while current.get('parent_id'):
+                    parent = topics_map.get(current['parent_id'])
+                    if not parent: break
+                    if parent['type'] == 'folder':
+                        topic_to_folder[t['id']] = parent['id']
+                        break
+                    current = parent
+
+        stats = {fid: {
+            'folder_name': folder['name'],
+            'session_count': 0,
+            'total_minutes': 0,
+            'conc': [], 'energy': [], 'interest': []
+        } for fid, folder in folders.items()}
+
+        # Виртуальная папка для тем без папки
+        stats[-1] = {
+            'folder_name': 'Без папки',
+            'session_count': 0,
+            'total_minutes': 0,
+            'conc': [], 'energy': [], 'interest': []
+        }
+
+        for s in sessions:
+            tid = s.topic_id
+            if tid is None:
+                fid = -1
+            else:
+                fid = topic_to_folder.get(tid, -1)
+
+            if fid in stats:
+                stats[fid]['session_count'] += 1
+                stats[fid]['total_minutes'] += s.duration_minutes or 0
+                logs = self._get_session_logs(s.id)
+                for log in logs:
+                    if log['metric'] == 'concentration':
+                        stats[fid]['conc'].append(log['value'])
+                    elif log['metric'] == 'energy':
+                        stats[fid]['energy'].append(log['value'])
+                    elif log['metric'] == 'interest':
+                        stats[fid]['interest'].append(log['value'])
+
+        result = []
+        for fid, data in stats.items():
+            if data['session_count'] > 0:  # Показываем только папки, где были сессии
+                result.append({
+                    'folder_name': data['folder_name'],
+                    'session_count': data['session_count'],
+                    'duration': f"{data['total_minutes']} мин",
+                    'avg_concentration': round(sum(data['conc']) / len(data['conc']), 1) if data['conc'] else 0,
+                    'avg_energy': round(sum(data['energy']) / len(data['energy']), 1) if data['energy'] else 0,
+                    'avg_interest': round(sum(data['interest']) / len(data['interest']), 1) if data['interest'] else 0,
+                })
+        result.sort(key=lambda x: x['session_count'], reverse=True)
+        return result
+
+    def analyze_metric_patterns(self, sessions: List[Session]) -> Dict[str, Any]:
+        """Анализирует временные паттерны метрик"""
+        if not sessions:
+            return {}
+
+        # Собираем все логи по минутам сессий
+        timeline = []
+        for session in sessions:
+            if not session.start_time:
+                continue
+            logs = self._get_session_logs(session.id)
+            session_start = datetime.fromisoformat(session.start_time)
+
+            for log in logs:
+                minute_time = session_start.replace(
+                    minute=log['minute'] % 60,
+                    hour=session_start.hour + (log['minute'] // 60)
+                )
+                timeline.append({
+                    'time': minute_time,
+                    'minute': log['minute'],
+                    'metric': log['metric'],
+                    'value': log['value']
+                })
+
+        if not timeline:
+            return {}
+
+        # Анализируем каждую метрику
+        result = {}
+        for metric in ['concentration', 'energy', 'interest']:
+            metric_data = [t for t in timeline if t['metric'] == metric]
+            if not metric_data:
+                continue
+
+            # Сортируем по времени
+            metric_data.sort(key=lambda x: x['time'])
+            values = [m['value'] for m in metric_data]
+
+            # Находим пики и спады
+            peak_info = self._find_peaks_and_drops(values, metric_data)
+            result[metric] = peak_info
+
+        # Анализируем синергию
+        result['synergy'] = self._analyze_synergy(timeline)
+
+        return result
+
+    def _find_peaks_and_drops(self, values: List[float], data: List[Dict]) -> Dict[str, Any]:
+        """Находит пики, спады и лучшие периоды"""
+        if not values:
+            return {}
+
+        max_value = max(values)
+        min_value = min(values)
+        avg_value = sum(values) / len(values)
+
+        # Находим первый пик
+        peak_minute = values.index(max_value)
+        peak_time = data[peak_minute]['time'].strftime("%H:%M") if peak_minute < len(data) else "—"
+
+        # Находим когда началось падение после пика
+        drop_minute = None
+        for i in range(peak_minute + 1, len(values)):
+            if values[i] < values[i - 1] * 0.9:  # Падение на 10% и более
+                drop_minute = i
+                break
+
+        drop_time = data[drop_minute]['time'].strftime("%H:%M") if drop_minute and drop_minute < len(data) else "—"
+        time_to_drop = f"{drop_minute - peak_minute} мин" if drop_minute else "Не зафиксировано"
+
+        # Находим лучший период (30 минут с наивысшим средним)
+        best_period_start = None
+        best_period_avg = 0
+        window_size = min(30, len(values))
+
+        for i in range(len(values) - window_size + 1):
+            window_avg = sum(values[i:i + window_size]) / window_size
+            if window_avg > best_period_avg:
+                best_period_avg = window_avg
+                best_period_start = i
+
+        best_start_time = data[best_period_start]['time'].strftime(
+            "%H:%M") if best_period_start is not None and best_period_start < len(data) else "—"
+        best_duration = f"{window_size} мин" if best_period_start is not None else "—"
+
+        # Находим когда начался спад от начального уровня
+        initial_drop_minute = None
+        initial_value = values[0] if values else 0
+        for i in range(1, len(values)):
+            if values[i] < initial_value * 0.85:  # Падение на 15% от начального
+                initial_drop_minute = i
+                break
+
+        initial_drop_time = data[initial_drop_minute]['time'].strftime(
+            "%H:%M") if initial_drop_minute and initial_drop_minute < len(data) else "—"
+        time_to_initial_drop = f"{initial_drop_minute} мин" if initial_drop_minute else "Не зафиксировано"
+
+        return {
+            'peak_value': round(max_value, 1),
+            'peak_time': peak_time,
+            'peak_minute': peak_minute,
+            'drop_time': drop_time,
+            'time_to_drop': time_to_drop,
+            'initial_drop_time': initial_drop_time,
+            'time_to_initial_drop': time_to_initial_drop,
+            'best_period_start': best_start_time,
+            'best_period_duration': best_duration,
+            'best_period_avg': round(best_period_avg, 1),
+            'avg': round(avg_value, 1),
+            'min': round(min_value, 1)
+        }
+
+    def _analyze_synergy(self, timeline: List[Dict]) -> Dict[str, Any]:
+        """Анализирует синергию метрик"""
+        if not timeline:
+            return {}
+
+        # Группируем по минутам
+        by_minute = {}
+        for t in timeline:
+            minute = t['minute']
+            if minute not in by_minute:
+                by_minute[minute] = {}
+            by_minute[minute][t['metric']] = t['value']
+
+        # Находим минуты где все метрики высокие
+        high_synergy_minutes = []
+        for minute, metrics in by_minute.items():
+            if all(metrics.get(m, 0) >= 70 for m in ['concentration', 'energy', 'interest']):
+                high_synergy_minutes.append(minute)
+
+        # Анализируем корреляции
+        conc_values = [t['value'] for t in timeline if t['metric'] == 'concentration']
+        energy_values = [t['value'] for t in timeline if t['metric'] == 'energy']
+        interest_values = [t['value'] for t in timeline if t['metric'] == 'interest']
+
+        # Простая корреляция
+        conc_energy_corr = self._calculate_correlation(conc_values, energy_values)
+        conc_interest_corr = self._calculate_correlation(conc_values, interest_values)
+
+        # Рекомендации
+        recommendations = []
+
+        if high_synergy_minutes:
+            peak_synergy_time = min(high_synergy_minutes)
+            recommendations.append(
+                f"🎯 Пик продуктивности (все метрики >70) достигнут на {peak_synergy_time}-й минуте сессии"
+            )
+
+        if conc_energy_corr > 0.7:
+            recommendations.append(
+                "⚡ Энергия сильно влияет на концентрацию - следите за отдыхом"
+            )
+
+        if conc_interest_corr > 0.7:
+            recommendations.append(
+                "❤️ Интерес напрямую влияет на концентрацию - выбирайте engaging темы"
+            )
+
+        # Находим когда начинается общий спад
+        synergy_drop = None
+        for i in range(len(conc_values)):
+            if i < len(energy_values) and i < len(interest_values):
+                if (conc_values[i] < conc_values[0] * 0.8 and
+                        energy_values[i] < energy_values[0] * 0.8):
+                    synergy_drop = i
+                    break
+
+        if synergy_drop:
+            recommendations.append(
+                f"⏱️ Оптимальная длительность сессии: {synergy_drop} минут (после начинается спад)"
+            )
+
+        return {
+            'high_synergy_minutes': len(high_synergy_minutes),
+            'peak_synergy_minute': min(high_synergy_minutes) if high_synergy_minutes else None,
+            'conc_energy_correlation': round(conc_energy_corr, 2),
+            'conc_interest_correlation': round(conc_interest_corr, 2),
+            'synergy_drop_minute': synergy_drop,
+            'recommendations': recommendations
+        }
+
+    def _calculate_correlation(self, x: List[float], y: List[float]) -> float:
+        """Вычисляет корреляцию Пирсона"""
+        if len(x) != len(y) or len(x) < 2:
+            return 0.0
+
+        n = len(x)
+        mean_x = sum(x) / n
+        mean_y = sum(y) / n
+
+        numerator = sum((x[i] - mean_x) * (y[i] - mean_y) for i in range(n))
+
+        sum_sq_x = sum((xi - mean_x) ** 2 for xi in x)
+        sum_sq_y = sum((yi - mean_y) ** 2 for yi in y)
+
+        denominator = (sum_sq_x * sum_sq_y) ** 0.5
+
+        if denominator == 0:
+            return 0.0
+
+        return numerator / denominator
+
+    def generate_detailed_recommendations(self, sessions: List[Session], patterns: Dict[str, Any]) -> List[str]:
+        """Генерирует детальные рекомендации на основе паттернов"""
+        recommendations = []
+
+        if not sessions or not patterns:
+            return ["📭 Недостаточно данных для рекомендаций"]
+
+        # Анализируем каждую метрику
+        for metric, metric_name in [
+            ('concentration', 'концентрации'),
+            ('energy', 'энергии'),
+            ('interest', 'интереса')
+        ]:
+            if metric not in patterns:
+                continue
+
+            data = patterns[metric]
+
+            # Рекомендации по пику
+            peak_minute = data.get('peak_minute', 0)
+            if peak_minute < 15:
+                recommendations.append(
+                    f"🔥 {metric_name.capitalize()} достигает пика очень быстро ({peak_minute} мин) - "
+                    f"начинайте с самых сложных задач"
+                )
+            elif peak_minute > 45:
+                recommendations.append(
+                    f" {metric_name.capitalize()} растет медленно (пик на {peak_minute} мин) - "
+                    f"дайте себе время на раскачку"
+                )
+
+            # Рекомендации по спаду
+            time_to_drop = data.get('time_to_initial_drop', '')
+            if 'мин' in time_to_drop:
+                minutes = int(time_to_drop.split()[0])
+                if minutes < 20:
+                    recommendations.append(
+                        f"⚠️ {metric_name.capitalize()} падает уже через {minutes} мин - "
+                        f"делайте микро-перерывы каждые 15 минут"
+                    )
+                elif minutes > 60:
+                    recommendations.append(
+                        f"💪 Отличная устойчивость {metric_name} ({minutes} мин) - "
+                        f"можете работать длинными сессиями"
+                    )
+
+        # Рекомендации по синергии
+        if 'synergy' in patterns:
+            synergy = patterns['synergy']
+
+            # Корреляции
+            conc_energy = synergy.get('conc_energy_correlation', 0)
+            conc_interest = synergy.get('conc_interest_correlation', 0)
+
+            if conc_energy > 0.8:
+                recommendations.append(
+                    "⚡⚡ Энергия и концентрация сильно связаны - "
+                    "следите за сном и питанием для лучшей фокусировки"
+                )
+            elif conc_energy < 0.3:
+                recommendations.append(
+                    "🔋 Концентрация не зависит от энергии - "
+                    "можете эффективно работать даже при усталости"
+                )
+
+            if conc_interest > 0.8:
+                recommendations.append(
+                    "❤️🧠 Интерес критичен для концентрации - "
+                    "разбивайте скучные задачи на интересные подзадачи"
+                )
+
+            # Оптимальная длительность
+            synergy_drop = synergy.get('synergy_drop_minute')
+            if synergy_drop:
+                recommendations.append(
+                    f"⏱️ Оптимальная длительность сессии: {synergy_drop} минут. "
+                    f"После этого все метрики начинают падать"
+                )
+
+            # Пик синергии
+            peak_synergy = synergy.get('peak_synergy_minute')
+            if peak_synergy:
+                recommendations.append(
+                    f"🎯 Максимальная продуктивность на {peak_synergy}-й минуте - "
+                    f"планируйте самые важные задачи на это время"
+                )
+
+        # Общие рекомендации по сессиям
+        total_sessions = len(sessions)
+        if total_sessions > 0:
+            avg_duration = sum(s.duration_minutes or 0 for s in sessions) / total_sessions
+
+            if avg_duration < 25:
+                recommendations.append(
+                    "📝 Среднее время сессии меньше 25 минут - "
+                    "попробуйте технику Pomodoro (25 мин работа / 5 мин отдых)"
+                )
+            elif avg_duration > 90:
+                recommendations.append(
+                    "⏰ Среднее время сессии больше 90 минут - "
+                    "риск выгорания. Разбивайте на блоки по 45-60 минут"
+                )
+
+        # Если мало рекомендаций
+        if len(recommendations) < 3:
+            recommendations.append(
+                "💡 Продолжайте отслеживать метрики - "
+                "чем больше данных, тем точнее будут рекомендации"
+            )
+
+        return recommendations
