@@ -73,7 +73,6 @@ class FocusSetupView(QWidget):
         # ----- ЛЕВАЯ КОЛОНКА -----
         left_col = QWidget()
         left_col_layout = QVBoxLayout(left_col)
-        left_col_layout.setSpacing(20)
         left_col_layout.setContentsMargins(0, 0, 0, 0)
 
         # ПЛАШКА 1: Выбор темы
@@ -85,7 +84,7 @@ class FocusSetupView(QWidget):
                 border: none;
             }
         """)
-        topic_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        topic_widget.setMinimumHeight(120)  # Фиксированная минимальная высота
 
         topic_layout = QVBoxLayout(topic_widget)
         topic_layout.setContentsMargins(20, 16, 20, 16)
@@ -107,9 +106,16 @@ class FocusSetupView(QWidget):
         self.topic_selector = TopicTreeSelector(self._topic_controller)
         topic_layout.addWidget(self.topic_selector)
 
-        left_col_layout.addWidget(topic_widget, 1)
+        left_col_layout.addWidget(topic_widget)
 
-        # ПЛАШКА 2: Интервал контроля активности
+        main_row_layout.addWidget(left_col, 1)
+
+        # ----- ПРАВАЯ КОЛОНКА: Интервал контроля активности -----
+        right_col = QWidget()
+        right_col_layout = QVBoxLayout(right_col)
+        right_col_layout.setContentsMargins(0, 0, 0, 0)
+
+        # ПЛАШКА: Интервал контроля активности
         interval_widget = QFrame()
         interval_widget.setStyleSheet("""
             QFrame {
@@ -118,7 +124,7 @@ class FocusSetupView(QWidget):
                 border: none;
             }
         """)
-        interval_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        interval_widget.setMinimumHeight(120)  # Та же высота что и у левой
 
         interval_layout = QVBoxLayout(interval_widget)
         interval_layout.setContentsMargins(20, 16, 20, 16)
@@ -159,17 +165,12 @@ class FocusSetupView(QWidget):
         """)
         interval_layout.addWidget(self.interval_combo)
 
-        left_col_layout.addWidget(interval_widget, 1)
+        right_col_layout.addWidget(interval_widget)
 
-        main_row_layout.addWidget(left_col, 1)
-
-        # ----- ПРАВАЯ КОЛОНКА: ПУСТОЕ МЕСТО (звуки убраны) -----
-        # Добавляем спейсер, чтобы левая колонка не растягивалась на всю ширину
-        right_spacer = QWidget()
-        right_spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        main_row_layout.addWidget(right_spacer, 1)
+        main_row_layout.addWidget(right_col, 1)
 
         content_layout.addLayout(main_row_layout)
+
 
         # ========== КНОПКА НАЧАТЬ СЕССИЮ ==========
         button_layout = QHBoxLayout()
