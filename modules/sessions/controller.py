@@ -241,12 +241,11 @@ class SessionController(QObject):
 
             session_id = self._current_session.id
 
-            # Завершаем последний интервал
+            # Завершаем все незавершённые интервалы
             self.end_interval(session_id)
 
-            # 🆕 Вычисляем длительность из активных интервалов
-            intervals = self.get_session_intervals(session_id)
-            total_active_seconds = sum(i.get('duration_seconds', 0) for i in intervals)
+            # ✅ ИСПРАВЛЕНО: используем _elapsed_seconds для точной длительности
+            total_active_seconds = self._elapsed_seconds
             duration_minutes = total_active_seconds // 60
 
             if duration_minutes == 0 and total_active_seconds > 0:
@@ -254,41 +253,35 @@ class SessionController(QObject):
 
             status = 'auto_completed' if auto else 'completed'
 
-            # Используем локальное время для end_time
             from utils.local_time import now_local_iso
             end_time = now_local_iso()
 
-            # Обновляем end_time и другие поля напрямую
             try:
                 db.execute(
-                    """UPDATE sessions SET end_time = ?, duration_minutes = ?, status = ? 
+                    """UPDATE sessions SET end_time = ?, duration_minutes = ?, status = ?
                     WHERE id = ?""",
                     (end_time, duration_minutes, status, session_id)
                 )
             except Exception as e:
                 logger.error(f"Не удалось обновить сессию {session_id} в БД: {e}")
 
-            # Останавливаем таймер (но не удаляем)
             self._stop_timer()
-
             self.session_completed.emit(duration_minutes)
 
             self._current_session = None
             self._current_topic_id = None
             self._elapsed_seconds = 0
             self._is_paused = False
-            #self._last_slider_save_time = None
 
-            logger.info(f"Сессия {session_id} завершена, длительность: {duration_minutes} мин")
+            logger.info(
+                f"Сессия {session_id} завершена, длительность: {duration_minutes} мин ({total_active_seconds} сек)")
             return duration_minutes
         except Exception as e:
             logger.error(f"Ошибка завершения сессии: {e}", exc_info=True)
-            # Все равно очищаем состояние
             self._current_session = None
             self._current_topic_id = None
             self._elapsed_seconds = 0
             self._is_paused = False
-            #self._last_slider_save_time = None
             self._stop_timer()
             return 0
 
@@ -311,15 +304,19 @@ class SessionController(QObject):
             return 0
 
     def end_interval(self, session_id: int) -> int:
-        """Завершает текущий интервал и возвращает его длительность"""
+        """Завершает ВСЕ незавершённые интервалы и возвращает общую длительность"""
         try:
             from utils.local_time import now_local_iso
-            row = db.fetchone(
-                "SELECT id, start_time FROM session_intervals WHERE session_id = ? AND end_time IS NULL ORDER BY id DESC",
+            now = now_local_iso()
+
+            # ✅ ИСПРАВЛЕНО: получаем ВСЕ незавершённые интервалы, а не только последний
+            rows = db.fetchall(
+                "SELECT id, start_time FROM session_intervals WHERE session_id = ? AND end_time IS NULL ORDER BY id ASC",
                 (session_id,)
             )
-            if row:
-                now = now_local_iso()
+
+            total_duration = 0
+            for row in rows:
                 try:
                     start_time = datetime.fromisoformat(row['start_time'])
                     duration = int((datetime.now() - start_time).total_seconds())
@@ -332,14 +329,17 @@ class SessionController(QObject):
                         "UPDATE session_intervals SET end_time = ?, duration_seconds = ? WHERE id = ?",
                         (now, duration, row['id'])
                     )
+                    total_duration += duration
                 except Exception as e:
                     logger.warning(f"Не удалось обновить интервал {row['id']} в БД: {e}")
 
-                logger.debug(f"Завершен интервал {row['id']}, длительность: {duration} сек")
-                return duration
-            return 0
+            if rows:
+                logger.debug(
+                    f"Завершено {len(rows)} интервал(ов) для сессии {session_id}, общая длительность: {total_duration} сек")
+
+            return total_duration
         except Exception as e:
-            logger.error(f"Ошибка завершения интервала для сессии {session_id}: {e}", exc_info=True)
+            logger.error(f"Ошибка завершения интервалов для сессии {session_id}: {e}", exc_info=True)
             return 0
 
     def get_session_intervals(self, session_id: int) -> list:

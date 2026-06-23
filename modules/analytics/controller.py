@@ -88,21 +88,21 @@ class AnalyticsController:
         total_remain_minutes = total_minutes % 60
 
         # Средние показатели
-        all_concentration = []
+        all_focus = []
         all_energy = []
         all_interest = []
 
         for session in sessions:
             logs = self._get_session_logs(session.id)
             for log in logs:
-                if log['metric'] == 'concentration':
-                    all_concentration.append(log['value'])
+                if log['metric'] == 'focus':  # ✅ ИСПРАВЛЕНО: было 'concentration'
+                    all_focus.append(log['value'])
                 elif log['metric'] == 'energy':
                     all_energy.append(log['value'])
                 elif log['metric'] == 'interest':
                     all_interest.append(log['value'])
 
-        avg_concentration = sum(all_concentration) / len(all_concentration) if all_concentration else 0
+        avg_focus = sum(all_focus) / len(all_focus) if all_focus else 0  # ✅ ИСПРАВЛЕНО
         avg_energy = sum(all_energy) / len(all_energy) if all_energy else 0
         avg_interest = sum(all_interest) / len(all_interest) if all_interest else 0
 
@@ -119,7 +119,7 @@ class AnalyticsController:
             "total_minutes_remain": total_remain_minutes,
             "total_hours_display": f"{total_hours}ч {total_remain_minutes}м",  # <--- ДОБАВЛЯЕМ ЭТУ СТРОКУ
             "avg_duration": round(avg_duration, 1),
-            "avg_concentration": round(avg_concentration, 2),
+            "avg_concentration": round(avg_focus, 2),
             "avg_energy": round(avg_energy, 2),
             "avg_interest": round(avg_interest, 2),
             "first_session": first_session,
@@ -135,8 +135,7 @@ class AnalyticsController:
             (session_id,)
         )
 
-    def get_progress_trend(self, sessions: List[Session], metric: str = 'concentration') -> Tuple[
-        List[str], List[float]]:
+    def get_progress_trend(self, sessions: List[Session], metric: str = 'focus') -> Tuple[List[str], List[float]]:
         """Возвращает динамику метрики по сессиям"""
         if not sessions:
             return [], []
@@ -163,7 +162,7 @@ class AnalyticsController:
     def get_all_metrics_trend(self, sessions: List[Session]) -> Dict[str, Tuple[List[str], List[float]]]:
         """Возвращает динамику всех трёх метрик"""
         return {
-            'concentration': self.get_progress_trend(sessions, 'concentration'),
+            'concentration': self.get_progress_trend(sessions, 'focus'),
             'energy': self.get_progress_trend(sessions, 'energy'),
             'interest': self.get_progress_trend(sessions, 'interest')
         }
@@ -215,7 +214,7 @@ class AnalyticsController:
 
             logs = self._get_session_logs(session.id)
             for log in logs:
-                if log['metric'] == "concentration":
+                if log['metric'] == "focus":  # ✅ ИСПРАВЛЕНО: было "concentration"
                     day_stats[dow]["concentration"].append(log['value'])
                 elif log['metric'] == "energy":
                     day_stats[dow]["energy"].append(log['value'])
@@ -319,26 +318,34 @@ class AnalyticsController:
         session_stats = self.get_session_stats(sessions)
         task_stats = self.get_task_stats(tasks)
 
+        # ✅ ИСПРАВЛЕНО: используем total_hours_display вместо total_hours
         insights.append(
             f"📊 Всего проведено {session_stats['total_sessions']} сессий, "
-            f"общей длительностью {session_stats['total_hours']} часов."
+            f"общей длительностью {session_stats['total_hours_display']}."
         )
 
-        if session_stats['avg_concentration'] >= 4:
-            insights.append(f"🧠 Отличная концентрация! Средний показатель {session_stats['avg_concentration']}/5.")
-        elif session_stats['avg_concentration'] >= 3:
-            insights.append(f"🧠 Хорошая концентрация: {session_stats['avg_concentration']}/5.")
+        if session_stats['avg_concentration'] >= 70:
+            insights.append(f"🧠 Отличная концентрация! Средний показатель {session_stats['avg_concentration']}/100.")
+        elif session_stats['avg_concentration'] >= 50:
+            insights.append(f"🧠 Хорошая концентрация: {session_stats['avg_concentration']}/100.")
         else:
-            insights.append(f"🧠 Концентрация ниже среднего ({session_stats['avg_concentration']}/5).")
+            insights.append(f"🧠 Концентрация ниже среднего ({session_stats['avg_concentration']}/100).")
 
-        if session_stats['avg_energy'] >= 4:
-            insights.append(f"⚡ Энергия на высоте! Средний показатель {session_stats['avg_energy']}/5.")
-        elif session_stats['avg_energy'] <= 2:
-            insights.append(f"⚡ Уровень энергии низкий ({session_stats['avg_energy']}/5).")
+        if session_stats['avg_energy'] >= 70:
+            insights.append(f"⚡ Энергия на высоте! Средний показатель {session_stats['avg_energy']}/100.")
+        elif session_stats['avg_energy'] <= 30:
+            insights.append(f"⚡ Уровень энергии низкий ({session_stats['avg_energy']}/100).")
+
+        # ✅ ИСПРАВЛЕНО: добавлен анализ интереса
+        if session_stats['avg_interest'] >= 70:
+            insights.append(f"❤️ Отличный интерес! Средний показатель {session_stats['avg_interest']}/100.")
+        elif session_stats['avg_interest'] <= 30:
+            insights.append(
+                f"❤️ Интерес низкий ({session_stats['avg_interest']}/100). Попробуйте более увлекательные темы.")
 
         best_hour, best_value = self.get_best_hour(sessions)
         if best_value > 0:
-            insights.append(f"⏰ Лучшее время для занятий: {best_hour:02d}:00 (концентрация {best_value:.1f}/5).")
+            insights.append(f"⏰ Лучшее время для занятий: {best_hour:02d}:00 (концентрация {best_value:.1f}/100).")
 
         if task_stats['total'] > 0:
             insights.append(
@@ -435,7 +442,7 @@ class AnalyticsController:
                 tid = session_to_topic[sid]['topic_id']
                 metric = log['metric']
                 val = log['value']
-                if metric == 'concentration':
+                if metric == 'focus':  # ✅ ИСПРАВЛЕНО: было 'concentration'
                     stats[tid]['conc'].append(val)
                 elif metric == 'energy':
                     stats[tid]['energy'].append(val)
@@ -472,7 +479,7 @@ class AnalyticsController:
         result = []
         for s in sessions:
             logs = self._get_session_logs(s.id)
-            conc = [l['value'] for l in logs if l['metric'] == 'concentration']
+            conc = [l['value'] for l in logs if l['metric'] == 'focus']
             energy = [l['value'] for l in logs if l['metric'] == 'energy']
             interest = [l['value'] for l in logs if l['metric'] == 'interest']
 
@@ -513,7 +520,7 @@ class AnalyticsController:
 
             logs = self._get_session_logs(s.id)
             for log in logs:
-                if log['metric'] == 'concentration':
+                if log['metric'] == 'focus':  # ✅ ИСПРАВЛЕНО: было 'concentration'
                     stats[tid]['conc'].append(log['value'])
                 elif log['metric'] == 'energy':
                     stats[tid]['energy'].append(log['value'])
@@ -540,7 +547,6 @@ class AnalyticsController:
         topics_map = {t['id']: t for t in all_topics}
         folders = {t['id']: t for t in all_topics if t['type'] == 'folder'}
 
-        # Маппинг topic_id -> folder_id (ищем ближайшую папку в иерархии родителей)
         topic_to_folder = {}
         for t in all_topics:
             if t['type'] == 'topic':
@@ -560,7 +566,6 @@ class AnalyticsController:
             'conc': [], 'energy': [], 'interest': []
         } for fid, folder in folders.items()}
 
-        # Виртуальная папка для тем без папки
         stats[-1] = {
             'folder_name': 'Без папки',
             'session_count': 0,
@@ -580,7 +585,8 @@ class AnalyticsController:
                 stats[fid]['total_minutes'] += s.duration_minutes or 0
                 logs = self._get_session_logs(s.id)
                 for log in logs:
-                    if log['metric'] == 'concentration':
+                    if log['metric'] == 'focus':
+                        # ✅ ИСПРАВЛЕНО: было stats[tid], должно быть stats[fid]
                         stats[fid]['conc'].append(log['value'])
                     elif log['metric'] == 'energy':
                         stats[fid]['energy'].append(log['value'])
@@ -589,7 +595,7 @@ class AnalyticsController:
 
         result = []
         for fid, data in stats.items():
-            if data['session_count'] > 0:  # Показываем только папки, где были сессии
+            if data['session_count'] > 0:
                 result.append({
                     'folder_name': data['folder_name'],
                     'session_count': data['session_count'],
@@ -631,7 +637,7 @@ class AnalyticsController:
 
         # Анализируем каждую метрику
         result = {}
-        for metric in ['concentration', 'energy', 'interest']:
+        for metric in ['focus', 'energy', 'interest']:  # ✅ ИСПРАВЛЕНО: было 'concentration'
             metric_data = [t for t in timeline if t['metric'] == metric]
             if not metric_data:
                 continue
@@ -730,11 +736,11 @@ class AnalyticsController:
         # Находим минуты где все метрики высокие
         high_synergy_minutes = []
         for minute, metrics in by_minute.items():
-            if all(metrics.get(m, 0) >= 70 for m in ['concentration', 'energy', 'interest']):
+            if all(metrics.get(m, 0) >= 70 for m in ['focus', 'energy', 'interest']):  # ✅ ИСПРАВЛЕНО
                 high_synergy_minutes.append(minute)
 
         # Анализируем корреляции
-        conc_values = [t['value'] for t in timeline if t['metric'] == 'concentration']
+        conc_values = [t['value'] for t in timeline if t['metric'] == 'focus']
         energy_values = [t['value'] for t in timeline if t['metric'] == 'energy']
         interest_values = [t['value'] for t in timeline if t['metric'] == 'interest']
 

@@ -665,11 +665,19 @@ class AnalyticsView(QWidget):
                 self.patterns_frame.hide()
                 return
 
+            # ✅ ИСПРАВЛЕНО: используем 'focus' вместо 'concentration'
+            # Но в UI показываем как 'concentration' для пользователя
+            metric_mapping = {
+                'focus': 'concentration',  # В БД 'focus', в UI 'concentration'
+                'energy': 'energy',
+                'interest': 'interest'
+            }
+
             # Обновляем карточки метрик
-            for metric in ['concentration', 'energy', 'interest']:
-                if metric in patterns and self.metric_cards.get(f"{metric}_labels"):
-                    labels = self.metric_cards[f"{metric}_labels"]
-                    data = patterns[metric]
+            for db_metric, ui_metric in metric_mapping.items():
+                if db_metric in patterns and self.metric_cards.get(f"{ui_metric}_labels"):
+                    labels = self.metric_cards[f"{ui_metric}_labels"]
+                    data = patterns[db_metric]
 
                     if 'peak_time' in labels:
                         labels['peak_time'].setText(f"{data.get('peak_time', '—')} ({data.get('peak_value', 0)})")
@@ -685,14 +693,13 @@ class AnalyticsView(QWidget):
                 synergy = patterns['synergy']
                 recommendations = synergy.get('recommendations', [])
 
-                # Добавляем детальные рекомендации
                 detailed_recs = self._analytics_controller.generate_detailed_recommendations(
                     sessions, patterns
                 )
                 all_recommendations = recommendations + detailed_recs
 
                 if all_recommendations:
-                    html_rec = "<br><br>".join([f"• {rec}" for rec in all_recommendations[:5]])  # Показываем топ-5
+                    html_rec = "<br><br>".join([f"• {rec}" for rec in all_recommendations[:5]])
                     self.synergy_label.setText(f"<b>💡 Рекомендации по оптимизации:</b><br><br>{html_rec}")
                     self.synergy_label.show()
                 else:
