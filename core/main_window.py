@@ -48,6 +48,7 @@ class MainWindow(QMainWindow):
             self._setup_navigation()
             self._setup_hotkeys()
             self._connect_signals()
+            self.focus_setup_view.resume_session.connect(self._resume_session_from_setup)
 
             # Проверяем, нужно ли показать онбординг
             self._check_onboarding()
@@ -182,6 +183,15 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.error(f"Ошибка обновления размера иконок: {e}", exc_info=True)
 
+    def _resume_session_from_setup(self, session_id: int, topic_id: int, topic_name: str):
+        """Возобновляет сессию из setup_view"""
+        try:
+            self.focus_active_view.resume_existing_session(session_id, topic_id, topic_name)
+            self.content_stack.setCurrentWidget(self.focus_active_view)
+            self.statusBar().showMessage(f"Сессия возобновлена: {topic_name}", 2000)
+        except Exception as e:
+            logger.error(f"Ошибка возобновления сессии: {e}", exc_info=True)
+
     def _create_views(self):
         """Создаёт все вьюхи модулей"""
         c = container
@@ -289,7 +299,18 @@ class MainWindow(QMainWindow):
             }
             section = section_map.get(row)
             if section:
-                self.navigation.navigate_to(section)
+                # ✅ ИСПРАВЛЕНО: проверяем, активна ли уже эта секция
+                current_view = self.content_stack.currentWidget()
+                target_view = self._get_view_for_section(section)
+
+                if current_view == target_view:
+                    # Если кликнули на активную вкладку — сбрасываем view
+                    if hasattr(current_view, 'reset_view'):
+                        current_view.reset_view()
+                    elif hasattr(current_view, 'refresh'):
+                        current_view.refresh()
+                else:
+                    self.navigation.navigate_to(section)
         except Exception as e:
             logger.error(f"Ошибка клика по сайдбару (row={row}): {e}", exc_info=True)
 
@@ -450,6 +471,19 @@ class MainWindow(QMainWindow):
                 lambda: self.navigation.navigate_to(NavSection.TASKS)
             )
 
+            # Dashboard обновление при изменении задач
+            event_bus.task_created.connect(lambda tid: self._refresh_dashboard())
+            event_bus.task_completed.connect(lambda tid: self._refresh_dashboard())
+            event_bus.task_deleted.connect(lambda tid: self._refresh_dashboard())
+
+            # Dashboard обновление при изменении заметок
+            event_bus.note_created.connect(lambda nid: self._refresh_dashboard())
+            event_bus.note_deleted.connect(lambda nid: self._refresh_dashboard())
+
+            # Dashboard обновление при изменении карточек
+            event_bus.flashcard_created.connect(lambda cid: self._refresh_dashboard())
+            event_bus.flashcard_deleted.connect(lambda cid: self._refresh_dashboard())
+
             # Topics tree
             self.topics_view.topic_selected.connect(
                 lambda topic_id: self.navigation.navigate_to(NavSection.TOPICS, topic_id)
@@ -513,7 +547,8 @@ class MainWindow(QMainWindow):
             event_bus.task_updated.connect(lambda tid: self._refresh_tasks())
             event_bus.flashcard_created.connect(lambda cid: self._refresh_flashcards())
             event_bus.flashcard_deleted.connect(lambda cid: self._refresh_flashcards())
-            event_bus.task_created.connect(lambda tid: self._refresh_dashboard())
+            event_bus.task_updated.connect(lambda tid: self._refresh_dashboard())
+            event_bus.note_updated.connect(lambda nid: self._refresh_dashboard())
 
             # Sessions History
             self.sessions_history_view.session_resumed.connect(self._resume_session_from_history)
@@ -735,7 +770,8 @@ class MainWindow(QMainWindow):
         """Открыть запись в режиме чтения"""
         try:
             from core.di.container import container
-            from PySide6.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QLabel, QPushButton, QFrame
+            from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton
+            from modules.notes.reader import NoteReader  # ✅ Импортируем NoteReader
 
             note = container.note_controller.get_note(note_id)
             if not note:
@@ -757,15 +793,11 @@ class MainWindow(QMainWindow):
             title_label.setStyleSheet("font-size: 20px; font-weight: bold;")
             layout.addWidget(title_label)
 
-            separator = QFrame()
-            separator.setFrameShape(QFrame.HLine)
-            layout.addWidget(separator)
-
-            content_text = QTextEdit()
-            content_text.setPlainText(note.content)
-            content_text.setReadOnly(True)
-            content_text.setStyleSheet("""
-                QTextEdit {
+            # ✅ ИСПРАВЛЕНО: используем NoteReader вместо QTextEdit
+            content_reader = NoteReader()
+            content_reader.display_note(note.title, note.content)
+            content_reader.setStyleSheet("""
+                QTextBrowser {
                     font-size: 12px;
                     background-color: #fafafa;
                     border: 1px solid #ddd;
@@ -773,7 +805,7 @@ class MainWindow(QMainWindow):
                     padding: 10px;
                 }
             """)
-            layout.addWidget(content_text, 1)
+            layout.addWidget(content_reader, 1)
 
             back_btn = QPushButton("← Назад к теме")
             back_btn.setFixedWidth(150)
@@ -782,8 +814,11 @@ class MainWindow(QMainWindow):
 
             self.content_stack.addWidget(self._current_reader)
             self.content_stack.setCurrentWidget(self._current_reader)
+
+            logger.debug(f"Открыта заметка {note_id} в режиме чтения")
         except Exception as e:
             logger.error(f"Ошибка открытия читалки заметки {note_id}: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось открыть заметку: {e}")
 
     def _close_reader(self):
         """Закрывает виджет чтения и возвращает к теме"""
@@ -862,7 +897,9 @@ class MainWindow(QMainWindow):
                     if self.content_stack.currentWidget() == self.topic_view:
                         self.topic_view.refresh()
 
+                    # ✅ ИСПРАВЛЕНО: обновляем все связанные view
                     self._refresh_dashboard()
+                    self._refresh_tasks()
         except Exception as e:
             logger.error(f"Ошибка создания задачи: {e}", exc_info=True)
             SilentMessageBox.warning(self, "Ошибка", f"Не удалось создать задачу: {e}")
@@ -877,6 +914,8 @@ class MainWindow(QMainWindow):
                 if dialog.exec():
                     self._refresh_topics()
                     self.topic_view.refresh()
+                    # ✅ ИСПРАВЛЕНО: обновляем tasks_view
+                    self._refresh_tasks()
         except Exception as e:
             logger.error(f"Ошибка редактирования задачи {task_id}: {e}", exc_info=True)
 
@@ -888,6 +927,8 @@ class MainWindow(QMainWindow):
                 container.task_controller.delete_task(task_id)
                 self._refresh_topics()
                 self.topic_view.refresh()
+                # ✅ ИСПРАВЛЕНО: обновляем tasks_view
+                self._refresh_tasks()
         except Exception as e:
             logger.error(f"Ошибка удаления задачи {task_id}: {e}", exc_info=True)
 
@@ -897,6 +938,8 @@ class MainWindow(QMainWindow):
             container.task_controller.complete_task(task_id)
             self._refresh_topics()
             self.topic_view.refresh()
+            # ✅ ИСПРАВЛЕНО: обновляем tasks_view
+            self._refresh_tasks()
         except Exception as e:
             logger.error(f"Ошибка завершения задачи {task_id}: {e}", exc_info=True)
 
@@ -913,7 +956,14 @@ class MainWindow(QMainWindow):
                     container.flashcard_controller.create_free_card(topic_id, data['content'])
                 else:
                     container.flashcard_controller.create_qa_card(topic_id, data['question'], data['answer'])
+
+                # ✅ ИСПРАВЛЕНО: обновляем все связанные view
                 self._refresh_dashboard()
+                self._refresh_flashcards()  # ← ДОБАВЛЕНО
+
+                # Если открыта тема - обновляем её
+                if self.content_stack.currentWidget() == self.topic_view:
+                    self.topic_view.refresh()
         except Exception as e:
             logger.error(f"Ошибка создания карточки: {e}", exc_info=True)
 

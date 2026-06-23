@@ -25,8 +25,9 @@ class SearchBarWidget(QWidget):
         self._connect_signals()
 
     def _setup_ui(self):
-        """Настраивает интерфейс"""
+        """Настраивает интерфейс поисковой строки"""
         try:
+            # ✅ ИСПРАВЛЕНО: восстанавливаем правильный код для SearchBarWidget
             layout = QHBoxLayout(self)
             layout.setContentsMargins(0, 0, 0, 0)
             layout.setSpacing(5)
@@ -35,18 +36,55 @@ class SearchBarWidget(QWidget):
             self.search_edit = QLineEdit()
             self.search_edit.setPlaceholderText("🔍 Поиск...")
             self.search_edit.setClearButtonEnabled(True)
+            self.search_edit.setStyleSheet("""
+                QLineEdit {
+                    background-color: #F0F4F8;
+                    border: 1px solid #E6EEF6;
+                    border-radius: 8px;
+                    padding: 8px 12px;
+                    font-size: 13px;
+                }
+                QLineEdit:focus {
+                    border: 1px solid #3B82F6;
+                    background-color: #FFFFFF;
+                }
+            """)
             layout.addWidget(self.search_edit, 1)
 
             # Кнопка поиска
             self.search_btn = QPushButton("🔍")
-            self.search_btn.setFixedWidth(30)
+            self.search_btn.setFixedWidth(40)
             self.search_btn.setToolTip("Поиск (Ctrl+F)")
+            self.search_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #3B82F6;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                }
+                QPushButton:hover {
+                    background-color: #2563EB;
+                }
+            """)
             layout.addWidget(self.search_btn)
 
             # Кнопка очистки
             self.clear_btn = QPushButton("✖")
-            self.clear_btn.setFixedWidth(30)
+            self.clear_btn.setFixedWidth(40)
             self.clear_btn.setToolTip("Очистить")
+            self.clear_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #F0F4F8;
+                    color: #6B7280;
+                    border: 1px solid #E6EEF6;
+                    border-radius: 8px;
+                    font-size: 14px;
+                }
+                QPushButton:hover {
+                    background-color: #E2E8F0;
+                }
+            """)
             layout.addWidget(self.clear_btn)
 
             # Настройка автодополнения
@@ -54,14 +92,19 @@ class SearchBarWidget(QWidget):
             self.completer.setCaseSensitivity(Qt.CaseInsensitive)
             self.completer.setFilterMode(Qt.MatchContains)
             self.search_edit.setCompleter(self.completer)
+
+            logger.debug("SearchBarWidget инициализирован")
         except Exception as e:
             logger.error(f"Ошибка настройки SearchBarWidget: {e}", exc_info=True)
 
     def _connect_signals(self):
         """Подключает сигналы"""
-        self.search_btn.clicked.connect(self._on_search)
-        self.clear_btn.clicked.connect(self._on_clear)
-        self.search_edit.returnPressed.connect(self._on_search)
+        try:
+            self.search_btn.clicked.connect(self._on_search)
+            self.clear_btn.clicked.connect(self._on_clear)
+            self.search_edit.returnPressed.connect(self._on_search)
+        except Exception as e:
+            logger.error(f"Ошибка подключения сигналов SearchBarWidget: {e}", exc_info=True)
 
     def _on_search(self):
         """Обработчик поиска"""
@@ -147,8 +190,8 @@ class SearchResultItemWidget(QWidget):
         """Настраивает интерфейс"""
         try:
             layout = QVBoxLayout(self)
-            layout.setContentsMargins(10, 8, 10, 8)
-            layout.setSpacing(4)
+            layout.setContentsMargins(12, 10, 12, 10)  # ✅ Увеличили отступы
+            layout.setSpacing(6)
 
             # ✅ ИСПРАВЛЕНО: безопасное получение type
             result_type = self.result.get('type', '')
@@ -161,74 +204,97 @@ class SearchResultItemWidget(QWidget):
 
             # Заголовок
             header_layout = QHBoxLayout()
+            header_layout.setSpacing(8)
 
             icon_label = QLabel(self.result.get('icon', '📄'))
-            icon_label.setStyleSheet("font-size: 16px;")
+            icon_label.setStyleSheet("font-size: 18px;")
             header_layout.addWidget(icon_label)
 
             title_label = QLabel(self.result.get('title', 'Без названия'))
-            title_label.setStyleSheet("font-weight: bold; font-size: 14px;")
-            header_layout.addWidget(title_label)
+            title_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #1F2937;")
+            title_label.setWordWrap(True)
+            header_layout.addWidget(title_label, 1)
 
             header_layout.addStretch()
 
-            # Тип и тема
+            # Тип
             type_text = self._get_type_text(result_type)
             type_label = QLabel(type_text)
-            type_label.setStyleSheet("color: #888888; font-size: 10px;")
+            type_label.setStyleSheet("""
+                background-color: #F0F4F8;
+                color: #6B7280;
+                font-size: 10px;
+                padding: 2px 8px;
+                border-radius: 4px;
+            """)
             header_layout.addWidget(type_label)
 
             layout.addLayout(header_layout)
 
             # Информация в зависимости от типа
             if result_type == 'note':
-                snippet_label = QLabel(self.result.get('snippet', ''))
-                snippet_label.setStyleSheet("color: #666666; font-size: 12px;")
-                snippet_label.setWordWrap(True)
-                layout.addWidget(snippet_label)
+                snippet = self.result.get('snippet', '')
+                if snippet:
+                    snippet_label = QLabel(snippet)
+                    snippet_label.setStyleSheet("color: #666666; font-size: 12px; margin-top: 4px;")
+                    snippet_label.setWordWrap(True)
+                    snippet_label.setMaximumHeight(60)
+                    layout.addWidget(snippet_label)
 
-                topic_label = QLabel(f"📁 {self.result.get('topic_name', '—')}")
-                topic_label.setStyleSheet("color: #888888; font-size: 10px;")
-                layout.addWidget(topic_label)
+                topic_name = self.result.get('topic_name')
+                if topic_name:
+                    topic_label = QLabel(f"📁 {topic_name}")
+                    topic_label.setStyleSheet("color: #888888; font-size: 10px; margin-top: 4px;")
+                    layout.addWidget(topic_label)
 
             elif result_type == 'task':
-                status_label = QLabel(self.result.get('status_text', ''))
-                status_label.setStyleSheet("color: #888888; font-size: 10px;")
-                layout.addWidget(status_label)
+                status_text = self.result.get('status_text', '')
+                if status_text:
+                    status_label = QLabel(status_text)
+                    status_label.setStyleSheet("color: #888888; font-size: 10px; margin-top: 4px;")
+                    layout.addWidget(status_label)
 
                 deadline = self.result.get('deadline')
                 if deadline:
                     deadline_label = QLabel(f"⏰ Дедлайн: {str(deadline)[:10]}")
-                    deadline_label.setStyleSheet("color: #888888; font-size: 10px;")
+                    deadline_label.setStyleSheet("color: #888888; font-size: 10px; margin-top: 4px;")
                     layout.addWidget(deadline_label)
 
             elif result_type == 'flashcard':
                 if self.result.get('card_type') == 'free':
                     content = self.result.get('content', '')
-                    content_label = QLabel(content[:100] if content else '')
-                    content_label.setStyleSheet("color: #666666; font-size: 12px;")
-                    content_label.setWordWrap(True)
-                    layout.addWidget(content_label)
+                    if content:
+                        content_label = QLabel(content[:150] + "..." if len(content) > 150 else content)
+                        content_label.setStyleSheet("color: #666666; font-size: 12px; margin-top: 4px;")
+                        content_label.setWordWrap(True)
+                        content_label.setMaximumHeight(60)
+                        layout.addWidget(content_label)
                 else:
                     question = self.result.get('question', '')
-                    question_label = QLabel(f"Вопрос: {question[:80] if question else ''}")
-                    question_label.setStyleSheet("color: #666666; font-size: 12px;")
-                    question_label.setWordWrap(True)
-                    layout.addWidget(question_label)
+                    if question:
+                        question_label = QLabel(f"Вопрос: {question[:100]}{'...' if len(question) > 100 else ''}")
+                        question_label.setStyleSheet("color: #666666; font-size: 12px; margin-top: 4px;")
+                        question_label.setWordWrap(True)
+                        question_label.setMaximumHeight(60)
+                        layout.addWidget(question_label)
 
-                topic_label = QLabel(f"📁 {self.result.get('topic_name', '—')}")
-                topic_label.setStyleSheet("color: #888888; font-size: 10px;")
-                layout.addWidget(topic_label)
+                topic_name = self.result.get('topic_name')
+                if topic_name:
+                    topic_label = QLabel(f"📁 {topic_name}")
+                    topic_label.setStyleSheet("color: #888888; font-size: 10px; margin-top: 4px;")
+                    layout.addWidget(topic_label)
 
             elif result_type == 'topic':
                 path = self.result.get('path')
                 if path:
                     path_label = QLabel(f"📁 {path}")
-                    path_label.setStyleSheet("color: #888888; font-size: 10px;")
+                    path_label.setStyleSheet("color: #888888; font-size: 10px; margin-top: 4px;")
                     layout.addWidget(path_label)
+
+            # ✅ Добавляем минимальную высоту
+            self.setMinimumHeight(60)
         except Exception as e:
             logger.error(f"Ошибка настройки SearchResultItemWidget: {e}", exc_info=True)
-            # Показываем fallback
             layout = self.layout()
             if layout is None:
                 layout = QVBoxLayout(self)

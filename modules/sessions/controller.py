@@ -49,12 +49,15 @@ class SessionController(QObject):
         self._is_paused: bool = False
         self._start_time: Optional[datetime] = None
 
-        # 🆕 ОДИН таймер на весь жизненный цикл контроллера
         self._timer = QTimer()
         self._timer.timeout.connect(self._on_timer_tick)
 
-        # Для ограничения сохранения ползунков (не чаще раза в минуту)
-        self._last_slider_save_time: Optional[datetime] = None
+        # ✅ ИСПРАВЛЕНО: отдельный таймер для каждой метрики
+        self._last_log_time: Dict[str, datetime] = {
+            'focus': None,
+            'energy': None,
+            'interest': None
+        }
 
         logger.debug("SessionController инициализирован")
 
@@ -114,7 +117,7 @@ class SessionController(QObject):
             self._current_topic_id = topic_id
             self._elapsed_seconds = 0
             self._is_paused = False
-            self._last_slider_save_time = None
+           #self._last_slider_save_time = None
 
             # Создаём запись в БД
             session_id = self._session_repo.create(topic_id)
@@ -168,7 +171,7 @@ class SessionController(QObject):
 
             self._current_session = Session.from_row(row)
             self._current_topic_id = row['topic_id']
-            self._last_slider_save_time = None
+            #self._last_slider_save_time = None
 
             # 🆕 Восстанавливаем время из elapsed_seconds
             self._elapsed_seconds = row.get('elapsed_seconds', 0) or 0
@@ -274,7 +277,7 @@ class SessionController(QObject):
             self._current_topic_id = None
             self._elapsed_seconds = 0
             self._is_paused = False
-            self._last_slider_save_time = None
+            #self._last_slider_save_time = None
 
             logger.info(f"Сессия {session_id} завершена, длительность: {duration_minutes} мин")
             return duration_minutes
@@ -285,7 +288,7 @@ class SessionController(QObject):
             self._current_topic_id = None
             self._elapsed_seconds = 0
             self._is_paused = False
-            self._last_slider_save_time = None
+            #self._last_slider_save_time = None
             self._stop_timer()
             return 0
 
@@ -358,15 +361,21 @@ class SessionController(QObject):
             if not self._current_session:
                 return
 
+            # ✅ ИСПРАВЛЕНО: сразу сохраняем значение ползунка в БД
+            self.save_slider_value(metric, value)
+
             now = datetime.now()
 
-            should_save = False
-            if self._last_slider_save_time is None:
-                should_save = True
-            elif (now - self._last_slider_save_time).total_seconds() >= 60:
-                should_save = True
+            # ✅ ИСПРАВЛЕНО: проверяем таймер для конкретной метрики
+            should_log = False
+            last_time = self._last_log_time.get(metric)
 
-            if should_save:
+            if last_time is None:
+                should_log = True
+            elif (now - last_time).total_seconds() >= 60:
+                should_log = True
+
+            if should_log:
                 minute = self.get_duration_minutes()
                 try:
                     self._state_log_repo.create(
@@ -375,11 +384,10 @@ class SessionController(QObject):
                         value=value,
                         minute=minute
                     )
+                    self._last_log_time[metric] = now
+                    logger.debug(f"Залогировано состояние {metric}={value} на {minute} минуте")
                 except Exception as e:
                     logger.warning(f"Не удалось сохранить лог состояния в БД: {e}")
-
-                self.save_slider_value(metric, value)
-                self._last_slider_save_time = now
 
             self.state_changed.emit(metric, value)
         except Exception as e:

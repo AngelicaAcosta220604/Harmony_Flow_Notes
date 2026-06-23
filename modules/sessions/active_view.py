@@ -361,6 +361,15 @@ class FocusActiveView(QWidget):
 
             if reply == SilentMessageBox.Yes:
                 duration = self._session_controller.end_session()
+
+                # ✅ ИСПРАВЛЕНО: останавливаем музыку при завершении сессии
+                try:
+                    self._music_controller.stop()
+                    self.music_widget._update_play_button()
+                    logger.info("Музыка остановлена при завершении сессии")
+                except Exception as e:
+                    logger.warning(f"Не удалось остановить музыку: {e}")
+
                 self.session_ended.emit(duration)
                 logger.info(f"Сессия завершена, длительность: {duration} мин")
         except Exception as e:
@@ -390,6 +399,7 @@ class FocusActiveView(QWidget):
     def _on_state_changed(self, metric: str, value: int):
         """Обработчик изменения состояния"""
         try:
+            # ✅ ИСПРАВЛЕНО: log_state() теперь сам сохраняет значение в БД сразу
             self._session_controller.log_state(metric, value)
             self.ping_manager.reset_idle()
         except Exception as e:
@@ -474,9 +484,9 @@ class FocusActiveView(QWidget):
             session_id = self._session_controller.get_current_session_id()
             if session_id:
                 values = self.state_sliders.get_values()
-                # Маппинг: concentration -> focus (в БД колонка focus)
+                # ✅ ИСПРАВЛЕНО: используем правильный ключ 'focus'
                 self._session_controller.save_slider_values(
-                    values.get('concentration', 50),  # conc_slider -> focus
+                    values.get('focus', 50),  # ← Было 'concentration'
                     values.get('energy', 50),
                     values.get('interest', 50)
                 )
@@ -502,14 +512,17 @@ class FocusActiveView(QWidget):
             success = self._session_controller.load_and_resume_session(session_id)
             if not success:
                 SilentMessageBox.warning(self, "Ошибка", "Не удалось загрузить сессию")
-                logger.warning(f"Не удалось загрузить сессию {session_id}")
                 return
 
-            # 🆕 Восстанавливаем время из контроллера (оно уже загружено из БД)
+            # 🆕 Восстанавливаем время из контроллера
             total_seconds = self._session_controller.get_elapsed_seconds()
             self.timer.set_time(total_seconds)
 
+            # ✅ ИСПРАВЛЕНО: восстанавливаем ползунки из БД
             slider_values = self._session_controller.get_slider_values(session_id)
+            logger.info(f"Восстановленные ползунки: {slider_values}")
+
+            # ✅ ИСПРАВЛЕНО: обращаемся к слайдерам напрямую, без ['slider']
             self.state_sliders.conc_slider.setValue(slider_values.get('focus', 50))
             self.state_sliders.energy_slider.setValue(slider_values.get('energy', 50))
             self.state_sliders.interest_slider.setValue(slider_values.get('interest', 50))
@@ -518,13 +531,11 @@ class FocusActiveView(QWidget):
                 self.status_label.setText("Сессия активна")
                 self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
                 self.pause_btn.setText("Пауза")
-                # ✅ ИСПРАВЛЕНО: используем get_resource_path
                 self.pause_btn.setIcon(QIcon(str(get_resource_path("resources/icons/pause1.png"))))
             else:
                 self.status_label.setText("Сессия на паузе")
                 self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
                 self.pause_btn.setText("Возобновить")
-                # ✅ ИСПРАВЛЕНО: используем get_resource_path
                 self.pause_btn.setIcon(QIcon(str(get_resource_path("resources/icons/play1.png"))))
 
             self.ping_manager = PingManager(
@@ -535,7 +546,7 @@ class FocusActiveView(QWidget):
             self.ping_manager.pingNeeded.connect(self._show_ping_dialog)
             self.ping_manager.timeoutReached.connect(self._auto_pause_from_ping)
 
-            # 🎵 Возобновляем музыку, если она была включена
+            # 🎵 Возобновляем музыку
             current_sound = self._music_controller.get_current_sound()
             if current_sound and current_sound != 'off':
                 self.music_widget.refresh()
@@ -546,3 +557,4 @@ class FocusActiveView(QWidget):
         except Exception as e:
             logger.error(f"Ошибка возобновления сессии {session_id}: {e}", exc_info=True)
             SilentMessageBox.warning(self, "Ошибка", f"Не удалось возобновить сессию: {e}")
+

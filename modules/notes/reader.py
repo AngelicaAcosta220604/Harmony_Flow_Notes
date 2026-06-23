@@ -33,11 +33,12 @@ class NoteReader(QTextBrowser):
         Отображает заметку с заголовком и содержимым
         """
         try:
+            # ✅ ИСПРАВЛЕНО: используем setHtml вместо setPlainText
             html = f"""
-            <h1>{self._escape_html(title)}</h1>
-            <hr>
-            {content}
-            """
+                <h1>{self._escape_html(title)}</h1>
+                <hr>
+                {content}
+                """
             self.setHtml(html)
         except Exception as e:
             logger.error(f"Ошибка отображения заметки: {e}", exc_info=True)

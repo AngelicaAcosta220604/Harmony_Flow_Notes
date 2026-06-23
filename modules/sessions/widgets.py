@@ -6,7 +6,9 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer, Signal, QSize
 from PySide6.QtGui import QFont
 
+import logging
 
+logger = logging.getLogger(__name__)
 class CustomTimer(QWidget):
     """Виджет таймера для отображения времени сессии."""
 

@@ -346,3 +346,15 @@ class TopicsView(QWidget):
 
     def select_topic(self, topic_id: int):
         self.tree.select_topic(topic_id)
+
+    def reset_view(self):
+        """Сбрасывает view к начальному состоянию"""
+        try:
+            self.refresh()
+            # Снимаем выделение
+            self.tree.clearSelection()
+            # Сворачиваем все папки
+            self.tree.collapseAll()
+            logger.debug("TopicsView сброшен")
+        except Exception as e:
+            logger.error(f"Ошибка сброса TopicsView: {e}", exc_info=True)
