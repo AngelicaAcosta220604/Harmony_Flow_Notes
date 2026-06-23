@@ -109,18 +109,28 @@ class StateSliders(QWidget):
         layout.addLayout(self.interest_layout)
 
     def _connect_signals(self):
-        # 🆕 Изменяем "concentration" на "focus" для консистентности с БД
-        self.conc_slider.valueChanged.connect(lambda v: self._on_value_changed("focus", v))
-        self.energy_slider.valueChanged.connect(lambda v: self._on_value_changed("energy", v))
-        self.interest_slider.valueChanged.connect(lambda v: self._on_value_changed("interest", v))
+        # ✅ ИСПРАВЛЕНО: сохраняем только при отпускании ползунка
+        self.conc_slider.valueChanged.connect(lambda v: self._on_value_preview("focus", v))
+        self.conc_slider.sliderReleased.connect(lambda: self._on_value_changed("focus", self.conc_slider.value()))
 
-    def _on_value_changed(self, metric: str, value: int):
+        self.energy_slider.valueChanged.connect(lambda v: self._on_value_preview("energy", v))
+        self.energy_slider.sliderReleased.connect(lambda: self._on_value_changed("energy", self.energy_slider.value()))
+
+        self.interest_slider.valueChanged.connect(lambda v: self._on_value_preview("interest", v))
+        self.interest_slider.sliderReleased.connect(
+            lambda: self._on_value_changed("interest", self.interest_slider.value()))
+
+    def _on_value_preview(self, metric: str, value: int):
+        """Обновляет только отображение значения (без сохранения в БД)"""
         if metric == "focus":
             self.conc_value_label.setText(str(value))
         elif metric == "energy":
             self.energy_value_label.setText(str(value))
         elif metric == "interest":
             self.interest_value_label.setText(str(value))
+
+    def _on_value_changed(self, metric: str, value: int):
+        """Сохраняет значение при отпускании ползунка"""
         self.state_changed.emit(metric, value)
 
     def get_values(self) -> dict:

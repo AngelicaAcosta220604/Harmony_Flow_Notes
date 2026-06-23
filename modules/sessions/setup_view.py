@@ -245,6 +245,33 @@ class FocusSetupView(QWidget):
         except Exception as e:
             logger.error(f"Ошибка настройки FocusSetupView: {e}", exc_info=True)
 
+    def showEvent(self, event):
+        """Проверяет наличие активных сессий при показе виджета"""
+        try:
+            super().showEvent(event)
+            self._check_active_sessions()
+        except Exception as e:
+            logger.error(f"Ошибка в showEvent: {e}", exc_info=True)
+
+    def _check_active_sessions(self):
+        """Проверяет наличие активных сессий"""
+        try:
+            from core.di.container import container
+            has_session, session_id, status, topic_id = container.session_controller.has_active_or_paused_session()
+
+            if has_session:
+                self.resume_btn.setVisible(True)
+                status_text = {
+                    'active': 'активна',
+                    'paused': 'на паузе'
+                }.get(status, status)
+                self.resume_btn.setText(f"▶ Возобновить ({status_text})")
+                logger.debug(f"Найдена сессия для возобновления: {session_id} ({status})")
+            else:
+                self.resume_btn.setVisible(False)
+        except Exception as e:
+            logger.error(f"Ошибка проверки активных сессий: {e}", exc_info=True)
+
     def _on_resume_clicked(self):
         """Возобновление существующей сессии"""
         try:

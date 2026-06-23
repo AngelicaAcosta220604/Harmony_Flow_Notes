@@ -844,13 +844,25 @@ class MainWindow(QMainWindow):
 
             self._current_editor = NoteEditorView(container.note_controller)
 
-            note = container.note_controller.get_note(value) if value else None
-            if note:
-                self._current_editor.load_note(value)
+            # ✅ ИСПРАВЛЕНО: проверяем тип value
+            if isinstance(value, int) and value > 0:
+                # Редактирование существующей заметки
+                note = container.note_controller.get_note(value)
+                if note:
+                    self._current_editor.load_note(value)
+                    logger.debug(f"Открыт редактор для заметки {value}")
+                else:
+                    # Заметка не найдена — создаём новую
+                    self._current_editor.create_new_note(
+                        self._current_topic_id if hasattr(self, '_current_topic_id') else None)
+                    logger.debug("Создание новой заметки (исходная не найдена)")
             else:
-                self._current_editor.create_new_note(value)
+                # ✅ Создание новой заметки
+                topic_id = value if isinstance(value, int) else None
+                self._current_editor.create_new_note(topic_id)
+                logger.debug(f"Создание новой заметки для темы {topic_id}")
 
-            # 🆕 Подключаем встроенную кнопку "Назад" редактора
+            # Подключаем встроенную кнопку "Назад" редактора
             self._current_editor.back_btn.clicked.connect(self._close_editor)
 
             self.content_stack.addWidget(self._current_editor)

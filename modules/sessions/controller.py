@@ -356,17 +356,15 @@ class SessionController(QObject):
     # ==================== ПОЛЗУНКИ СОСТОЯНИЯ ====================
 
     def log_state(self, metric: str, value: int):
-        """Логирует изменение состояния с ограничением (не чаще раза в минуту)"""
+        """Логирует изменение состояния (только при отпускании ползунка)"""
         try:
             if not self._current_session:
                 return
 
-            # ✅ ИСПРАВЛЕНО: сразу сохраняем значение ползунка в БД
+            # ✅ Сохраняем значение ползунка в БД (теперь только при отпускании)
             self.save_slider_value(metric, value)
 
             now = datetime.now()
-
-            # ✅ ИСПРАВЛЕНО: проверяем таймер для конкретной метрики
             should_log = False
             last_time = self._last_log_time.get(metric)
 
