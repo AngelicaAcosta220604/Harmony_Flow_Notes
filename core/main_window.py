@@ -151,6 +151,31 @@ class MainWindow(QMainWindow):
             # Возвращаем пустой item чтобы не сломать навигацию
             return QListWidgetItem(text)
 
+    def _create_new_note(self, topic_id: int):
+        """Создаёт новую заметку в теме"""
+        try:
+            from modules.notes.editor import NoteEditorView
+
+            # Удаляем старый редактор, если есть
+            if hasattr(self, '_current_editor') and self._current_editor:
+                self.content_stack.removeWidget(self._current_editor)
+                self._current_editor.deleteLater()
+
+            self._current_editor = NoteEditorView(container.note_controller)
+
+            # ✅ Создаём новую заметку с topic_id
+            self._current_editor.create_new_note(topic_id)
+            logger.debug(f"Создание новой заметки для темы {topic_id}")
+
+            # Подключаем кнопку "Назад"
+            self._current_editor.back_btn.clicked.connect(self._close_editor)
+
+            self.content_stack.addWidget(self._current_editor)
+            self.content_stack.setCurrentWidget(self._current_editor)
+        except Exception as e:
+            logger.error(f"Ошибка создания новой заметки: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось создать заметку: {e}")
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         try:
@@ -207,9 +232,9 @@ class MainWindow(QMainWindow):
             self.content_stack.addWidget(self.topics_view)
             logger.debug("TopicsView создан")
 
-            # Topic (экран темы)
+            # ✅ ДОБАВЬ ЭТО: Topic (экран конкретной темы)
             self.topic_view = TopicView(c.topic_controller, c.topic_analytics_controller)
-            self.content_stack.addWidget(self.topic_view)
+            # НЕ добавляем в content_stack сразу — добавим лениво в _handle_navigation_data()
             logger.debug("TopicView создан")
 
             # Focus Setup
@@ -433,7 +458,7 @@ class MainWindow(QMainWindow):
 
             # Topic view signals (записи)
             self.topic_view.create_note_requested.connect(
-                lambda topic_id: self._open_note_editor(topic_id)
+                lambda topic_id: self._create_new_note(topic_id)  # ✅ ИСПРАВЛЕНО: было _open_note_editor
             )
             self.topic_view.edit_note_requested.connect(self._open_note_editor)
             self.topic_view.show_all_notes_requested.connect(self._open_note_reader)
@@ -832,8 +857,8 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.error(f"Ошибка закрытия читалки: {e}", exc_info=True)
 
-    def _open_note_editor(self, value):
-        """Открыть редактор заметок"""
+    def _open_note_editor(self, note_id: int):
+        """Открыть редактор для существующей заметки"""
         try:
             from modules.notes.editor import NoteEditorView
 
@@ -844,32 +869,25 @@ class MainWindow(QMainWindow):
 
             self._current_editor = NoteEditorView(container.note_controller)
 
-            # ✅ ИСПРАВЛЕНО: проверяем тип value
-            if isinstance(value, int) and value > 0:
-                # Редактирование существующей заметки
-                note = container.note_controller.get_note(value)
-                if note:
-                    self._current_editor.load_note(value)
-                    logger.debug(f"Открыт редактор для заметки {value}")
-                else:
-                    # Заметка не найдена — создаём новую
-                    self._current_editor.create_new_note(
-                        self._current_topic_id if hasattr(self, '_current_topic_id') else None)
-                    logger.debug("Создание новой заметки (исходная не найдена)")
+            # ✅ Загружаем существующую заметку
+            note = container.note_controller.get_note(note_id)
+            if note:
+                self._current_editor.load_note(note_id)
+                logger.debug(f"Открыт редактор для заметки {note_id}")
             else:
-                # ✅ Создание новой заметки
-                topic_id = value if isinstance(value, int) else None
-                self._current_editor.create_new_note(topic_id)
-                logger.debug(f"Создание новой заметки для темы {topic_id}")
+                logger.warning(f"Заметка {note_id} не найдена")
+                SilentMessageBox.warning(self, "Ошибка", "Заметка не найдена")
+                return
 
-            # Подключаем встроенную кнопку "Назад" редактора
+            # Подключаем кнопку "Назад"
             self._current_editor.back_btn.clicked.connect(self._close_editor)
 
             self.content_stack.addWidget(self._current_editor)
             self.content_stack.setCurrentWidget(self._current_editor)
         except Exception as e:
-            logger.error(f"Ошибка открытия редактора заметки: {e}", exc_info=True)
+            logger.error(f"Ошибка открытия редактора заметки {note_id}: {e}", exc_info=True)
             SilentMessageBox.warning(self, "Ошибка", f"Не удалось открыть редактор: {e}")
+
 
     def _close_editor(self):
         """Закрывает редактор и возвращает к теме"""

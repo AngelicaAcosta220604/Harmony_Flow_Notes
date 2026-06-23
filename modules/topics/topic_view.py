@@ -344,16 +344,17 @@ class TaskListItemWidget(QWidget):
             layout.addWidget(self.checkbox)
 
             self.title_label = QLabel(title)
+            # ✅ ИСПРАВЛЕНО: правильные цвета текста
             if status == 'completed':
-                self.title_label.setStyleSheet("text-decoration: line-through; color: #9CA3AF;")
+                self.title_label.setStyleSheet("text-decoration: line-through; color: #9CA3AF; background-color: transparent;")
             elif is_overdue:
-                self.title_label.setStyleSheet("color: #EF4444; font-weight: 500;")
+                self.title_label.setStyleSheet("color: #EF4444; font-weight: 500; background-color: transparent;")
             else:
-                self.title_label.setStyleSheet("color: #1F2937;")
+                self.title_label.setStyleSheet("color: #1F2937; background-color: transparent;")
             layout.addWidget(self.title_label, 1)
 
             self.deadline_label = QLabel(deadline)
-            self.deadline_label.setStyleSheet("color: #6B7280; font-size: 10px;")
+            self.deadline_label.setStyleSheet("color: #6B7280; font-size: 10px; background-color: transparent;")
             layout.addWidget(self.deadline_label)
 
             self.edit_btn = QPushButton()
@@ -371,13 +372,20 @@ class TaskListItemWidget(QWidget):
             layout.addWidget(self.delete_btn)
 
             self.setFixedHeight(50)
+            # ✅ ИСПРАВЛЕНО: background-color: #FFFFFF вместо transparent
             self.setStyleSheet("""
                 TaskListItemWidget {
                     border-bottom: 1px solid #E6EEF6;
-                    background-color: transparent;
+                    background-color: #FFFFFF;
                 }
                 TaskListItemWidget:hover {
                     background-color: #F9FAFB;
+                }
+                QLabel {
+                    background-color: transparent;
+                }
+                QCheckBox {
+                    background-color: transparent;
                 }
                 QPushButton {
                     border: none;
@@ -1426,7 +1434,7 @@ class TopicView(QWidget):
             <p>⏰ <b>Общее время:</b> {stats['total_hours']} ч</p>
             <p>🧠 <b>Средняя концентрация:</b> {stats['avg_concentration']}/100</p>
             <p>⚡ <b>Средняя энергия:</b> {stats['avg_energy']}/100</p>
-            <p>❤️ <b>Средний интерес:</b> {stats['avg_interest']}/5</p>
+            <p>❤️ <b>Средний интерес:</b> {stats['avg_interest']}/100</p>
             <p>✅ <b>Задачи:</b> {stats['completed_tasks']}/{stats['task_count']} выполнено</p>
             <p>📝 <b>Заметки:</b> {stats['note_count']}</p>
             <p>🃏 <b>Карточки:</b> {stats['flashcard_count']}</p>

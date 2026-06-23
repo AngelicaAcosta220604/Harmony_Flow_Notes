@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QIcon, QPixmap
 from datetime import datetime, timedelta, date
 import logging
-
+from modules.topics.topic_view import TaskListItemWidget
 from utils.resource_paths import get_resource_path
 from modules.tasks.controller import TaskController
 from modules.tasks.filters import TaskFilters
@@ -20,35 +20,35 @@ from widgets import SilentMessageBox
 logger = logging.getLogger(__name__)
 
 
-class TaskListItem(QWidget):
-    """Кастомный виджет для элемента списка задач с обрезкой текста через ..."""
-
-    def __init__(self, text: str, parent=None):
-        super().__init__(parent)
-        self._full_text = text
-
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 4, 8, 4)
-
-        self.label = QLabel(text)
-        self.label.setStyleSheet("color: #1F2937; font-size: 13px;")
-        layout.addWidget(self.label)
-
-    def setText(self, text: str):
-        self._full_text = text
-        self.label.setText(text)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._elide_text()
-
-    def _elide_text(self):
-        """Обрезает текст через ... если не влезает"""
-        metrics = self.label.fontMetrics()
-        # Оставляем запас для отступов
-        available_width = self.label.width() - 10
-        elided = metrics.elidedText(self._full_text, Qt.ElideRight, available_width)
-        self.label.setText(elided)
+# class TaskListItem(QWidget):
+#     """Кастомный виджет для элемента списка задач с обрезкой текста через ..."""
+#
+#     def __init__(self, text: str, parent=None):
+#         super().__init__(parent)
+#         self._full_text = text
+#
+#         layout = QHBoxLayout(self)
+#         layout.setContentsMargins(8, 4, 8, 4)
+#
+#         self.label = QLabel(text)
+#         self.label.setStyleSheet("color: #1F2937; font-size: 13px;")
+#         layout.addWidget(self.label)
+#
+#     def setText(self, text: str):
+#         self._full_text = text
+#         self.label.setText(text)
+#
+#     def resizeEvent(self, event):
+#         super().resizeEvent(event)
+#         self._elide_text()
+#
+#     def _elide_text(self):
+#         """Обрезает текст через ... если не влезает"""
+#         metrics = self.label.fontMetrics()
+#         # Оставляем запас для отступов
+#         available_width = self.label.width() - 10
+#         elided = metrics.elidedText(self._full_text, Qt.ElideRight, available_width)
+#         self.label.setText(elided)
 
 
 class GlobalTasksView(QWidget):
@@ -619,21 +619,21 @@ class GlobalTasksView(QWidget):
                 return
 
             for task in tasks:
-                topic_name = self._controller.get_topic_name(task)
+                # ✅ ИСПРАВЛЕНО: используем TaskListItemWidget с чекбоксом и кнопками
+                item_widget = TaskListItemWidget(
+                    task.id,
+                    task.title,
+                    task.deadline_display if task.deadline else "Без дедлайна",
+                    task.status,
+                    task.is_overdue()
+                )
 
-                if task.status == 'completed':
-                    icon = "✅"
-                elif task.is_overdue():
-                    icon = "⚠️"
-                else:
-                    icon = "🟢"
+                # ✅ Подключаем сигналы виджета
+                item_widget.complete_clicked.connect(self._on_task_complete_from_widget)
+                item_widget.edit_clicked.connect(self._on_task_edit_from_widget)
+                item_widget.delete_clicked.connect(self._on_task_delete_from_widget)
 
-                deadline_str = f" (до {task.deadline_display})" if task.deadline else ""
-                full_text = f"{icon} {task.title} [{topic_name}]{deadline_str}"
-
-                # 🆕 Используем кастомный виджет вместо QListWidgetItem
                 item = QListWidgetItem()
-                item_widget = TaskListItem(full_text)
                 item.setSizeHint(item_widget.sizeHint())
                 item.setData(Qt.UserRole, task.id)
 
@@ -644,6 +644,59 @@ class GlobalTasksView(QWidget):
         except Exception as e:
             logger.error(f"Ошибка загрузки задач: {e}", exc_info=True)
             SilentMessageBox.warning(self, "Ошибка", f"Не удалось загрузить задачи: {e}")
+
+    def _on_task_complete_from_widget(self, task_id: int):
+        """Обработчик выполнения задачи из виджета"""
+        try:
+            if self._controller.complete_task(task_id):
+                self._load_tasks()
+                self.task_updated.emit()
+                logger.info(f"Задача {task_id} выполнена")
+        except Exception as e:
+            logger.error(f"Ошибка выполнения задачи {task_id}: {e}", exc_info=True)
+
+    def _on_task_edit_from_widget(self, task_id: int):
+        """Обработчик редактирования задачи из виджета"""
+        try:
+            task = self._controller.get_task(task_id)
+            if not task:
+                return
+            dialog = TaskDialog(self, task)
+            if dialog.exec() == QDialog.Accepted:
+                try:
+                    data = dialog.get_task_data()
+                    self._controller.update_task(
+                        task_id,
+                        title=data['title'],
+                        description=data['description'],
+                        deadline=data['deadline']
+                    )
+                    self._load_tasks()
+                    self.task_updated.emit()
+                    logger.info(f"Задача {task_id} обновлена")
+                except ValueError as e:
+                    SilentMessageBox.warning(self, "Ошибка", str(e))
+        except Exception as e:
+            logger.error(f"Ошибка редактирования задачи {task_id}: {e}", exc_info=True)
+
+    def _on_task_delete_from_widget(self, task_id: int):
+        """Обработчик удаления задачи из виджета"""
+        try:
+            task = self._controller.get_task(task_id)
+            if not task:
+                return
+            reply = SilentMessageBox.question(
+                self, "Подтверждение удаления",
+                f"Удалить задачу «{task.title}»?"
+            )
+            if reply == SilentMessageBox.Yes:
+                if self._controller.delete_task(task_id):
+                    self._load_tasks()
+                    self.task_updated.emit()
+                    self.stack.setCurrentIndex(0)
+                    logger.info(f"Задача {task_id} удалена")
+        except Exception as e:
+            logger.error(f"Ошибка удаления задачи {task_id}: {e}", exc_info=True)
 
     def _filter_by_period(self, tasks, period):
         today = date.today()
