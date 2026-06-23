@@ -5,14 +5,19 @@ from PySide6.QtWidgets import (
 )
 
 from utils.ping_manager import PingManager
+from utils.resource_paths import get_resource_path
 from widgets import SilentMessageBox
 from PySide6.QtCore import Qt, QTimer, Signal, QSize
 from PySide6.QtGui import QIcon, QPixmap, QFont
+import logging
 
 from .controller import SessionController
 from .widgets import CustomTimer, StateSliders, PingDialog
 from .quick_capture import QuickNoteDialog
 from modules.music.widgets import MusicWidget
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 
 class FocusActiveView(QWidget):
@@ -98,7 +103,8 @@ class FocusActiveView(QWidget):
         # Заголовок с иконкой
         state_title_layout = QHBoxLayout()
         state_icon = QLabel()
-        state_icon_pixmap = QPixmap("resources/icons/brain1.png")
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        state_icon_pixmap = QPixmap(str(get_resource_path("resources/icons/brain1.png")))
         if not state_icon_pixmap.isNull():
             state_icon_pixmap = state_icon_pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             state_icon.setPixmap(state_icon_pixmap)
@@ -131,7 +137,8 @@ class FocusActiveView(QWidget):
         # Заголовок с иконкой
         music_title_layout = QHBoxLayout()
         music_icon = QLabel()
-        music_icon_pixmap = QPixmap("resources/icons/music1.png")
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        music_icon_pixmap = QPixmap(str(get_resource_path("resources/icons/music1.png")))
         if not music_icon_pixmap.isNull():
             music_icon_pixmap = music_icon_pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             music_icon.setPixmap(music_icon_pixmap)
@@ -156,7 +163,8 @@ class FocusActiveView(QWidget):
 
         # Быстрая запись (жёлтая)
         self.quick_note_btn = QPushButton("Быстрая запись")
-        self.quick_note_btn.setIcon(QIcon("resources/icons/new_notes1.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.quick_note_btn.setIcon(QIcon(str(get_resource_path("resources/icons/new_notes1.png"))))
         self.quick_note_btn.setIconSize(QSize(18, 18))
         self.quick_note_btn.setStyleSheet("""
             QPushButton {
@@ -177,7 +185,8 @@ class FocusActiveView(QWidget):
 
         # Возобновить/Пауза (зелёная)
         self.pause_btn = QPushButton("Пауза")
-        self.pause_btn.setIcon(QIcon("resources/icons/play1.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.pause_btn.setIcon(QIcon(str(get_resource_path("resources/icons/play1.png"))))
         self.pause_btn.setIconSize(QSize(18, 18))
         self.pause_btn.setStyleSheet("""
             QPushButton {
@@ -244,214 +253,296 @@ class FocusActiveView(QWidget):
 
     def _setup_ping_manager(self):
         """Настраивает менеджер контроля активности"""
-        self.ping_manager = PingManager(
-            idle_ms=self._activity_check_interval * 60 * 1000,
-            timeout_ms=90 * 60 * 1000,
-            parent=self
-        )
-        self.ping_manager.pingNeeded.connect(self._show_ping_dialog)
-        self.ping_manager.timeoutReached.connect(self._auto_pause_from_ping)
+        try:
+            self.ping_manager = PingManager(
+                idle_ms=self._activity_check_interval * 60 * 1000,
+                timeout_ms=90 * 60 * 1000,
+                parent=self
+            )
+            self.ping_manager.pingNeeded.connect(self._show_ping_dialog)
+            self.ping_manager.timeoutReached.connect(self._auto_pause_from_ping)
+            logger.debug(f"PingManager настроен: idle={self._activity_check_interval} мин")
+        except Exception as e:
+            logger.error(f"Ошибка настройки PingManager: {e}", exc_info=True)
 
     def _show_ping_dialog(self):
         """Показывает диалог 'Ты ещё тут?' и ставит сессию на паузу"""
-        self._session_controller.pause_session()
+        try:
+            self._session_controller.pause_session()
 
-        dialog = PingDialog(self)
-        dialog.continue_session.connect(self._on_continue_from_ping)
-        dialog.pause_session.connect(self._on_pause_from_ping)
-        dialog.exec()
+            dialog = PingDialog(self)
+            dialog.continue_session.connect(self._on_continue_from_ping)
+            dialog.pause_session.connect(self._on_pause_from_ping)
+            dialog.exec()
+        except Exception as e:
+            logger.error(f"Ошибка показа PingDialog: {e}", exc_info=True)
 
     def _on_continue_from_ping(self):
         """Продолжение сессии после пинга"""
-        self.ping_manager.user_confirmed()
-        self._session_controller.resume_session()
+        try:
+            self.ping_manager.user_confirmed()
+            self._session_controller.resume_session()
+            logger.debug("Сессия продолжена после пинга")
+        except Exception as e:
+            logger.error(f"Ошибка продолжения сессии: {e}", exc_info=True)
 
     def _on_pause_from_ping(self):
         """Пауза после пинга"""
-        self.ping_manager.reset_idle()
-        self.status_label.setText("Сессия на паузе")
-        self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
-        self.pause_btn.setText("Возобновить")
-        self.pause_btn.setIcon(QIcon("resources/icons/play1.png"))
+        try:
+            self.ping_manager.reset_idle()
+            self.status_label.setText("Сессия на паузе")
+            self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
+            self.pause_btn.setText("Возобновить")
+            # ✅ ИСПРАВЛЕНО: используем get_resource_path
+            self.pause_btn.setIcon(QIcon(str(get_resource_path("resources/icons/play1.png"))))
+        except Exception as e:
+            logger.error(f"Ошибка паузы после пинга: {e}", exc_info=True)
 
     def _auto_pause_from_ping(self):
         """Авто-пауза, если пользователь вообще не ответил"""
-        if not self._session_controller.is_session_paused():
-            self._session_controller.pause_session()
-        self.status_label.setText("Авто-пауза (нет активности)")
-        self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
-        self.pause_btn.setText("Возобновить")
-        self.pause_btn.setIcon(QIcon("resources/icons/play1.png"))
+        try:
+            if not self._session_controller.is_session_paused():
+                self._session_controller.pause_session()
+            self.status_label.setText("Авто-пауза (нет активности)")
+            self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
+            self.pause_btn.setText("Возобновить")
+            # ✅ ИСПРАВЛЕНО: используем get_resource_path
+            self.pause_btn.setIcon(QIcon(str(get_resource_path("resources/icons/play1.png"))))
+            logger.info("Авто-пауза сессии из-за отсутствия активности")
+        except Exception as e:
+            logger.error(f"Ошибка авто-паузы: {e}", exc_info=True)
 
     def _on_paused(self):
         """Обработчик паузы"""
-        self.status_label.setText("Сессия на паузе")
-        self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
-        self.pause_btn.setText("Возобновить")
-        self.pause_btn.setIcon(QIcon("resources/icons/play1.png"))
-        self.music_widget._controller.pause()
+        try:
+            self.status_label.setText("Сессия на паузе")
+            self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
+            self.pause_btn.setText("Возобновить")
+            # ✅ ИСПРАВЛЕНО: используем get_resource_path
+            self.pause_btn.setIcon(QIcon(str(get_resource_path("resources/icons/play1.png"))))
+            self.music_widget._controller.pause()
+            logger.debug("Сессия на паузе")
+        except Exception as e:
+            logger.error(f"Ошибка обработки паузы: {e}", exc_info=True)
 
     def _on_resumed(self):
         """Обработчик возобновления"""
-        self.status_label.setText("Сессия активна")
-        self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
-        self.pause_btn.setText("Пауза")
-        self.pause_btn.setIcon(QIcon("resources/icons/pause1.png"))
-        self.ping_manager.reset_idle()
-        self.music_widget._controller.resume()
+        try:
+            self.status_label.setText("Сессия активна")
+            self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
+            self.pause_btn.setText("Пауза")
+            # ✅ ИСПРАВЛЕНО: используем get_resource_path
+            self.pause_btn.setIcon(QIcon(str(get_resource_path("resources/icons/pause1.png"))))
+            self.ping_manager.reset_idle()
+            self.music_widget._controller.resume()
+            logger.debug("Сессия возобновлена")
+        except Exception as e:
+            logger.error(f"Ошибка возобновления сессии: {e}", exc_info=True)
 
     def _on_pause_clicked(self):
         """Обработчик кнопки паузы"""
-        if self._session_controller.is_session_active():
-            self._session_controller.pause_session()
-        else:
-            self._session_controller.resume_session()
+        try:
+            if self._session_controller.is_session_active():
+                self._session_controller.pause_session()
+            else:
+                self._session_controller.resume_session()
+        except Exception as e:
+            logger.error(f"Ошибка переключения паузы: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось изменить состояние сессии: {e}")
 
     def _on_end_clicked(self):
         """Обработчик кнопки завершения"""
-        reply = SilentMessageBox.question(
-            self, "Завершить сессию?",
-            "Вы действительно хотите завершить сессию?",
-            SilentMessageBox.Yes | SilentMessageBox.No, SilentMessageBox.No
-        )
+        try:
+            reply = SilentMessageBox.question(
+                self, "Завершить сессию?",
+                "Вы действительно хотите завершить сессию?",
+                SilentMessageBox.Yes | SilentMessageBox.No, SilentMessageBox.No
+            )
 
-        if reply == SilentMessageBox.Yes:
-            duration = self._session_controller.end_session()
-            self.session_ended.emit(duration)
+            if reply == SilentMessageBox.Yes:
+                duration = self._session_controller.end_session()
+                self.session_ended.emit(duration)
+                logger.info(f"Сессия завершена, длительность: {duration} мин")
+        except Exception as e:
+            logger.error(f"Ошибка завершения сессии: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось завершить сессию: {e}")
 
     def _on_quick_note(self):
         """Быстрая запись"""
-        dialog = QuickNoteDialog(self)
-        dialog.note_saved.connect(self._save_quick_note)
-        dialog.exec()
+        try:
+            dialog = QuickNoteDialog(self)
+            dialog.note_saved.connect(self._save_quick_note)
+            dialog.exec()
+        except Exception as e:
+            logger.error(f"Ошибка открытия QuickNoteDialog: {e}", exc_info=True)
 
     def _save_quick_note(self, content: str):
         """Сохраняет быструю запись"""
-        self._session_controller.add_quick_note(content)
-        self.status_label.setText("✅ Запись сохранена")
-        QTimer.singleShot(2000, lambda: self.status_label.setText("Сессия активна"))
+        try:
+            self._session_controller.add_quick_note(content)
+            self.status_label.setText("✅ Запись сохранена")
+            QTimer.singleShot(2000, lambda: self.status_label.setText("Сессия активна"))
+            logger.debug("Быстрая запись сохранена")
+        except Exception as e:
+            logger.error(f"Ошибка сохранения быстрой записи: {e}", exc_info=True)
+            self.status_label.setText("❌ Ошибка сохранения записи")
 
     def _on_state_changed(self, metric: str, value: int):
         """Обработчик изменения состояния"""
-        self._session_controller.log_state(metric, value)
-        self.ping_manager.reset_idle()
+        try:
+            self._session_controller.log_state(metric, value)
+            self.ping_manager.reset_idle()
+        except Exception as e:
+            logger.error(f"Ошибка логирования состояния {metric}: {e}", exc_info=True)
 
     def start(self, topic_id: int, topic_name: str, activity_check_interval: int):
         """Запускает НОВУЮ сессию"""
-        self._activity_check_interval = activity_check_interval
-        self.topic_label.setText(f"Работа над темой: {topic_name}")
+        try:
+            self._activity_check_interval = activity_check_interval
+            self.topic_label.setText(f"Работа над темой: {topic_name}")
 
-        # 🆕 Используем новый метод, который создаёт новую сессию
-        session_id = self._session_controller.start_new_session(topic_id)
+            # 🆕 Используем новый метод, который создаёт новую сессию
+            session_id = self._session_controller.start_new_session(topic_id)
 
-        if not session_id:
-            SilentMessageBox.warning(self, "Ошибка", "Не удалось создать сессию")
-            return
+            if not session_id:
+                SilentMessageBox.warning(self, "Ошибка", "Не удалось создать сессию")
+                logger.warning(f"Не удалось создать сессию для темы {topic_id}")
+                return
 
-        # Сбрасываем UI
-        #self.timer.reset()
-        self.state_sliders.reset()
+            # Сбрасываем UI
+            # self.timer.reset()
+            self.state_sliders.reset()
 
-        # Обновляем UI
-        self.status_label.setText("Сессия активна")
-        self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
-        self.pause_btn.setText("Пауза")
-        self.pause_btn.setIcon(QIcon("resources/icons/pause1.png"))
+            # Обновляем UI
+            self.status_label.setText("Сессия активна")
+            self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
+            self.pause_btn.setText("Пауза")
+            # ✅ ИСПРАВЛЕНО: используем get_resource_path
+            self.pause_btn.setIcon(QIcon(str(get_resource_path("resources/icons/pause1.png"))))
 
-        # Запускаем PingManager
-        self.ping_manager = PingManager(
-            idle_ms=self._activity_check_interval * 60 * 1000,
-            timeout_ms=90 * 60 * 1000,
-            parent=self
-        )
-        self.ping_manager.pingNeeded.connect(self._show_ping_dialog)
-        self.ping_manager.timeoutReached.connect(self._auto_pause_from_ping)
+            # Запускаем PingManager
+            self.ping_manager = PingManager(
+                idle_ms=self._activity_check_interval * 60 * 1000,
+                timeout_ms=90 * 60 * 1000,
+                parent=self
+            )
+            self.ping_manager.pingNeeded.connect(self._show_ping_dialog)
+            self.ping_manager.timeoutReached.connect(self._auto_pause_from_ping)
 
-        # 🎵 Запускаем музыку, если выбран звук
-        default_sound = self._music_controller.get_current_sound()
-        if default_sound and default_sound != 'off':
-            # Обновляем виджет и запускаем
-            self.music_widget.refresh()
-            self._music_controller.play(default_sound)
-            self.music_widget._update_play_button()
+            # 🎵 Запускаем музыку, если выбран звук
+            default_sound = self._music_controller.get_current_sound()
+            if default_sound and default_sound != 'off':
+                # Обновляем виджет и запускаем
+                self.music_widget.refresh()
+                self._music_controller.play(default_sound)
+                self.music_widget._update_play_button()
+
+            logger.info(f"Начата новая сессия {session_id} для темы '{topic_name}'")
+        except Exception as e:
+            logger.error(f"Ошибка запуска сессии: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось запустить сессию: {e}")
 
     def cleanup(self):
         """Очищает ресурсы"""
-        if hasattr(self, 'ping_manager'):
-            self.ping_manager._idle_timer.stop()
-            self.ping_manager._timeout_timer.stop()
+        try:
+            if hasattr(self, 'ping_manager'):
+                self.ping_manager._idle_timer.stop()
+                self.ping_manager._timeout_timer.stop()
+                logger.debug("Ресурсы PingManager очищены")
+        except Exception as e:
+            logger.error(f"Ошибка очистки ресурсов: {e}", exc_info=True)
 
     def force_save_time(self):
         """Принудительно сохраняет текущее время сессии в БД"""
-        session_id = self._session_controller.get_current_session_id()
-        if session_id and self.timer:
-            current_seconds = self._session_controller.get_elapsed_seconds()
-            if current_seconds > 0:
-                from datebase.db_manager import db
-                db.execute(
-                    "UPDATE sessions SET duration_minutes = ? WHERE id = ?",
-                    (current_seconds // 60, session_id)
-                )
+        try:
+            session_id = self._session_controller.get_current_session_id()
+            if session_id and self.timer:
+                current_seconds = self._session_controller.get_elapsed_seconds()
+                if current_seconds > 0:
+                    from datebase.db_manager import db
+                    db.execute(
+                        "UPDATE sessions SET duration_minutes = ? WHERE id = ?",
+                        (current_seconds // 60, session_id)
+                    )
+                    logger.debug(f"Принудительно сохранено время сессии {session_id}: {current_seconds} сек")
+        except Exception as e:
+            logger.error(f"Ошибка принудительного сохранения времени: {e}", exc_info=True)
 
     def force_save_state(self):
         """Принудительно сохраняет ползунки"""
-        session_id = self._session_controller.get_current_session_id()
-        if session_id:
-            values = self.state_sliders.get_values()
-            # Маппинг: concentration -> focus (в БД колонка focus)
-            self._session_controller.save_slider_values(
-                values.get('concentration', 50),  # conc_slider -> focus
-                values.get('energy', 50),
-                values.get('interest', 50)
-            )
+        try:
+            session_id = self._session_controller.get_current_session_id()
+            if session_id:
+                values = self.state_sliders.get_values()
+                # Маппинг: concentration -> focus (в БД колонка focus)
+                self._session_controller.save_slider_values(
+                    values.get('concentration', 50),  # conc_slider -> focus
+                    values.get('energy', 50),
+                    values.get('interest', 50)
+                )
+                logger.debug(f"Принудительно сохранены ползунки сессии {session_id}")
+        except Exception as e:
+            logger.error(f"Ошибка принудительного сохранения состояния: {e}", exc_info=True)
 
     def hideEvent(self, event):
         """Сохраняем состояние при переключении вкладок"""
-        if self._session_controller.get_current_session_id():
-            self.force_save_time()
-            self.force_save_state()
+        try:
+            if self._session_controller.get_current_session_id():
+                self.force_save_time()
+                self.force_save_state()
+        except Exception as e:
+            logger.error(f"Ошибка сохранения состояния при скрытии: {e}", exc_info=True)
         super().hideEvent(event)
 
     def resume_existing_session(self, session_id: int, topic_id: int, topic_name: str):
         """Загружает СТАРУЮ сессию из БД"""
-        self.topic_label.setText(f"Работа над темой: {topic_name}")
+        try:
+            self.topic_label.setText(f"Работа над темой: {topic_name}")
 
-        success = self._session_controller.load_and_resume_session(session_id)
-        if not success:
-            SilentMessageBox.warning(self, "Ошибка", "Не удалось загрузить сессию")
-            return
+            success = self._session_controller.load_and_resume_session(session_id)
+            if not success:
+                SilentMessageBox.warning(self, "Ошибка", "Не удалось загрузить сессию")
+                logger.warning(f"Не удалось загрузить сессию {session_id}")
+                return
 
-        # 🆕 Восстанавливаем время из контроллера (оно уже загружено из БД)
-        total_seconds = self._session_controller.get_elapsed_seconds()
-        self.timer.set_time(total_seconds)
+            # 🆕 Восстанавливаем время из контроллера (оно уже загружено из БД)
+            total_seconds = self._session_controller.get_elapsed_seconds()
+            self.timer.set_time(total_seconds)
 
-        slider_values = self._session_controller.get_slider_values(session_id)
-        self.state_sliders.conc_slider.setValue(slider_values.get('focus', 50))
-        self.state_sliders.energy_slider.setValue(slider_values.get('energy', 50))
-        self.state_sliders.interest_slider.setValue(slider_values.get('interest', 50))
+            slider_values = self._session_controller.get_slider_values(session_id)
+            self.state_sliders.conc_slider.setValue(slider_values.get('focus', 50))
+            self.state_sliders.energy_slider.setValue(slider_values.get('energy', 50))
+            self.state_sliders.interest_slider.setValue(slider_values.get('interest', 50))
 
-        if self._session_controller.is_session_active():
-            self.status_label.setText("Сессия активна")
-            self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
-            self.pause_btn.setText("Пауза")
-            self.pause_btn.setIcon(QIcon("resources/icons/pause1.png"))
-        else:
-            self.status_label.setText("Сессия на паузе")
-            self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
-            self.pause_btn.setText("Возобновить")
-            self.pause_btn.setIcon(QIcon("resources/icons/play1.png"))
+            if self._session_controller.is_session_active():
+                self.status_label.setText("Сессия активна")
+                self.status_label.setStyleSheet("color: #10B981; font-weight: 500;")
+                self.pause_btn.setText("Пауза")
+                # ✅ ИСПРАВЛЕНО: используем get_resource_path
+                self.pause_btn.setIcon(QIcon(str(get_resource_path("resources/icons/pause1.png"))))
+            else:
+                self.status_label.setText("Сессия на паузе")
+                self.status_label.setStyleSheet("color: #F59E0B; font-weight: 500;")
+                self.pause_btn.setText("Возобновить")
+                # ✅ ИСПРАВЛЕНО: используем get_resource_path
+                self.pause_btn.setIcon(QIcon(str(get_resource_path("resources/icons/play1.png"))))
 
-        self.ping_manager = PingManager(
-            idle_ms=self._activity_check_interval * 60 * 1000,
-            timeout_ms=90 * 60 * 1000,
-            parent=self
-        )
-        self.ping_manager.pingNeeded.connect(self._show_ping_dialog)
-        self.ping_manager.timeoutReached.connect(self._auto_pause_from_ping)
+            self.ping_manager = PingManager(
+                idle_ms=self._activity_check_interval * 60 * 1000,
+                timeout_ms=90 * 60 * 1000,
+                parent=self
+            )
+            self.ping_manager.pingNeeded.connect(self._show_ping_dialog)
+            self.ping_manager.timeoutReached.connect(self._auto_pause_from_ping)
 
-        # 🎵 Возобновляем музыку, если она была включена
-        current_sound = self._music_controller.get_current_sound()
-        if current_sound and current_sound != 'off':
-            self.music_widget.refresh()
-            self._music_controller.resume()
-            self.music_widget._update_play_button()
+            # 🎵 Возобновляем музыку, если она была включена
+            current_sound = self._music_controller.get_current_sound()
+            if current_sound and current_sound != 'off':
+                self.music_widget.refresh()
+                self._music_controller.resume()
+                self.music_widget._update_play_button()
+
+            logger.info(f"Возобновлена существующая сессия {session_id}")
+        except Exception as e:
+            logger.error(f"Ошибка возобновления сессии {session_id}: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось возобновить сессию: {e}")

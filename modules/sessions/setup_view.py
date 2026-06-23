@@ -5,9 +5,14 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QIcon, QPixmap
+import logging
 
+from utils.resource_paths import get_resource_path
 from modules.topics.widgets import TopicTreeSelector
 from widgets import SilentMessageBox
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 
 class FocusSetupView(QWidget):
@@ -54,7 +59,8 @@ class FocusSetupView(QWidget):
         header_layout.setAlignment(Qt.AlignCenter)
 
         header_icon = QLabel()
-        header_pixmap = QPixmap("resources/icons/session1.png")
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        header_pixmap = QPixmap(str(get_resource_path("resources/icons/session1.png")))
         if not header_pixmap.isNull():
             header_pixmap = header_pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             header_icon.setPixmap(header_pixmap)
@@ -92,7 +98,8 @@ class FocusSetupView(QWidget):
 
         topic_title_layout = QHBoxLayout()
         topic_icon = QLabel()
-        topic_icon_pixmap = QPixmap("resources/icons/new_notes1.png")
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        topic_icon_pixmap = QPixmap(str(get_resource_path("resources/icons/new_notes1.png")))
         if not topic_icon_pixmap.isNull():
             topic_icon_pixmap = topic_icon_pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             topic_icon.setPixmap(topic_icon_pixmap)
@@ -132,7 +139,8 @@ class FocusSetupView(QWidget):
 
         interval_title_layout = QHBoxLayout()
         interval_icon = QLabel()
-        interval_icon_pixmap = QPixmap("resources/icons/time1.png")
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        interval_icon_pixmap = QPixmap(str(get_resource_path("resources/icons/time1.png")))
         if not interval_icon_pixmap.isNull():
             interval_icon_pixmap = interval_icon_pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             interval_icon.setPixmap(interval_icon_pixmap)
@@ -177,7 +185,8 @@ class FocusSetupView(QWidget):
         button_layout.addStretch()
 
         self.start_btn = QPushButton("Начать сессию")
-        self.start_btn.setIcon(QIcon("resources/icons/play1.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.start_btn.setIcon(QIcon(str(get_resource_path("resources/icons/play1.png"))))
         self.start_btn.setIconSize(QSize(20, 20))
         self.start_btn.setFixedWidth(200)
         self.start_btn.setFixedHeight(48)
@@ -211,22 +220,36 @@ class FocusSetupView(QWidget):
 
     def _load_settings(self):
         """Загружает настройки"""
-        if self._settings_controller:
-            default_interval = self._settings_controller.get_activity_check_interval()
-            index = self.interval_combo.findData(default_interval)
-            if index >= 0:
-                self.interval_combo.setCurrentIndex(index)
+        try:
+            if self._settings_controller:
+                default_interval = self._settings_controller.get_activity_check_interval()
+                index = self.interval_combo.findData(default_interval)
+                if index >= 0:
+                    self.interval_combo.setCurrentIndex(index)
+                logger.debug(f"Загружены настройки: интервал {default_interval} мин")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки настроек: {e}", exc_info=True)
 
     def _on_start(self):
         """Запуск сессии"""
-        topic_id = self.topic_selector.get_selected_topic_id()
-        if not topic_id:
-            SilentMessageBox.warning(self, "Ошибка", "Выберите тему для сессии")
-            return
+        try:
+            topic_id = self.topic_selector.get_selected_topic_id()
+            if not topic_id:
+                SilentMessageBox.warning(self, "Ошибка", "Выберите тему для сессии")
+                logger.warning("Попытка начать сессию без выбранной темы")
+                return
 
-        interval = self.interval_combo.currentData()
-        self.start_session.emit(topic_id, interval)
+            interval = self.interval_combo.currentData()
+            self.start_session.emit(topic_id, interval)
+            logger.info(f"Запрошен запуск сессии для темы {topic_id}, интервал {interval} мин")
+        except Exception as e:
+            logger.error(f"Ошибка запуска сессии: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось начать сессию: {e}")
 
     def refresh_topics(self):
         """Обновляет список тем"""
-        self.topic_selector.refresh()
+        try:
+            self.topic_selector.refresh()
+            logger.debug("Список тем обновлен")
+        except Exception as e:
+            logger.error(f"Ошибка обновления списка тем: {e}", exc_info=True)

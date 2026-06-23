@@ -7,9 +7,14 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QIcon, QPixmap, QFont, QColor
+import logging
 
+from utils.resource_paths import get_resource_path
 from .controller import FlashcardController
 from datebase.db_manager import db
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 
 class TopicCheckboxTree(QTreeWidget):
@@ -46,35 +51,38 @@ class TopicCheckboxTree(QTreeWidget):
         self._load_topics()
 
     def _on_item_changed(self, item: QTreeWidgetItem, column: int):
-        if self._updating_children > 0:
-            return
-
-        first_level_id = self._get_first_level_container_id(item)
-
-        if item.checkState(0) == Qt.Checked:
-            if self._active_first_level_id is not None and self._active_first_level_id != first_level_id:
-                self._updating_children += 1
-                item.setCheckState(0, Qt.Unchecked)
-                self._updating_children -= 1
-                QMessageBox.warning(
-                    self, "Ограничение выбора",
-                    "Нельзя выбирать карточки из разных разделов первого уровня.\nСначала снимите галочки в текущем разделе."
-                )
+        try:
+            if self._updating_children > 0:
                 return
 
-            self._active_first_level_id = first_level_id
+            first_level_id = self._get_first_level_container_id(item)
 
-            if item.childCount() > 0:
-                self._check_all_children(item, Qt.Checked)
-        else:
-            if item.childCount() > 0:
-                self._check_all_children(item, Qt.Unchecked)
+            if item.checkState(0) == Qt.Checked:
+                if self._active_first_level_id is not None and self._active_first_level_id != first_level_id:
+                    self._updating_children += 1
+                    item.setCheckState(0, Qt.Unchecked)
+                    self._updating_children -= 1
+                    QMessageBox.warning(
+                        self, "Ограничение выбора",
+                        "Нельзя выбирать карточки из разных разделов первого уровня.\nСначала снимите галочки в текущем разделе."
+                    )
+                    return
 
-            if self._active_first_level_id is not None:
-                if not self._has_checked_items_in_container(self._active_first_level_id):
-                    self._active_first_level_id = None
+                self._active_first_level_id = first_level_id
 
-        self._emit_selection()
+                if item.childCount() > 0:
+                    self._check_all_children(item, Qt.Checked)
+            else:
+                if item.childCount() > 0:
+                    self._check_all_children(item, Qt.Unchecked)
+
+                if self._active_first_level_id is not None:
+                    if not self._has_checked_items_in_container(self._active_first_level_id):
+                        self._active_first_level_id = None
+
+            self._emit_selection()
+        except Exception as e:
+            logger.error(f"Ошибка обработки изменения элемента дерева: {e}", exc_info=True)
 
     def _check_all_children(self, item: QTreeWidgetItem, state):
         self._updating_children += 1
@@ -94,64 +102,68 @@ class TopicCheckboxTree(QTreeWidget):
         self._load_topics()
 
     def _load_topics(self):
-        self.clear()
-        self._items_by_id.clear()
-        self._active_first_level_id = None
+        try:
+            self.clear()
+            self._items_by_id.clear()
+            self._active_first_level_id = None
 
-        rows = db.fetchall("SELECT id, name, parent_id, created_at FROM topics")
+            rows = db.fetchall("SELECT id, name, parent_id, created_at FROM topics")
 
-        for row in rows:
-            item = QTreeWidgetItem()
-            item.setData(0, Qt.UserRole, row['id'])
-            item.setText(0, row['name'])
-            item.setCheckState(0, Qt.Unchecked)
-            item.setData(0, Qt.UserRole + 1, row.get('created_at', ''))
-            self._items_by_id[row['id']] = item
+            for row in rows:
+                item = QTreeWidgetItem()
+                item.setData(0, Qt.UserRole, row['id'])
+                item.setText(0, row['name'])
+                item.setCheckState(0, Qt.Unchecked)
+                item.setData(0, Qt.UserRole + 1, row.get('created_at', ''))
+                self._items_by_id[row['id']] = item
 
-        root_items = []
-        child_items = {}
+            root_items = []
+            child_items = {}
 
-        for row in rows:
-            item = self._items_by_id[row['id']]
-            parent_id = row.get('parent_id')
+            for row in rows:
+                item = self._items_by_id[row['id']]
+                parent_id = row.get('parent_id')
 
-            if not parent_id or parent_id == 0 or parent_id not in self._items_by_id:
-                root_items.append(item)
-            else:
-                if parent_id not in child_items:
-                    child_items[parent_id] = []
-                child_items[parent_id].append(item)
+                if not parent_id or parent_id == 0 or parent_id not in self._items_by_id:
+                    root_items.append(item)
+                else:
+                    if parent_id not in child_items:
+                        child_items[parent_id] = []
+                    child_items[parent_id].append(item)
 
-        def is_folder(item):
-            return item.data(0, Qt.UserRole) in child_items
+            def is_folder(item):
+                return item.data(0, Qt.UserRole) in child_items
 
-        reverse = self._sort_mode in ('name_desc', 'date_new')
-        root_items.sort(key=lambda x: x.text(0).lower(), reverse=reverse)
-        root_items.sort(key=is_folder)
+            reverse = self._sort_mode in ('name_desc', 'date_new')
+            root_items.sort(key=lambda x: x.text(0).lower(), reverse=reverse)
+            root_items.sort(key=is_folder)
 
-        for parent_id, children in child_items.items():
-            children.sort(key=lambda x: x.text(0).lower(), reverse=reverse)
-            children.sort(key=lambda x: x.childCount() > 0)
+            for parent_id, children in child_items.items():
+                children.sort(key=lambda x: x.text(0).lower(), reverse=reverse)
+                children.sort(key=lambda x: x.childCount() > 0)
 
-        for item in root_items:
-            self.addTopLevelItem(item)
-            item_id = item.data(0, Qt.UserRole)
+            for item in root_items:
+                self.addTopLevelItem(item)
+                item_id = item.data(0, Qt.UserRole)
 
-            if item_id in child_items:
-                for child in child_items[item_id]:
-                    item.addChild(child)
-                    child_id = child.data(0, Qt.UserRole)
-                    if child_id in child_items:
-                        for grandchild in child_items[child_id]:
-                            child.addChild(grandchild)
+                if item_id in child_items:
+                    for child in child_items[item_id]:
+                        item.addChild(child)
+                        child_id = child.data(0, Qt.UserRole)
+                        if child_id in child_items:
+                            for grandchild in child_items[child_id]:
+                                child.addChild(grandchild)
 
-        for item in self._items_by_id.values():
-            if item.childCount() > 0:
-                self._style_as_folder(item)
-            else:
-                self._style_as_topic(item)
+            for item in self._items_by_id.values():
+                if item.childCount() > 0:
+                    self._style_as_folder(item)
+                else:
+                    self._style_as_topic(item)
 
-        self.collapseAll()
+            self.collapseAll()
+            logger.debug(f"Загружено {len(rows)} тем в дерево")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки тем в дерево: {e}", exc_info=True)
 
     def _style_as_folder(self, item: QTreeWidgetItem):
         font = item.font(0)
@@ -249,7 +261,8 @@ class GlobalCardsView(QWidget):
         header_layout.setAlignment(Qt.AlignCenter)
 
         header_icon = QLabel()
-        header_pixmap = QPixmap("resources/icons/flashcard1.png")
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        header_pixmap = QPixmap(str(get_resource_path("resources/icons/flashcard1.png")))
         if not header_pixmap.isNull():
             header_pixmap = header_pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             header_icon.setPixmap(header_pixmap)
@@ -485,8 +498,11 @@ class GlobalCardsView(QWidget):
         event_bus.flashcard_deleted.connect(lambda cid: self._load_data())
 
     def _load_data(self):
-        selected_ids = self.topic_tree.get_selected_topic_ids()
-        self._update_cards_and_analytics(selected_ids)
+        try:
+            selected_ids = self.topic_tree.get_selected_topic_ids()
+            self._update_cards_and_analytics(selected_ids)
+        except Exception as e:
+            logger.error(f"Ошибка загрузки данных: {e}", exc_info=True)
 
     def _on_topics_selection_changed(self, selected_ids: list):
         self._update_cards_and_analytics(selected_ids)
@@ -496,88 +512,93 @@ class GlobalCardsView(QWidget):
         return progress['status']
 
     def _update_cards_and_analytics(self, topic_ids: list):
-        if not topic_ids:
+        try:
+            if not topic_ids:
+                self.card_list.clear()
+                self.card_display.clear()
+                self._update_analytics_labels(0, 0, 0, 0)
+                return
+
+            cards = self._controller.get_cards_by_topics(topic_ids)
+
+            sort_by = self.sort_combo.currentData()
+            if sort_by == "topic":
+                cards.sort(key=lambda c: self._get_topic_name(c.topic_id))
+            elif sort_by == "status":
+                cards.sort(key=lambda c: self._get_card_status(c))
+            else:
+                cards.sort(key=lambda c: c.created_at)
+
+            total = len(cards)
+            new_count = sum(1 for c in cards if self._get_card_status(c) == "new")
+            in_progress_count = sum(1 for c in cards if self._get_card_status(c) == "in_progress")
+            mastered_count = sum(1 for c in cards if self._get_card_status(c) == "mastered")
+
+            self._update_analytics_labels(total, new_count, in_progress_count, mastered_count)
+
             self.card_list.clear()
-            self.card_display.clear()
-            self._update_analytics_labels(0, 0, 0, 0)
-            return
+            self._selected_card_ids.clear()
 
-        cards = self._controller.get_cards_by_topics(topic_ids)
+            if not cards:
+                empty_item = QListWidgetItem("📭 В выбранных темах нет карточек")
+                empty_item.setForeground(Qt.gray)
+                self.card_list.addItem(empty_item)
+                self.card_display.clear()
+                return
 
-        sort_by = self.sort_combo.currentData()
-        if sort_by == "topic":
-            cards.sort(key=lambda c: self._get_topic_name(c.topic_id))
-        elif sort_by == "status":
-            cards.sort(key=lambda c: self._get_card_status(c))
-        else:
-            cards.sort(key=lambda c: c.created_at)
+            for card in cards:
+                item = QListWidgetItem()
+                topic_name = self._get_topic_name(card.topic_id)
+                status = self._get_card_status(card)
 
-        total = len(cards)
-        new_count = sum(1 for c in cards if self._get_card_status(c) == "new")
-        in_progress_count = sum(1 for c in cards if self._get_card_status(c) == "in_progress")
-        mastered_count = sum(1 for c in cards if self._get_card_status(c) == "mastered")
+                widget = QWidget()
+                widget_layout = QHBoxLayout(widget)
+                widget_layout.setContentsMargins(8, 5, 8, 5)
+                widget_layout.setSpacing(10)
 
-        self._update_analytics_labels(total, new_count, in_progress_count, mastered_count)
+                checkbox = QCheckBox()
+                checkbox.setChecked(True)
+                checkbox.setStyleSheet("QCheckBox { spacing: 5px; }")
+                self._selected_card_ids.add(card.id)
+                checkbox.stateChanged.connect(
+                    lambda state, cid=card.id: self._on_card_checkbox_changed(cid, state)
+                )
 
-        self.card_list.clear()
-        self._selected_card_ids.clear()
+                if status == "new":
+                    status_badge = "[🆕 Новое]"
+                    status_color = "#3B82F6"
+                elif status == "in_progress":
+                    status_badge = "[🔄 В процессе]"
+                    status_color = "#F59E0B"
+                else:
+                    status_badge = "[✅ Выучено]"
+                    status_color = "#10B981"
 
-        if not cards:
-            empty_item = QListWidgetItem("📭 В выбранных темах нет карточек")
-            empty_item.setForeground(Qt.gray)
-            self.card_list.addItem(empty_item)
-            self.card_display.clear()
-            return
+                if card.is_free:
+                    preview = card.content[:50] + "..." if len(card.content) > 50 else card.content
+                    text = f"{status_badge} 📝 [{topic_name}] {preview}"
+                else:
+                    preview = card.question[:50] + "..." if len(card.question) > 50 else card.question
+                    text = f"{status_badge} ❓ [{topic_name}] {preview}"
 
-        for card in cards:
-            item = QListWidgetItem()
-            topic_name = self._get_topic_name(card.topic_id)
-            status = self._get_card_status(card)
+                label = QLabel(text)
+                label.setStyleSheet(f"color: {status_color}; font-size: 13px; background-color: transparent;")
+                label.setWordWrap(True)
 
-            widget = QWidget()
-            widget_layout = QHBoxLayout(widget)
-            widget_layout.setContentsMargins(8, 5, 8, 5)
-            widget_layout.setSpacing(10)
+                widget_layout.addWidget(checkbox)
+                widget_layout.addWidget(label, 1)
 
-            checkbox = QCheckBox()
-            checkbox.setChecked(True)
-            checkbox.setStyleSheet("QCheckBox { spacing: 5px; }")
-            self._selected_card_ids.add(card.id)
-            checkbox.stateChanged.connect(
-                lambda state, cid=card.id: self._on_card_checkbox_changed(cid, state)
-            )
+                widget.setMinimumHeight(35)
+                widget.setMaximumHeight(50)
 
-            if status == "new":
-                status_badge = "[🆕 Новое]"
-                status_color = "#3B82F6"
-            elif status == "in_progress":
-                status_badge = "[🔄 В процессе]"
-                status_color = "#F59E0B"
-            else:
-                status_badge = "[✅ Выучено]"
-                status_color = "#10B981"
+                item.setSizeHint(widget.sizeHint())
+                self.card_list.addItem(item)
+                self.card_list.setItemWidget(item, widget)
+                item.setData(Qt.UserRole, card.id)
 
-            if card.is_free:
-                preview = card.content[:50] + "..." if len(card.content) > 50 else card.content
-                text = f"{status_badge} 📝 [{topic_name}] {preview}"
-            else:
-                preview = card.question[:50] + "..." if len(card.question) > 50 else card.question
-                text = f"{status_badge} ❓ [{topic_name}] {preview}"
-
-            label = QLabel(text)
-            label.setStyleSheet(f"color: {status_color}; font-size: 13px; background-color: transparent;")
-            label.setWordWrap(True)
-
-            widget_layout.addWidget(checkbox)
-            widget_layout.addWidget(label, 1)
-
-            widget.setMinimumHeight(35)
-            widget.setMaximumHeight(50)
-
-            item.setSizeHint(widget.sizeHint())
-            self.card_list.addItem(item)
-            self.card_list.setItemWidget(item, widget)
-            item.setData(Qt.UserRole, card.id)
+            logger.debug(f"Загружено {len(cards)} карточек для {len(topic_ids)} тем")
+        except Exception as e:
+            logger.error(f"Ошибка обновления карточек и аналитики: {e}", exc_info=True)
 
     def _update_analytics_labels(self, total: int, new_count: int, in_progress_count: int, mastered_count: int):
         self.stat_total.setText(f"📚 Всего: {total}")
@@ -590,48 +611,51 @@ class GlobalCardsView(QWidget):
         return row['name'] if row else "Без темы"
 
     def _on_card_selected(self, item: QListWidgetItem):
-        card_id = item.data(Qt.UserRole)
-        if not card_id:
-            return
+        try:
+            card_id = item.data(Qt.UserRole)
+            if not card_id:
+                return
 
-        card = self._controller.get_card(card_id)
-        if not card:
-            return
+            card = self._controller.get_card(card_id)
+            if not card:
+                return
 
-        self._current_card = card
-        status = self._get_card_status(card)
-        status_color = {
-            "new": "#3B82F6",
-            "in_progress": "#F59E0B",
-            "mastered": "#10B981"
-        }.get(status, "#6B7280")
+            self._current_card = card
+            status = self._get_card_status(card)
+            status_color = {
+                "new": "#3B82F6",
+                "in_progress": "#F59E0B",
+                "mastered": "#10B981"
+            }.get(status, "#6B7280")
 
-        if card.is_free:
-            self.card_display.setHtml(f"""
-                <style>
-                    h3 {{ color: #1F2937; margin-bottom: 8px; }}
-                    small {{ color: {status_color}; }}
-                    hr {{ border: 1px solid #E6EEF6; }}
-                    p {{ color: #374151; line-height: 1.5; }}
-                </style>
-                <h3>📝 Свободная карточка <small>({status})</small></h3>
-                <hr>
-                <p>{card.content}</p>
-            """)
-        else:
-            self.card_display.setHtml(f"""
-                <style>
-                    h3 {{ color: #1F2937; margin-bottom: 8px; }}
-                    small {{ color: {status_color}; }}
-                    hr {{ border: 1px solid #E6EEF6; }}
-                    p {{ color: #374151; line-height: 1.5; }}
-                    b {{ color: #1F2937; }}
-                </style>
-                <h3>❓ Карточка Вопрос-Ответ <small>({status})</small></h3>
-                <p><b>Вопрос:</b><br>{card.question}</p>
-                <hr>
-                <p><b>Ответ:</b><br>{card.answer}</p>
-            """)
+            if card.is_free:
+                self.card_display.setHtml(f"""
+                    <style>
+                        h3 {{ color: #1F2937; margin-bottom: 8px; }}
+                        small {{ color: {status_color}; }}
+                        hr {{ border: 1px solid #E6EEF6; }}
+                        p {{ color: #374151; line-height: 1.5; }}
+                    </style>
+                    <h3>📝 Свободная карточка <small>({status})</small></h3>
+                    <hr>
+                    <p>{card.content}</p>
+                """)
+            else:
+                self.card_display.setHtml(f"""
+                    <style>
+                        h3 {{ color: #1F2937; margin-bottom: 8px; }}
+                        small {{ color: {status_color}; }}
+                        hr {{ border: 1px solid #E6EEF6; }}
+                        p {{ color: #374151; line-height: 1.5; }}
+                        b {{ color: #1F2937; }}
+                    </style>
+                    <h3>❓ Карточка Вопрос-Ответ <small>({status})</small></h3>
+                    <p><b>Вопрос:</b><br>{card.question}</p>
+                    <hr>
+                    <p><b>Ответ:</b><br>{card.answer}</p>
+                """)
+        except Exception as e:
+            logger.error(f"Ошибка выбора карточки: {e}", exc_info=True)
 
     def _on_card_checkbox_changed(self, card_id: int, state: int):
         if state == Qt.Checked:
@@ -640,22 +664,32 @@ class GlobalCardsView(QWidget):
             self._selected_card_ids.discard(card_id)
 
     def _on_start_review_clicked(self):
-        topic_ids = self.topic_tree.get_selected_topic_ids()
-        if not topic_ids:
-            QMessageBox.warning(self, "Внимание", "Выберите хотя бы одну тему в дереве слева.")
-            return
+        try:
+            topic_ids = self.topic_tree.get_selected_topic_ids()
+            if not topic_ids:
+                QMessageBox.warning(self, "Внимание", "Выберите хотя бы одну тему в дереве слева.")
+                return
 
-        card_ids = list(self._selected_card_ids) if self._selected_card_ids else None
-        self.start_review_requested.emit(topic_ids, True, True, True, card_ids)
+            card_ids = list(self._selected_card_ids) if self._selected_card_ids else None
+            self.start_review_requested.emit(topic_ids, True, True, True, card_ids)
+            logger.info(f"Запрошено начало повторения для {len(topic_ids)} тем")
+        except Exception as e:
+            logger.error(f"Ошибка начала повторения: {e}", exc_info=True)
 
     def refresh(self):
-        self.topic_tree.reset_selection()
-        self.topic_tree.reload()
-        self.topic_tree.collapseAll()
-        self._load_data()
+        try:
+            self.topic_tree.reset_selection()
+            self.topic_tree.reload()
+            self.topic_tree.collapseAll()
+            self._load_data()
+        except Exception as e:
+            logger.error(f"Ошибка обновления: {e}", exc_info=True)
 
     def _on_tree_sort_changed(self):
-        sort_mode = self.tree_sort_combo.currentData()
-        if sort_mode:
-            self.topic_tree.set_sort_mode(sort_mode)
-            self.topic_tree.reload()
+        try:
+            sort_mode = self.tree_sort_combo.currentData()
+            if sort_mode:
+                self.topic_tree.set_sort_mode(sort_mode)
+                self.topic_tree.reload()
+        except Exception as e:
+            logger.error(f"Ошибка изменения сортировки: {e}", exc_info=True)

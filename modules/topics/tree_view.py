@@ -7,9 +7,14 @@ from widgets import SilentMessageBox, SilentInputDialog
 
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QAction, QIcon, QPixmap
+import logging
 
+from utils.resource_paths import get_resource_path
 from .controller import TopicController
 from .widgets import TreeWidget
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 
 class TopicsView(QWidget):
@@ -45,7 +50,8 @@ class TopicsView(QWidget):
         title_layout.setAlignment(Qt.AlignCenter)
 
         title_icon_label = QLabel()
-        title_pixmap = QPixmap("resources/icons/structure1.png")
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        title_pixmap = QPixmap(str(get_resource_path("resources/icons/structure1.png")))
         if not title_pixmap.isNull():
             title_pixmap = title_pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             title_icon_label.setPixmap(title_pixmap)
@@ -68,7 +74,8 @@ class TopicsView(QWidget):
         button_layout.setSpacing(10)
 
         self.new_folder_btn = QPushButton("Новая папка")
-        self.new_folder_btn.setIcon(QIcon("resources/icons/new_folder1.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.new_folder_btn.setIcon(QIcon(str(get_resource_path("resources/icons/new_folder1.png"))))
         self.new_folder_btn.setIconSize(QSize(18, 18))
         self.new_folder_btn.setFixedWidth(140)
         self.new_folder_btn.setStyleSheet("""
@@ -92,7 +99,8 @@ class TopicsView(QWidget):
         button_layout.addWidget(self.new_folder_btn)
 
         self.new_topic_btn = QPushButton("Новая тема")
-        self.new_topic_btn.setIcon(QIcon("resources/icons/new_notes1.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.new_topic_btn.setIcon(QIcon(str(get_resource_path("resources/icons/new_notes1.png"))))
         self.new_topic_btn.setIconSize(QSize(18, 18))
         self.new_topic_btn.setFixedWidth(140)
         self.new_topic_btn.setStyleSheet("""
@@ -116,7 +124,8 @@ class TopicsView(QWidget):
         button_layout.addWidget(self.new_topic_btn)
 
         self.rename_btn = QPushButton("Переименовать")
-        self.rename_btn.setIcon(QIcon("resources/icons/rename1.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.rename_btn.setIcon(QIcon(str(get_resource_path("resources/icons/rename1.png"))))
         self.rename_btn.setIconSize(QSize(18, 18))
         self.rename_btn.setFixedWidth(140)
         self.rename_btn.setStyleSheet("""
@@ -140,7 +149,8 @@ class TopicsView(QWidget):
         button_layout.addWidget(self.rename_btn)
 
         self.delete_btn = QPushButton("Удалить")
-        self.delete_btn.setIcon(QIcon("resources/icons/delete1.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.delete_btn.setIcon(QIcon(str(get_resource_path("resources/icons/delete1.png"))))
         self.delete_btn.setIconSize(QSize(18, 18))
         self.delete_btn.setFixedWidth(140)
         self.delete_btn.setStyleSheet("""
@@ -188,114 +198,148 @@ class TopicsView(QWidget):
         self.delete_btn.setEnabled(has_selection)
 
     def _on_topic_double_clicked(self, topic_id: int):
-        topic = self._controller.get_topic(topic_id)
-        if topic and topic.is_topic:
-            self.topic_selected.emit(topic_id)
+        try:
+            topic = self._controller.get_topic(topic_id)
+            if topic and topic.is_topic:
+                self.topic_selected.emit(topic_id)
+        except Exception as e:
+            logger.error(f"Ошибка при двойном клике на тему {topic_id}: {e}", exc_info=True)
 
     def _on_new_folder(self):
-        parent_id = self.tree.get_selected_folder_id()
-        name, ok = SilentInputDialog.getText(self, "Новая папка", "Введите название папки:")
-        if ok and name.strip():
-            topic_id = self._controller.create_folder(name.strip(), parent_id)
-            if topic_id:
-                self.refresh()
-                self.topic_created.emit(topic_id)
-                self.tree.select_topic(topic_id)
-            else:
-                SilentMessageBox.warning(self, "Ошибка", "Не удалось создать папку")
+        try:
+            parent_id = self.tree.get_selected_folder_id()
+            name, ok = SilentInputDialog.getText(self, "Новая папка", "Введите название папки:")
+            if ok and name.strip():
+                topic_id = self._controller.create_folder(name.strip(), parent_id)
+                if topic_id:
+                    self.refresh()
+                    self.topic_created.emit(topic_id)
+                    self.tree.select_topic(topic_id)
+                else:
+                    SilentMessageBox.warning(self, "Ошибка", "Не удалось создать папку")
+        except Exception as e:
+            logger.error(f"Ошибка создания папки: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось создать папку: {e}")
 
     def _on_new_topic(self):
-        parent_id = self.tree.get_selected_folder_id()
-        name, ok = SilentInputDialog.getText(self, "Новая тема", "Введите название темы:")
-        if ok and name.strip():
-            topic_id = self._controller.create_topic(name.strip(), parent_id)
-            if topic_id:
-                self.refresh()
-                self.topic_created.emit(topic_id)
-                self.tree.select_topic(topic_id)
-            else:
-                SilentMessageBox.warning(self, "Ошибка", "Не удалось создать тему")
+        try:
+            parent_id = self.tree.get_selected_folder_id()
+            name, ok = SilentInputDialog.getText(self, "Новая тема", "Введите название темы:")
+            if ok and name.strip():
+                topic_id = self._controller.create_topic(name.strip(), parent_id)
+                if topic_id:
+                    self.refresh()
+                    self.topic_created.emit(topic_id)
+                    self.tree.select_topic(topic_id)
+                else:
+                    SilentMessageBox.warning(self, "Ошибка", "Не удалось создать тему")
+        except Exception as e:
+            logger.error(f"Ошибка создания темы: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось создать тему: {e}")
 
     def _on_rename(self):
-        topic_id = self.tree.get_selected_topic_id()
-        if not topic_id:
-            SilentMessageBox.information(self, "Информация", "Выберите элемент для переименования")
-            return
-        topic = self._controller.get_topic(topic_id)
-        if not topic:
-            return
-        new_name, ok = SilentInputDialog.getText(self, "Переименовать", "Введите новое название:", text=topic.name)
-        if ok and new_name.strip() and new_name.strip() != topic.name:
-            if self._controller.rename(topic_id, new_name.strip()):
-                self.refresh()
-                self.tree.select_topic(topic_id)
-            else:
-                SilentMessageBox.warning(self, "Ошибка", "Не удалось переименовать")
+        try:
+            topic_id = self.tree.get_selected_topic_id()
+            if not topic_id:
+                SilentMessageBox.information(self, "Информация", "Выберите элемент для переименования")
+                return
+            topic = self._controller.get_topic(topic_id)
+            if not topic:
+                return
+            new_name, ok = SilentInputDialog.getText(self, "Переименовать", "Введите новое название:", text=topic.name)
+            if ok and new_name.strip() and new_name.strip() != topic.name:
+                if self._controller.rename(topic_id, new_name.strip()):
+                    self.refresh()
+                    self.tree.select_topic(topic_id)
+                else:
+                    SilentMessageBox.warning(self, "Ошибка", "Не удалось переименовать")
+        except Exception as e:
+            logger.error(f"Ошибка переименования: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось переименовать: {e}")
 
     def _on_delete(self):
-        topic_id = self.tree.get_selected_topic_id()
-        if not topic_id:
-            SilentMessageBox.information(self, "Информация", "Выберите элемент для удаления")
-            return
-        topic = self._controller.get_topic(topic_id)
-        if not topic:
-            return
-        msg = f"Вы действительно хотите удалить «{topic.name}»?\n\n"
-        msg += "Вместе с ним будут удалены все:\n"
-        msg += "• заметки\n• задачи\n• карточки\n• сессии\n• аналитика"
-        reply = SilentMessageBox.question(self, "Подтверждение удаления", msg)
-        if reply == SilentMessageBox.Yes:
-            if self._controller.delete(topic_id):
-                self.refresh()
-                self.topic_deleted.emit(topic_id)
-            else:
-                SilentMessageBox.warning(self, "Ошибка", "Не удалось удалить элемент")
+        try:
+            topic_id = self.tree.get_selected_topic_id()
+            if not topic_id:
+                SilentMessageBox.information(self, "Информация", "Выберите элемент для удаления")
+                return
+            topic = self._controller.get_topic(topic_id)
+            if not topic:
+                return
+            msg = f"Вы действительно хотите удалить «{topic.name}»?\n\n"
+            msg += "Вместе с ним будут удалены все:\n"
+            msg += "• заметки\n• задачи\n• карточки\n• сессии\n• аналитика"
+            reply = SilentMessageBox.question(self, "Подтверждение удаления", msg)
+            if reply == SilentMessageBox.Yes:
+                if self._controller.delete(topic_id):
+                    self.refresh()
+                    self.topic_deleted.emit(topic_id)
+                else:
+                    SilentMessageBox.warning(self, "Ошибка", "Не удалось удалить элемент")
+        except Exception as e:
+            logger.error(f"Ошибка удаления: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось удалить элемент: {e}")
 
     def _show_context_menu(self, position):
-        item = self.tree.itemAt(position)
-        if not item:
-            return
-        menu = QMenu()
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #FFFFFF;
-                border: 1px solid #E6EEF6;
-                border-radius: 12px;
-                padding: 4px;
-            }
-            QMenu::item {
-                padding: 6px 12px;
-                border-radius: 6px;
-            }
-            QMenu::item:selected {
-                background-color: rgba(59, 130, 246, 0.08);
-                color: #3B82F6;
-            }
-        """)
-        new_folder_action = QAction("Новая папка", self)
-        new_folder_action.setIcon(QIcon("resources/icons/new_folder1.png"))
-        new_folder_action.triggered.connect(self._on_new_folder)
-        menu.addAction(new_folder_action)
-        new_topic_action = QAction("Новая тема", self)
-        new_topic_action.setIcon(QIcon("resources/icons/new_notes1.png"))
-        new_topic_action.triggered.connect(self._on_new_topic)
-        menu.addAction(new_topic_action)
-        menu.addSeparator()
-        rename_action = QAction("Переименовать", self)
-        rename_action.setIcon(QIcon("resources/icons/rename1.png"))
-        rename_action.triggered.connect(self._on_rename)
-        menu.addAction(rename_action)
-        delete_action = QAction("Удалить", self)
-        delete_action.setIcon(QIcon("resources/icons/delete1.png"))
-        delete_action.triggered.connect(self._on_delete)
-        menu.addAction(delete_action)
-        menu.exec(self.tree.viewport().mapToGlobal(position))
+        try:
+            item = self.tree.itemAt(position)
+            if not item:
+                return
+            menu = QMenu()
+            menu.setStyleSheet("""
+                QMenu {
+                    background-color: #FFFFFF;
+                    border: 1px solid #E6EEF6;
+                    border-radius: 12px;
+                    padding: 4px;
+                }
+                QMenu::item {
+                    padding: 6px 12px;
+                    border-radius: 6px;
+                }
+                QMenu::item:selected {
+                    background-color: rgba(59, 130, 246, 0.08);
+                    color: #3B82F6;
+                }
+            """)
+            new_folder_action = QAction("Новая папка", self)
+            # ✅ ИСПРАВЛЕНО: используем get_resource_path
+            new_folder_action.setIcon(QIcon(str(get_resource_path("resources/icons/new_folder1.png"))))
+            new_folder_action.triggered.connect(self._on_new_folder)
+            menu.addAction(new_folder_action)
+
+            new_topic_action = QAction("Новая тема", self)
+            # ✅ ИСПРАВЛЕНО: используем get_resource_path
+            new_topic_action.setIcon(QIcon(str(get_resource_path("resources/icons/new_notes1.png"))))
+            new_topic_action.triggered.connect(self._on_new_topic)
+            menu.addAction(new_topic_action)
+
+            menu.addSeparator()
+
+            rename_action = QAction("Переименовать", self)
+            # ✅ ИСПРАВЛЕНО: используем get_resource_path
+            rename_action.setIcon(QIcon(str(get_resource_path("resources/icons/rename1.png"))))
+            rename_action.triggered.connect(self._on_rename)
+            menu.addAction(rename_action)
+
+            delete_action = QAction("Удалить", self)
+            # ✅ ИСПРАВЛЕНО: используем get_resource_path
+            delete_action.setIcon(QIcon(str(get_resource_path("resources/icons/delete1.png"))))
+            delete_action.triggered.connect(self._on_delete)
+            menu.addAction(delete_action)
+
+            menu.exec(self.tree.viewport().mapToGlobal(position))
+        except Exception as e:
+            logger.error(f"Ошибка контекстного меню: {e}", exc_info=True)
 
     def refresh(self):
-        self.tree.load_topics()
-        has_selection = self.tree.get_selected_topic_id() is not None
-        self.rename_btn.setEnabled(has_selection)
-        self.delete_btn.setEnabled(has_selection)
+        try:
+            self.tree.load_topics()
+            has_selection = self.tree.get_selected_topic_id() is not None
+            self.rename_btn.setEnabled(has_selection)
+            self.delete_btn.setEnabled(has_selection)
+        except Exception as e:
+            logger.error(f"Ошибка обновления дерева тем: {e}", exc_info=True)
 
     def get_selected_topic_id(self):
         return self.tree.get_selected_topic_id()

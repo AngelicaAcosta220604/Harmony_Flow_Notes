@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QTabWidget, QScrollArea, QFrame, QComboBox, QMessageBox, QTableWidget, QTableWidgetItem, QHeaderView
 )
 from PySide6.QtCore import Qt, Signal
+import logging
 
 from .controller import AnalyticsController
 from .charts import AnalyticsCharts
@@ -12,6 +13,9 @@ from .insights import AnalyticsInsights
 from .dialogs import AnalyticsSelectorDialog
 from modules.topics.controller import TopicController
 from services.time_service import TimeService
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 
 class AnalyticsView(QWidget):
@@ -226,72 +230,77 @@ class AnalyticsView(QWidget):
 
     def _update_detail_table(self):
         """Обновляет таблицу детализации в зависимости от выбранного режима"""
-        if not hasattr(self, '_current_stats') or not hasattr(self, 'detail_table'):
-            return
+        try:
+            if not hasattr(self, '_current_stats') or not hasattr(self, 'detail_table'):
+                return
 
-        mode = self.detail_mode_combo.currentText()
-        topic_ids = self._current_topic_ids
+            mode = self.detail_mode_combo.currentText()
+            topic_ids = self._current_topic_ids
 
-        # Выбираем данные и заголовки в зависимости от режима
-        if "сессиям" in mode:
-            data = self._analytics_controller.get_sessions_table_data(topic_ids)
-            headers = ["Дата", "Тема", "Длительность", "Конц.", "Энергия", "Интерес"]
-            keys = ['date', 'topic_name', 'duration', 'avg_concentration', 'avg_energy', 'avg_interest']
-        elif "темам" in mode:
-            data = self._analytics_controller.get_topics_table_data(topic_ids)
-            headers = ["Тема", "Сессий", "Время", "Конц.", "Энергия", "Интерес"]
-            keys = ['topic_name', 'session_count', 'duration', 'avg_concentration', 'avg_energy', 'avg_interest']
-        elif "папкам" in mode:
-            data = self._analytics_controller.get_folders_table_data(topic_ids)
-            headers = ["Папка", "Сессий", "Время", "Конц.", "Энергия", "Интерес"]
-            keys = ['folder_name', 'session_count', 'duration', 'avg_concentration', 'avg_energy', 'avg_interest']
-        else:
-            return
+            # Выбираем данные и заголовки в зависимости от режима
+            if "сессиям" in mode:
+                data = self._analytics_controller.get_sessions_table_data(topic_ids)
+                headers = ["Дата", "Тема", "Длительность", "Конц.", "Энергия", "Интерес"]
+                keys = ['date', 'topic_name', 'duration', 'avg_concentration', 'avg_energy', 'avg_interest']
+            elif "темам" in mode:
+                data = self._analytics_controller.get_topics_table_data(topic_ids)
+                headers = ["Тема", "Сессий", "Время", "Конц.", "Энергия", "Интерес"]
+                keys = ['topic_name', 'session_count', 'duration', 'avg_concentration', 'avg_energy', 'avg_interest']
+            elif "папкам" in mode:
+                data = self._analytics_controller.get_folders_table_data(topic_ids)
+                headers = ["Папка", "Сессий", "Время", "Конц.", "Энергия", "Интерес"]
+                keys = ['folder_name', 'session_count', 'duration', 'avg_concentration', 'avg_energy', 'avg_interest']
+            else:
+                return
 
-        # Настройка таблицы
-        self.detail_table.setRowCount(len(data))
-        self.detail_table.setColumnCount(len(headers))
-        self.detail_table.setHorizontalHeaderLabels(headers)
+            # Настройка таблицы
+            self.detail_table.setRowCount(len(data))
+            self.detail_table.setColumnCount(len(headers))
+            self.detail_table.setHorizontalHeaderLabels(headers)
 
-        # 🆕 Отключаем редактирование и лишние эффекты
-        self.detail_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.detail_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.detail_table.setSelectionMode(QTableWidget.SingleSelection)
-        self.detail_table.setTabKeyNavigation(False)
-        self.detail_table.setFocusPolicy(Qt.NoFocus)
+            # 🆕 Отключаем редактирование и лишние эффекты
+            self.detail_table.setEditTriggers(QTableWidget.NoEditTriggers)
+            self.detail_table.setSelectionBehavior(QTableWidget.SelectRows)
+            self.detail_table.setSelectionMode(QTableWidget.SingleSelection)
+            self.detail_table.setTabKeyNavigation(False)
+            self.detail_table.setFocusPolicy(Qt.NoFocus)
 
-        # Отключаем tooltip'ы
-        self.detail_table.viewport().setMouseTracking(False)
+            # Отключаем tooltip'ы
+            self.detail_table.viewport().setMouseTracking(False)
 
-        # Первая колонка растягивается, остальные по содержимому
-        self.detail_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        for i in range(1, len(headers)):
-            self.detail_table.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeToContents)
+            # Первая колонка растягивается, остальные по содержимому
+            self.detail_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+            for i in range(1, len(headers)):
+                self.detail_table.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeToContents)
 
-        # Заполнение данными
-        for row, item in enumerate(data):
-            for col, key in enumerate(keys):
-                val = item.get(key, 0)
-                if isinstance(val, float):
-                    val = f"{val:.1f}"
+            # Заполнение данными
+            for row, item in enumerate(data):
+                for col, key in enumerate(keys):
+                    val = item.get(key, 0)
+                    if isinstance(val, float):
+                        val = f"{val:.1f}"
 
-                table_item = QTableWidgetItem(str(val))
-                table_item.setTextAlignment(Qt.AlignCenter if col > 0 else Qt.AlignLeft)
+                    table_item = QTableWidgetItem(str(val))
+                    table_item.setTextAlignment(Qt.AlignCenter if col > 0 else Qt.AlignLeft)
 
-                # 🎨 Подсветка метрик цветом (как в дашборде)
-                if key in ['avg_concentration', 'avg_energy', 'avg_interest']:
-                    try:
-                        v = float(val)
-                        if v >= 80:
-                            table_item.setForeground(QColor("#10B981"))  # Зеленый
-                        elif v >= 50:
-                            table_item.setForeground(QColor("#F59E0B"))  # Оранжевый
-                        else:
-                            table_item.setForeground(QColor("#EF4444"))  # Красный
-                    except:
-                        pass
+                    # 🎨 Подсветка метрик цветом (как в дашборде)
+                    if key in ['avg_concentration', 'avg_energy', 'avg_interest']:
+                        try:
+                            v = float(val)
+                            if v >= 80:
+                                table_item.setForeground(QColor("#10B981"))  # Зеленый
+                            elif v >= 50:
+                                table_item.setForeground(QColor("#F59E0B"))  # Оранжевый
+                            else:
+                                table_item.setForeground(QColor("#EF4444"))  # Красный
+                        except (ValueError, TypeError) as e:
+                            logger.debug(f"Не удалось преобразовать значение {val} для подсветки: {e}")
 
-                self.detail_table.setItem(row, col, table_item)
+                    self.detail_table.setItem(row, col, table_item)
+
+            logger.debug(f"Таблица детализации обновлена: режим '{mode}', {len(data)} строк")
+        except Exception as e:
+            logger.error(f"Ошибка обновления таблицы детализации: {e}", exc_info=True)
 
     def _create_charts_tab(self) -> QWidget:
         """Создаёт вкладку с графиками"""
@@ -338,71 +347,84 @@ class AnalyticsView(QWidget):
 
     def _load_topics_to_selector(self):
         """Загружает темы в выпадающий список"""
-        topics = self._topic_controller.get_all_topics()
+        try:
+            topics = self._topic_controller.get_all_topics()
 
-        # Сохраняем текущий индекс
-        current_index = self.topic_selector.currentIndex()
+            # Сохраняем текущий индекс
+            current_index = self.topic_selector.currentIndex()
 
-        # Очищаем всё, кроме первых двух пунктов
-        while self.topic_selector.count() > 2:
-            self.topic_selector.removeItem(2)
+            # Очищаем всё, кроме первых двух пунктов
+            while self.topic_selector.count() > 2:
+                self.topic_selector.removeItem(2)
 
-        for topic in topics:
-            if topic.is_topic:
-                self.topic_selector.addItem(topic.name, topic.id)
+            for topic in topics:
+                if topic.is_topic:
+                    self.topic_selector.addItem(topic.name, topic.id)
 
-        if current_index >= 0:
-            self.topic_selector.setCurrentIndex(current_index)
+            if current_index >= 0:
+                self.topic_selector.setCurrentIndex(current_index)
+
+            logger.debug(f"Загружено {len(topics)} тем в селектор")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки тем в селектор: {e}", exc_info=True)
 
     def _on_topic_changed(self, index: int):
         """Обработчик изменения выбора тем - теперь с автообновлением"""
-        data = self.topic_selector.currentData()
+        try:
+            data = self.topic_selector.currentData()
 
-        if data == "select":
-            # Открыть диалог множественного выбора
-            dialog = AnalyticsSelectorDialog(self)
-            dialog.topics_selected.connect(self._on_topics_selected)
-            dialog.exec()
-            # Возвращаем предыдущий выбор после закрытия диалога
-            if self._current_topic_ids:
-                # Если были выбраны темы, показываем "Выбрано N тем"
-                count = len(self._current_topic_ids)
-                self.topic_selector.blockSignals(True)
-                self.topic_selector.setCurrentIndex(1)
-                self.topic_selector.blockSignals(False)
+            if data == "select":
+                # Открыть диалог множественного выбора
+                dialog = AnalyticsSelectorDialog(self)
+                dialog.topics_selected.connect(self._on_topics_selected)
+                dialog.exec()
+                # Возвращаем предыдущий выбор после закрытия диалога
+                if self._current_topic_ids:
+                    # Если были выбраны темы, показываем "Выбрано N тем"
+                    count = len(self._current_topic_ids)
+                    self.topic_selector.blockSignals(True)
+                    self.topic_selector.setCurrentIndex(1)
+                    self.topic_selector.blockSignals(False)
+                else:
+                    self.topic_selector.setCurrentIndex(0)
+            elif data is not None:
+                # 🆕 Выбрана конкретная тема из списка - обновляем автоматически
+                self._current_topic_ids = [data]
+                self._load_data()
             else:
-                self.topic_selector.setCurrentIndex(0)
-        elif data is not None:
-            # 🆕 Выбрана конкретная тема из списка - обновляем автоматически
-            self._current_topic_ids = [data]
-            self._load_data()
-        else:
-            # 🆕 Выбрано "Все темы" (data == None) - обновляем автоматически
-            self._current_topic_ids = []
-            self._load_data()
+                # 🆕 Выбрано "Все темы" (data == None) - обновляем автоматически
+                self._current_topic_ids = []
+                self._load_data()
+        except Exception as e:
+            logger.error(f"Ошибка обработки изменения темы: {e}", exc_info=True)
 
     def _on_topics_selected(self, topic_ids: list):
         """Обработчик выбора тем из диалога"""
-        self._current_topic_ids = topic_ids
+        try:
+            self._current_topic_ids = topic_ids
 
-        # 🆕 Автоматически обновляем данные
-        self._load_data()
+            # 🆕 Автоматически обновляем данные
+            self._load_data()
 
-        # Обновляем отображение в комбобоксе
-        if len(topic_ids) == 0:
-            self.topic_selector.setCurrentIndex(0)
-        else:
-            # Показываем количество выбранных тем
-            count = len(topic_ids)
-            self.topic_selector.blockSignals(True)
+            # Обновляем отображение в комбобоксе
+            if len(topic_ids) == 0:
+                self.topic_selector.setCurrentIndex(0)
+            else:
+                # Показываем количество выбранных тем
+                count = len(topic_ids)
+                self.topic_selector.blockSignals(True)
 
-            # Удаляем старый пункт "Выбрано N тем" если он есть
-            if self.topic_selector.count() > 2:
-                self.topic_selector.removeItem(1)
+                # Удаляем старый пункт "Выбрано N тем" если он есть
+                if self.topic_selector.count() > 2:
+                    self.topic_selector.removeItem(1)
 
-            self.topic_selector.insertItem(1, f"📁 Выбрано {count} тем", topic_ids)
-            self.topic_selector.setCurrentIndex(1)
-            self.topic_selector.blockSignals(False)
+                self.topic_selector.insertItem(1, f"📁 Выбрано {count} тем", topic_ids)
+                self.topic_selector.setCurrentIndex(1)
+                self.topic_selector.blockSignals(False)
+
+            logger.debug(f"Выбрано {len(topic_ids)} тем для анализа")
+        except Exception as e:
+            logger.error(f"Ошибка обработки выбора тем: {e}", exc_info=True)
 
     def _load_data(self):
         """Загружает данные аналитики"""
@@ -433,69 +455,74 @@ class AnalyticsView(QWidget):
                     self.insights_frame.show()
                 else:
                     self.insights_frame.hide()
+
+            logger.debug(f"Данные аналитики загружены для {len(self._current_topic_ids)} тем")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки данных аналитики: {e}", exc_info=True)
+            QMessageBox.warning(self, "Ошибка", f"Не удалось загрузить данные аналитики: {e}")
         finally:
             # 🆕 Возвращаем кнопку в исходное состояние
             if hasattr(self, 'refresh_btn'):
                 self.refresh_btn.setText("🔄 Обновить")
                 self.refresh_btn.setEnabled(True)
 
-
-
-
     def _update_overview(self, stats: dict):
         """Обновляет вкладку обзора с защитой от пустых данных"""
-        # Гарантируем, что stats и его вложенные структуры являются словарями
-        stats = stats if isinstance(stats, dict) else {}
-        session_stats = stats.get('session_stats', {}) if stats.get('session_stats') else {}
-        task_stats = stats.get('task_stats', {}) if stats.get('task_stats') else {}
-        content_stats = stats.get('content_stats', {}) if stats.get('content_stats') else {}
+        try:
+            # Гарантируем, что stats и его вложенные структуры являются словарями
+            stats = stats if isinstance(stats, dict) else {}
+            session_stats = stats.get('session_stats', {}) if stats.get('session_stats') else {}
+            task_stats = stats.get('task_stats', {}) if stats.get('task_stats') else {}
+            content_stats = stats.get('content_stats', {}) if stats.get('content_stats') else {}
 
-        # Очищаем KPI контейнер
-        while self.kpi_layout.count():
-            child = self.kpi_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+            # Очищаем KPI контейнер
+            while self.kpi_layout.count():
+                child = self.kpi_layout.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
 
-        # Безопасное извлечение значений метрик
-        total_sessions = str(session_stats.get('total_sessions', 0))
-        total_hours = session_stats.get('total_hours_display', '0.0 ч')
-        avg_concentration = session_stats.get('avg_concentration', '0.0')
-        avg_energy = session_stats.get('avg_energy', '0.0')
-        avg_interest = session_stats.get('avg_interest', '0.0')
-        completion_rate = task_stats.get('completion_rate', 0)
+            # Безопасное извлечение значений метрик
+            total_sessions = str(session_stats.get('total_sessions', 0))
+            total_hours = session_stats.get('total_hours_display', '0.0 ч')
+            avg_concentration = session_stats.get('avg_concentration', '0.0')
+            avg_energy = session_stats.get('avg_energy', '0.0')
+            avg_interest = session_stats.get('avg_interest', '0.0')
+            completion_rate = task_stats.get('completion_rate', 0)
 
-        tasks_completed = task_stats.get('completed', 0)
-        tasks_total = task_stats.get('total', 0)
+            tasks_completed = task_stats.get('completed', 0)
+            tasks_total = task_stats.get('total', 0)
 
-        total_notes = content_stats.get('total_notes', 0)
-        total_flashcards = content_stats.get('total_flashcards', 0)
-        free_cards = content_stats.get('free_cards', 0)
-        qa_cards = content_stats.get('qa_cards', 0)
+            total_notes = content_stats.get('total_notes', 0)
+            total_flashcards = content_stats.get('total_flashcards', 0)
+            free_cards = content_stats.get('free_cards', 0)
+            qa_cards = content_stats.get('qa_cards', 0)
 
-        first_session = session_stats.get('first_session', '—')
-        last_session = session_stats.get('last_session', '—')
-        unique_days = session_stats.get('unique_days', 0)
+            first_session = session_stats.get('first_session', '—')
+            last_session = session_stats.get('last_session', '—')
+            unique_days = session_stats.get('unique_days', 0)
 
-        # Создаём карточки KPI
-        self.kpi_layout.addWidget(self._create_kpi_card("🎯 Сессии", total_sessions))
-        self.kpi_layout.addWidget(self._create_kpi_card("⏱️ Время", total_hours))
-        self.kpi_layout.addWidget(self._create_kpi_card("🧠 Концентрация", f"{avg_concentration}/100"))
-        self.kpi_layout.addWidget(self._create_kpi_card("⚡ Энергия", f"{avg_energy}/100"))
-        self.kpi_layout.addWidget(self._create_kpi_card("❤️ Интерес", f"{avg_interest}/100"))
-        self.kpi_layout.addWidget(self._create_kpi_card("✅ Задачи", f"{completion_rate}%"))
+            # Создаём карточки KPI
+            self.kpi_layout.addWidget(self._create_kpi_card("🎯 Сессии", total_sessions))
+            self.kpi_layout.addWidget(self._create_kpi_card("⏱️ Время", total_hours))
+            self.kpi_layout.addWidget(self._create_kpi_card("🧠 Концентрация", f"{avg_concentration}/100"))
+            self.kpi_layout.addWidget(self._create_kpi_card("⚡ Энергия", f"{avg_energy}/100"))
+            self.kpi_layout.addWidget(self._create_kpi_card("❤️ Интерес", f"{avg_interest}/100"))
+            self.kpi_layout.addWidget(self._create_kpi_card("✅ Задачи", f"{completion_rate}%"))
 
-        # Формирование детальной статистики
-        stats_text = f"""
-        <b>📊 Детальная статистика</b><br><br>
-        <b>Сессии:</b> {total_sessions} сессий, {total_hours}<br>
-        <b>Задачи:</b> {tasks_completed}/{tasks_total} выполнено ({completion_rate}%)<br>
-        <b>Заметки:</b> {total_notes} шт.<br>
-        <b>Карточки:</b> {total_flashcards} шт. (свободных: {free_cards}, Q&A: {qa_cards})<br>
-        <b>Период:</b> с {first_session} по {last_session}<br>
-        <b>Дней с активностью:</b> {unique_days}<br>
-        """
+            # Формирование детальной статистики
+            stats_text = f"""
+            <b>📊 Детальная статистика</b><br><br>
+            <b>Сессии:</b> {total_sessions} сессий, {total_hours}<br>
+            <b>Задачи:</b> {tasks_completed}/{tasks_total} выполнено ({completion_rate}%)<br>
+            <b>Заметки:</b> {total_notes} шт.<br>
+            <b>Карточки:</b> {total_flashcards} шт. (свободных: {free_cards}, Q&A: {qa_cards})<br>
+            <b>Период:</b> с {first_session} по {last_session}<br>
+            <b>Дней с активностью:</b> {unique_days}<br>
+            """
 
-        self.stats_label.setText(stats_text)
+            self.stats_label.setText(stats_text)
+        except Exception as e:
+            logger.error(f"Ошибка обновления обзора: {e}", exc_info=True)
 
     def _create_kpi_card(self, title: str, value: str) -> QFrame:
         """Создаёт карточку KPI"""
@@ -520,48 +547,61 @@ class AnalyticsView(QWidget):
 
     def _update_chart(self):
         """Обновляет текущий график с валидацией ключей трендов"""
-        if not hasattr(self, '_current_stats') or not self._current_stats:
-            return
+        try:
+            if not hasattr(self, '_current_stats') or not self._current_stats:
+                return
 
-        stats = self._current_stats
-        chart_type = self.chart_type_combo.currentData()
+            stats = self._current_stats
+            chart_type = self.chart_type_combo.currentData()
 
-        # Безопасная проверка наличия базовых ключей графиков
-        if not isinstance(stats, dict) or 'trends' not in stats:
-            return
+            # Безопасная проверка наличия базовых ключей графиков
+            if not isinstance(stats, dict) or 'trends' not in stats:
+                return
 
-        trends = stats.get('trends', {})
+            trends = stats.get('trends', {})
 
-        if chart_type == 'concentration' and 'concentration' in trends:
-            dates, values = trends['concentration']
-            self.charts_widget.plot_metric_trend(dates, values, "Динамика концентрации", "Концентрация (1-100)", '#1976d2')
+            if chart_type == 'concentration' and 'concentration' in trends:
+                dates, values = trends['concentration']
+                self.charts_widget.plot_metric_trend(dates, values, "Динамика концентрации", "Концентрация (1-100)",
+                                                     '#1976d2')
 
-        elif chart_type == 'energy' and 'energy' in trends:
-            dates, values = trends['energy']
-            self.charts_widget.plot_metric_trend(dates, values, "Динамика энергии", "Энергия (1-100)", '#ff9800')
+            elif chart_type == 'energy' and 'energy' in trends:
+                dates, values = trends['energy']
+                self.charts_widget.plot_metric_trend(dates, values, "Динамика энергии", "Энергия (1-100)", '#ff9800')
 
-        elif chart_type == 'interest' and 'interest' in trends:
-            dates, values = trends['interest']
-            self.charts_widget.plot_metric_trend(dates, values, "Динамика интереса", "Интерес (1-100)", '#4cafz0')
+            elif chart_type == 'interest' and 'interest' in trends:
+                dates, values = trends['interest']
+                # ✅ ИСПРАВЛЕНО: опечатка '#4cafz0' → '#4caf50'
+                self.charts_widget.plot_metric_trend(dates, values, "Динамика интереса", "Интерес (1-100)", '#4caf50')
 
-        elif chart_type == 'comparison':
-            self.charts_widget.plot_comparison_trend(trends)
+            elif chart_type == 'comparison':
+                self.charts_widget.plot_comparison_trend(trends)
 
-        elif chart_type == 'hours' and 'hour_stats' in stats:
-            self.charts_widget.plot_hour_stats(stats['hour_stats'])
+            elif chart_type == 'hours' and 'hour_stats' in stats:
+                self.charts_widget.plot_hour_stats(stats['hour_stats'])
 
-        elif chart_type == 'days' and 'day_stats' in stats:
-            self.charts_widget.plot_day_stats(stats['day_stats'])
+            elif chart_type == 'days' and 'day_stats' in stats:
+                self.charts_widget.plot_day_stats(stats['day_stats'])
+
+            logger.debug(f"График обновлен: тип '{chart_type}'")
+        except Exception as e:
+            logger.error(f"Ошибка обновления графика: {e}", exc_info=True)
 
     def _update_insights(self, stats: dict):
         """Обновляет инсайты"""
-        if isinstance(stats, dict) and 'insights' in stats:
-            self.insights_widget.set_insights(stats['insights'])
+        try:
+            if isinstance(stats, dict) and 'insights' in stats:
+                self.insights_widget.set_insights(stats['insights'])
+        except Exception as e:
+            logger.error(f"Ошибка обновления инсайтов: {e}", exc_info=True)
 
     def refresh(self):
         """Обновляет данные"""
-        self._load_topics_to_selector()
-        self._load_data()
+        try:
+            self._load_topics_to_selector()
+            self._load_data()
+        except Exception as e:
+            logger.error(f"Ошибка обновления аналитики: {e}", exc_info=True)
 
     def _create_metric_pattern_card(self, metric: str, icon: str, color: str) -> QFrame:
         """Создает карточку анализа паттерна метрики"""
@@ -610,49 +650,54 @@ class AnalyticsView(QWidget):
 
     def _update_pattern_analysis(self):
         """Обновляет анализ паттернов"""
-        if not hasattr(self, '_current_stats') or not hasattr(self, 'patterns_frame'):
-            return
+        try:
+            if not hasattr(self, '_current_stats') or not hasattr(self, 'patterns_frame'):
+                return
 
-        sessions = self._current_stats.get('sessions', [])
-        if not sessions:
-            self.patterns_frame.hide()
-            return
+            sessions = self._current_stats.get('sessions', [])
+            if not sessions:
+                self.patterns_frame.hide()
+                return
 
-        patterns = self._analytics_controller.analyze_metric_patterns(sessions)
+            patterns = self._analytics_controller.analyze_metric_patterns(sessions)
 
-        if not patterns:
-            self.patterns_frame.hide()
-            return
+            if not patterns:
+                self.patterns_frame.hide()
+                return
 
-        # Обновляем карточки метрик
-        for metric in ['concentration', 'energy', 'interest']:
-            if metric in patterns and self.metric_cards.get(f"{metric}_labels"):
-                labels = self.metric_cards[f"{metric}_labels"]
-                data = patterns[metric]
+            # Обновляем карточки метрик
+            for metric in ['concentration', 'energy', 'interest']:
+                if metric in patterns and self.metric_cards.get(f"{metric}_labels"):
+                    labels = self.metric_cards[f"{metric}_labels"]
+                    data = patterns[metric]
 
-                if 'peak_time' in labels:
-                    labels['peak_time'].setText(f"{data.get('peak_time', '—')} ({data.get('peak_value', 0)})")
-                if 'time_to_drop' in labels:
-                    labels['time_to_drop'].setText(data.get('time_to_initial_drop', '—'))
-                if 'best_period_start' in labels:
-                    labels['best_period_start'].setText(
-                        f"{data.get('best_period_start', '—')} ({data.get('best_period_duration', '')})"
-                    )
+                    if 'peak_time' in labels:
+                        labels['peak_time'].setText(f"{data.get('peak_time', '—')} ({data.get('peak_value', 0)})")
+                    if 'time_to_drop' in labels:
+                        labels['time_to_drop'].setText(data.get('time_to_initial_drop', '—'))
+                    if 'best_period_start' in labels:
+                        labels['best_period_start'].setText(
+                            f"{data.get('best_period_start', '—')} ({data.get('best_period_duration', '')})"
+                        )
 
-        # Обновляем синергию
-        if 'synergy' in patterns and hasattr(self, 'synergy_label'):
-            synergy = patterns['synergy']
-            recommendations = synergy.get('recommendations', [])
+            # Обновляем синергию
+            if 'synergy' in patterns and hasattr(self, 'synergy_label'):
+                synergy = patterns['synergy']
+                recommendations = synergy.get('recommendations', [])
 
-            # Добавляем детальные рекомендации
-            detailed_recs = self._analytics_controller.generate_detailed_recommendations(
-                sessions, patterns
-            )
-            all_recommendations = recommendations + detailed_recs
+                # Добавляем детальные рекомендации
+                detailed_recs = self._analytics_controller.generate_detailed_recommendations(
+                    sessions, patterns
+                )
+                all_recommendations = recommendations + detailed_recs
 
-            if all_recommendations:
-                html_rec = "<br><br>".join([f"• {rec}" for rec in all_recommendations[:5]])  # Показываем топ-5
-                self.synergy_label.setText(f"<b>💡 Рекомендации по оптимизации:</b><br><br>{html_rec}")
-                self.synergy_label.show()
-            else:
-                self.synergy_label.hide()
+                if all_recommendations:
+                    html_rec = "<br><br>".join([f"• {rec}" for rec in all_recommendations[:5]])  # Показываем топ-5
+                    self.synergy_label.setText(f"<b>💡 Рекомендации по оптимизации:</b><br><br>{html_rec}")
+                    self.synergy_label.show()
+                else:
+                    self.synergy_label.hide()
+
+            logger.debug("Анализ паттернов обновлен")
+        except Exception as e:
+            logger.error(f"Ошибка обновления анализа паттернов: {e}", exc_info=True)

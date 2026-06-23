@@ -1,6 +1,9 @@
 # modules/notes/reader.py
-from PySide6.QtWidgets import QTextBrowser, QWidget, QVBoxLayout, QLabel
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QTextBrowser, QWidget, QVBoxLayout, QHBoxLayout, QLabel
+import logging
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 
 class NoteReader(QTextBrowser):
@@ -14,24 +17,31 @@ class NoteReader(QTextBrowser):
 
     def _setup_reader(self):
         """Настраивает виджет"""
-        self.setOpenExternalLinks(True)
-        self.setReadOnly(True)
+        try:
+            self.setOpenExternalLinks(True)
+            self.setReadOnly(True)
 
-        # Настройка шрифта
-        font = self.font()
-        font.setPointSize(11)
-        self.setFont(font)
+            # Настройка шрифта
+            font = self.font()
+            font.setPointSize(11)
+            self.setFont(font)
+        except Exception as e:
+            logger.error(f"Ошибка настройки NoteReader: {e}", exc_info=True)
 
     def display_note(self, title: str, content: str):
         """
         Отображает заметку с заголовком и содержимым
         """
-        html = f"""
-        <h1>{self._escape_html(title)}</h1>
-        <hr>
-        {content}
-        """
-        self.setHtml(html)
+        try:
+            html = f"""
+            <h1>{self._escape_html(title)}</h1>
+            <hr>
+            {content}
+            """
+            self.setHtml(html)
+        except Exception as e:
+            logger.error(f"Ошибка отображения заметки: {e}", exc_info=True)
+            self.setHtml(f"<p style='color: red;'>Ошибка отображения заметки: {e}</p>")
 
     def _escape_html(self, text: str) -> str:
         """Экранирует HTML-спецсимволы"""
@@ -43,7 +53,10 @@ class NoteReader(QTextBrowser):
 
     def clear_display(self):
         """Очищает отображаемое содержимое"""
-        self.clear()
+        try:
+            self.clear()
+        except Exception as e:
+            logger.error(f"Ошибка очистки NoteReader: {e}", exc_info=True)
 
 
 class NotePreviewWidget(QWidget):
@@ -58,31 +71,35 @@ class NotePreviewWidget(QWidget):
 
     def _setup_ui(self, title: str, preview: str, updated_at: str):
         """Настраивает интерфейс"""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 8, 10, 8)
-        layout.setSpacing(4)
+        try:
+            layout = QVBoxLayout(self)
+            layout.setContentsMargins(10, 8, 10, 8)
+            layout.setSpacing(4)
 
-        # Заголовок и дата
-        header_layout = QHBoxLayout()
+            # Заголовок и дата
+            # ✅ ИСПРАВЛЕНО: QHBoxLayout теперь импортирован
+            header_layout = QHBoxLayout()
 
-        title_label = QLabel(title)
-        title_label.setStyleSheet("font-weight: bold; font-size: 14px;")
-        header_layout.addWidget(title_label)
+            title_label = QLabel(title)
+            title_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+            header_layout.addWidget(title_label)
 
-        header_layout.addStretch()
+            header_layout.addStretch()
 
-        date_label = QLabel(updated_at[:10] if updated_at else "")
-        date_label.setStyleSheet("color: #888888; font-size: 10px;")
-        header_layout.addWidget(date_label)
+            date_label = QLabel(updated_at[:10] if updated_at else "")
+            date_label.setStyleSheet("color: #888888; font-size: 10px;")
+            header_layout.addWidget(date_label)
 
-        layout.addLayout(header_layout)
+            layout.addLayout(header_layout)
 
-        # Превью
-        if preview:
-            preview_label = QLabel(preview)
-            preview_label.setStyleSheet("color: #666666; font-size: 12px;")
-            preview_label.setWordWrap(True)
-            preview_label.setMaximumHeight(60)
-            layout.addWidget(preview_label)
+            # Превью
+            if preview:
+                preview_label = QLabel(preview)
+                preview_label.setStyleSheet("color: #666666; font-size: 12px;")
+                preview_label.setWordWrap(True)
+                preview_label.setMaximumHeight(60)
+                layout.addWidget(preview_label)
 
-        self.setProperty("class", "note-preview")
+            self.setProperty("class", "note-preview")
+        except Exception as e:
+            logger.error(f"Ошибка настройки NotePreviewWidget: {e}", exc_info=True)

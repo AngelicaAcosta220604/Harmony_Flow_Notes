@@ -6,9 +6,14 @@ from PySide6.QtWidgets import (
 from widgets import SilentMessageBox
 from PySide6.QtCore import Qt, Signal, QTimer, QSize
 from PySide6.QtGui import QIcon, QPixmap, QColor
+import logging
 
+from utils.resource_paths import get_resource_path
 from .review_controller import ReviewController
 from models.flashcard import Flashcard
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 
 class ReviewSessionView(QWidget):
@@ -51,7 +56,8 @@ class ReviewSessionView(QWidget):
         header_layout.setAlignment(Qt.AlignCenter)
 
         header_icon = QLabel()
-        header_pixmap = QPixmap("resources/icons/flashcard1.png")
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        header_pixmap = QPixmap(str(get_resource_path("resources/icons/flashcard1.png")))
         if not header_pixmap.isNull():
             header_pixmap = header_pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             header_icon.setPixmap(header_pixmap)
@@ -131,7 +137,8 @@ class ReviewSessionView(QWidget):
         button_layout.addStretch()
 
         self.show_btn = QPushButton("Показать ответ")
-        self.show_btn.setIcon(QIcon("resources/icons/eye.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.show_btn.setIcon(QIcon(str(get_resource_path("resources/icons/eye.png"))))
         self.show_btn.setIconSize(QSize(18, 18))
         self.show_btn.setStyleSheet("""
             QPushButton {
@@ -152,7 +159,8 @@ class ReviewSessionView(QWidget):
 
         # Кнопка "Знал(а)" (зелёная контурная)
         self.knew_btn = QPushButton("Знал(а)")
-        self.knew_btn.setIcon(QIcon("resources/icons/check.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.knew_btn.setIcon(QIcon(str(get_resource_path("resources/icons/check.png"))))
         self.knew_btn.setIconSize(QSize(18, 18))
         self.knew_btn.setStyleSheet("""
             QPushButton {
@@ -173,7 +181,8 @@ class ReviewSessionView(QWidget):
 
         # Кнопка "Сомневался/лась" (оранжевая контурная)
         self.doubt_btn = QPushButton("Сомневался/лась")
-        self.doubt_btn.setIcon(QIcon("resources/icons/doubt.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.doubt_btn.setIcon(QIcon(str(get_resource_path("resources/icons/doubt.png"))))
         self.doubt_btn.setIconSize(QSize(18, 18))
         self.doubt_btn.setStyleSheet("""
             QPushButton {
@@ -194,7 +203,8 @@ class ReviewSessionView(QWidget):
 
         # Кнопка "Не знал(а)" (красная контурная)
         self.didnt_know_btn = QPushButton("Не знал(а)")
-        self.didnt_know_btn.setIcon(QIcon("resources/icons/close.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.didnt_know_btn.setIcon(QIcon(str(get_resource_path("resources/icons/close.png"))))
         self.didnt_know_btn.setIconSize(QSize(18, 18))
         self.didnt_know_btn.setStyleSheet("""
             QPushButton {
@@ -245,105 +255,131 @@ class ReviewSessionView(QWidget):
         """
         Начинает сессию повторения
         """
-        session_id = self._controller.start_review_session(
-            topic_ids, mode, include_free, include_qa, skip_reviewed, card_ids
-        )
+        try:
+            session_id = self._controller.start_review_session(
+                topic_ids, mode, include_free, include_qa, skip_reviewed, card_ids
+            )
 
-        if not session_id:
-            SilentMessageBox.warning(self, "Ошибка", "Нет карточек для повторения в выбранных темах")
+            if not session_id:
+                SilentMessageBox.warning(self, "Ошибка", "Нет карточек для повторения в выбранных темах")
+                self.session_cancelled.emit()
+                return
+
+            self._load_current_card()
+            logger.info(f"Сессия повторения начата: {len(topic_ids)} тем, режим: {mode}")
+        except Exception as e:
+            logger.error(f"Ошибка начала сессии повторения: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось начать сессию: {e}")
             self.session_cancelled.emit()
-            return
-
-        self._load_current_card()
 
     def _load_current_card(self):
         """Загружает текущую карточку"""
-        self._current_card = self._controller.get_current_card()
+        try:
+            self._current_card = self._controller.get_current_card()
 
-        if not self._current_card:
-            self._end_session()
-            return
+            if not self._current_card:
+                self._end_session()
+                return
 
-        self._show_answer = False
-        self._set_answer_buttons_visible(False)
+            self._show_answer = False
+            self._set_answer_buttons_visible(False)
 
-        # Отображаем карточку
-        if self._current_card.is_free:
-            self.card_display.setPlainText(self._current_card.content)
-        else:
-            self.card_display.setPlainText(f"❓ {self._current_card.question}\n\n[Нажмите «Показать ответ»]")
+            # Отображаем карточку
+            if self._current_card.is_free:
+                self.card_display.setPlainText(self._current_card.content)
+            else:
+                self.card_display.setPlainText(f"❓ {self._current_card.question}\n\n[Нажмите «Показать ответ»]")
 
-        # Обновляем прогресс
-        progress = self._controller.get_progress()
-        self.progress_label.setText(f"Карточка {progress['completed'] + 1} из {progress['total']}")
-        self.progress_bar.setMaximum(progress['total'])
-        self.progress_bar.setValue(progress['completed'])
+            # Обновляем прогресс
+            progress = self._controller.get_progress()
+            self.progress_label.setText(f"Карточка {progress['completed'] + 1} из {progress['total']}")
+            self.progress_bar.setMaximum(progress['total'])
+            self.progress_bar.setValue(progress['completed'])
 
-        self.status_label.setText("Подумайте над ответом, затем нажмите «Показать ответ»")
+            self.status_label.setText("Подумайте над ответом, затем нажмите «Показать ответ»")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки карточки: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось загрузить карточку: {e}")
 
     def _on_show_answer(self):
         """Показывает ответ"""
-        if not self._current_card:
-            return
+        try:
+            if not self._current_card:
+                return
 
-        self._show_answer = True
+            self._show_answer = True
 
-        # Отображаем ответ
-        if self._current_card.is_free:
-            self.card_display.setPlainText(
-                f"{self._current_card.content}\n\n"
-                f"{'=' * 50}\n"
-                f"Оцените, насколько хорошо вы запомнили этот материал:"
-            )
-        else:
-            self.card_display.setPlainText(
-                f"❓ {self._current_card.question}\n\n"
-                f"📝 Ответ:\n{self._current_card.answer}\n\n"
-                f"{'=' * 50}\n"
-                f"Оцените свой ответ:"
-            )
+            # Отображаем ответ
+            if self._current_card.is_free:
+                self.card_display.setPlainText(
+                    f"{self._current_card.content}\n\n"
+                    f"{'=' * 50}\n"
+                    f"Оцените, насколько хорошо вы запомнили этот материал:"
+                )
+            else:
+                self.card_display.setPlainText(
+                    f"❓ {self._current_card.question}\n\n"
+                    f"📝 Ответ:\n{self._current_card.answer}\n\n"
+                    f"{'=' * 50}\n"
+                    f"Оцените свой ответ:"
+                )
 
-        self._set_answer_buttons_visible(True)
-        self.status_label.setText("Оцените, насколько хорошо вы знали ответ")
+            self._set_answer_buttons_visible(True)
+            self.status_label.setText("Оцените, насколько хорошо вы знали ответ")
+        except Exception as e:
+            logger.error(f"Ошибка показа ответа: {e}", exc_info=True)
 
     def _on_answer(self, correct: bool):
         """Обработчик ответа пользователя"""
-        if not self._current_card:
-            return
+        try:
+            if not self._current_card:
+                return
 
-        self._controller.record_answer(self._current_card.id, correct)
-        has_more = self._controller.answer_current_card(correct)
+            self._controller.record_answer(self._current_card.id, correct)
+            has_more = self._controller.answer_current_card(correct)
 
-        if has_more:
-            self._load_current_card()
-        else:
-            self._end_session()
+            if has_more:
+                self._load_current_card()
+            else:
+                self._end_session()
+        except Exception as e:
+            logger.error(f"Ошибка обработки ответа: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось обработать ответ: {e}")
 
     def _end_session(self):
         """Завершает сессию"""
-        progress = self._controller.get_progress()
+        try:
+            progress = self._controller.get_progress()
 
-        self._controller.end_review_session()
+            self._controller.end_review_session()
 
-        self.session_completed.emit(
-            progress['completed'],
-            progress['total']
-        )
+            self.session_completed.emit(
+                progress['completed'],
+                progress['total']
+            )
 
-        SilentMessageBox.information(
-            self, "Сессия завершена",
-            f"Повторение завершено!\n\n"
-            f"Повторено карточек: {progress['completed']} из {progress['total']}"
-        )
+            SilentMessageBox.information(
+                self, "Сессия завершена",
+                f"Повторение завершено!\n\n"
+                f"Повторено карточек: {progress['completed']} из {progress['total']}"
+            )
+            logger.info(f"Сессия повторения завершена: {progress['completed']}/{progress['total']}")
+        except Exception as e:
+            logger.error(f"Ошибка завершения сессии: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось завершить сессию: {e}")
 
     def _on_cancel(self):
         """Отмена сессии"""
-        reply = SilentMessageBox.question(
-            self, "Завершить сессию?",
-            "Вы действительно хотите завершить сессию повторения досрочно?",
-            SilentMessageBox.Yes | SilentMessageBox.No, SilentMessageBox.No
-        )
+        try:
+            reply = SilentMessageBox.question(
+                self, "Завершить сессию?",
+                "Вы действительно хотите завершить сессию повторения досрочно?",
+                SilentMessageBox.Yes | SilentMessageBox.No, SilentMessageBox.No
+            )
 
-        if reply == SilentMessageBox.Yes:
-            self._controller.end_review_session()
-            self.session_cancelled.emit()
+            if reply == SilentMessageBox.Yes:
+                self._controller.end_review_session()
+                self.session_cancelled.emit()
+                logger.info("Сессия повторения отменена пользователем")
+        except Exception as e:
+            logger.error(f"Ошибка отмены сессии: {e}", exc_info=True)

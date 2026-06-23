@@ -5,10 +5,14 @@ from PySide6.QtWidgets import (
     QDialog
 )
 from PySide6.QtCore import Qt, Signal
+import logging
 
 from modules.tasks.controller import TaskController
 from modules.tasks.dialogs import TaskDialog
 from widgets import SilentMessageBox
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 
 class TasksView(QWidget):
@@ -94,112 +98,148 @@ class TasksView(QWidget):
         self._load_tasks()
 
     def _load_tasks(self):
-        self.task_list.clear()
-        self.stack.setCurrentIndex(0)
-        self._current_task = None
+        try:
+            self.task_list.clear()
+            self.stack.setCurrentIndex(0)
+            self._current_task = None
 
-        if not self._current_topic_id:
-            return
+            if not self._current_topic_id:
+                return
 
-        tasks = self._controller.get_tasks_by_topic(self._current_topic_id)
+            tasks = self._controller.get_tasks_by_topic(self._current_topic_id)
 
-        if not tasks:
-            self.task_list.addItem("📭 Нет задач в этой теме")
-            return
+            if not tasks:
+                self.task_list.addItem("📭 Нет задач в этой теме")
+                return
 
-        for task in tasks:
-            item = QListWidgetItem()
-            if task.status == 'completed':
-                icon = "✅"
-            elif task.is_overdue():
-                icon = "⚠️"
-            else:
-                icon = "⏳"
-            item.setText(f"{icon} {task.title}")
-            item.setData(Qt.UserRole, task.id)
-            self.task_list.addItem(item)
+            for task in tasks:
+                item = QListWidgetItem()
+                if task.status == 'completed':
+                    icon = "✅"
+                elif task.is_overdue():
+                    icon = "⚠️"
+                else:
+                    icon = "⏳"
+                item.setText(f"{icon} {task.title}")
+                item.setData(Qt.UserRole, task.id)
+                self.task_list.addItem(item)
+
+            logger.debug(f"Загружено {len(tasks)} задач для темы {self._current_topic_id}")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки задач для темы {self._current_topic_id}: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось загрузить задачи: {e}")
 
     def _on_task_selected(self, item: QListWidgetItem):
-        task_id = item.data(Qt.UserRole)
-        self._current_task = self._controller.get_task(task_id)
-        if not self._current_task:
-            return
+        try:
+            task_id = item.data(Qt.UserRole)
+            self._current_task = self._controller.get_task(task_id)
+            if not self._current_task:
+                logger.warning(f"Задача {task_id} не найдена при выборе")
+                return
 
-        self.stack.setCurrentIndex(1)
-        self.detail_title.setText(self._current_task.title)
-        self.detail_desc.setPlainText(self._current_task.description or "Нет описания")
+            self.stack.setCurrentIndex(1)
+            self.detail_title.setText(self._current_task.title)
+            self.detail_desc.setPlainText(self._current_task.description or "Нет описания")
 
-        if self._current_task.deadline:
-            from datetime import datetime
-            deadline_dt = datetime.fromisoformat(self._current_task.deadline)
-            deadline_display = deadline_dt.strftime("%d.%m.%Y %H:%M")
-            self.detail_deadline.setText(f"⏰ Дедлайн: {deadline_display}")
-        else:
-            self.detail_deadline.setText("⏰ Без дедлайна")
+            if self._current_task.deadline:
+                from datetime import datetime
+                try:
+                    deadline_dt = datetime.fromisoformat(self._current_task.deadline)
+                    deadline_display = deadline_dt.strftime("%d.%m.%Y %H:%M")
+                    self.detail_deadline.setText(f"⏰ Дедлайн: {deadline_display}")
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Неверный формат дедлайна для задачи {task_id}: {e}")
+                    self.detail_deadline.setText(f"⏰ Дедлайн: {self._current_task.deadline}")
+            else:
+                self.detail_deadline.setText("⏰ Без дедлайна")
 
-        self.complete_btn.setEnabled(self._current_task.status != 'completed')
+            self.complete_btn.setEnabled(self._current_task.status != 'completed')
+        except Exception as e:
+            logger.error(f"Ошибка выбора задачи: {e}", exc_info=True)
 
     def _on_new_task(self):
-        if not self._current_topic_id:
-            SilentMessageBox.warning(self, "Ошибка", "Сначала выберите тему")
-            return
+        try:
+            if not self._current_topic_id:
+                SilentMessageBox.warning(self, "Ошибка", "Сначала выберите тему")
+                return
 
-        dialog = TaskDialog(self, topic_id=self._current_topic_id)
-        if dialog.exec() == QDialog.Accepted:
-            try:
-                data = dialog.get_task_data()
-                task_id = self._controller.create_task(
-                    title=data['title'],
-                    description=data['description'],
-                    topic_id=self._current_topic_id,
-                    deadline=data['deadline']
-                )
-                if task_id:
-                    self._load_tasks()
-                    self.task_updated.emit()
-                    SilentMessageBox.information(self, "Успех", "Задача создана")
-            except ValueError as e:
-                SilentMessageBox.warning(self, "Ошибка", str(e))
+            dialog = TaskDialog(self, topic_id=self._current_topic_id)
+            if dialog.exec() == QDialog.Accepted:
+                try:
+                    data = dialog.get_task_data()
+                    task_id = self._controller.create_task(
+                        title=data['title'],
+                        description=data['description'],
+                        topic_id=self._current_topic_id,
+                        deadline=data['deadline']
+                    )
+                    if task_id:
+                        self._load_tasks()
+                        self.task_updated.emit()
+                        SilentMessageBox.information(self, "Успех", "Задача создана")
+                        logger.info(f"Создана задача {task_id} в теме {self._current_topic_id}")
+                except ValueError as e:
+                    SilentMessageBox.warning(self, "Ошибка", str(e))
+                    logger.warning(f"Ошибка валидации данных задачи: {e}")
+        except Exception as e:
+            logger.error(f"Ошибка создания задачи: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось создать задачу: {e}")
 
     def _on_complete_task(self):
-        if not self._current_task:
-            return
-        if self._controller.complete_task(self._current_task.id):
-            self._load_tasks()
-            self.task_updated.emit()
-            SilentMessageBox.information(self, "Успех", "Задача выполнена!")
+        try:
+            if not self._current_task:
+                return
+            if self._controller.complete_task(self._current_task.id):
+                self._load_tasks()
+                self.task_updated.emit()
+                SilentMessageBox.information(self, "Успех", "Задача выполнена!")
+                logger.info(f"Задача {self._current_task.id} выполнена")
+        except Exception as e:
+            logger.error(f"Ошибка выполнения задачи: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось выполнить задачу: {e}")
 
     def _on_edit_task(self):
-        if not self._current_task:
-            return
-        dialog = TaskDialog(self, self._current_task)
-        if dialog.exec() == QDialog.Accepted:
-            try:
-                data = dialog.get_task_data()
-                self._controller.update_task(
-                    self._current_task.id,
-                    title=data['title'],
-                    description=data['description'],
-                    deadline=data['deadline']
-                )
-                self._load_tasks()
-                self.task_updated.emit()
-                SilentMessageBox.information(self, "Успех", "Задача обновлена")
-            except ValueError as e:
-                SilentMessageBox.warning(self, "Ошибка", str(e))
+        try:
+            if not self._current_task:
+                return
+            dialog = TaskDialog(self, self._current_task)
+            if dialog.exec() == QDialog.Accepted:
+                try:
+                    data = dialog.get_task_data()
+                    self._controller.update_task(
+                        self._current_task.id,
+                        title=data['title'],
+                        description=data['description'],
+                        deadline=data['deadline']
+                    )
+                    self._load_tasks()
+                    self.task_updated.emit()
+                    SilentMessageBox.information(self, "Успех", "Задача обновлена")
+                    logger.info(f"Задача {self._current_task.id} обновлена")
+                except ValueError as e:
+                    SilentMessageBox.warning(self, "Ошибка", str(e))
+                    logger.warning(f"Ошибка валидации данных задачи: {e}")
+        except Exception as e:
+            logger.error(f"Ошибка редактирования задачи: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось обновить задачу: {e}")
 
     def _on_delete_task(self):
-        if not self._current_task:
-            return
-        reply = SilentMessageBox.question(
-            self, "Подтверждение удаления",
-            f"Удалить задачу «{self._current_task.title}»?"
-        )
-        if reply == SilentMessageBox.Yes:
-            if self._controller.delete_task(self._current_task.id):
-                self._load_tasks()
-                self.task_updated.emit()
-                self.stack.setCurrentIndex(0)
+        try:
+            if not self._current_task:
+                return
+            reply = SilentMessageBox.question(
+                self, "Подтверждение удаления",
+                f"Удалить задачу «{self._current_task.title}»?"
+            )
+            if reply == SilentMessageBox.Yes:
+                if self._controller.delete_task(self._current_task.id):
+                    self._load_tasks()
+                    self.task_updated.emit()
+                    self.stack.setCurrentIndex(0)
+                    logger.info(f"Задача {self._current_task.id} удалена")
+        except Exception as e:
+            logger.error(f"Ошибка удаления задачи: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось удалить задачу: {e}")
 
     def refresh(self):
         self._load_tasks()

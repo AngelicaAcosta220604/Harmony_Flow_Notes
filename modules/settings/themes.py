@@ -1,8 +1,14 @@
 # modules/settings/themes.py
+import logging
 from pathlib import Path
 from typing import Optional
 
-#
+from utils.resource_paths import get_resource_path
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
+
+
 class ThemeManager:
     """Менеджер для переключения светлой и тёмной темы"""
 
@@ -80,101 +86,103 @@ class ThemeManager:
         }
 
         /* Дерево тем */
-QTreeWidget {
-    background-color: #FFFFFF;
-    border: 1px solid #E6EEF6;
-    border-radius: 16px;
-    outline: none;
-    padding: 8px 0px;
-}
+        QTreeWidget {
+            background-color: #FFFFFF;
+            border: 1px solid #E6EEF6;
+            border-radius: 16px;
+            outline: none;
+            padding: 8px 0px;
+        }
 
-QTreeWidget::item {
-    min-height: 38px;
-    padding: 4px 12px;
-    margin: 1px 8px;
-    border-radius: 8px;
-    font-size: 13px;
-    border: none;
-}
+        QTreeWidget::item {
+            min-height: 38px;
+            padding: 4px 12px;
+            margin: 1px 8px;
+            border-radius: 8px;
+            font-size: 13px;
+            border: none;
+        }
 
-/* Выделение для папок (жёлтое) */
-QTreeWidget::item:selected {
-    background-color: #FFF7EB;
-    border-left: 3px solid #F59E0B;
-    border-radius: 6px;
-    color: #1F2937;
-}
+        /* Выделение для папок (жёлтое) */
+        QTreeWidget::item:selected {
+            background-color: #FFF7EB;
+            border-left: 3px solid #F59E0B;
+            border-radius: 6px;
+            color: #1F2937;
+        }
 
-/* Выделение для тем (голубое) */
-QTreeWidget::item:selected:!has-children {
-    background-color: #EBF5FF;
-    border-left: 3px solid #3B82F6;
-    border-radius: 6px;
-    color: #1F2937;
-}
+        /* Выделение для тем (голубое) */
+        QTreeWidget::item:selected:!has-children {
+            background-color: #EBF5FF;
+            border-left: 3px solid #3B82F6;
+            border-radius: 6px;
+            color: #1F2937;
+        }
 
-/* Наведение на элемент */
-QTreeWidget::item:hover:!selected {
-    background-color: #F9FAFB;
-    border-radius: 8px;
-}
-/* Стили для QInputDialog и QMessageBox */
-QInputDialog, QMessageBox {
-    background-color: #FFFFFF;
-    border-radius: 16px;
-}
+        /* Наведение на элемент */
+        QTreeWidget::item:hover:!selected {
+            background-color: #F9FAFB;
+            border-radius: 8px;
+        }
 
-QInputDialog QLabel, QMessageBox QLabel {
-    font-family: 'Segoe UI', 'Inter', sans-serif;
-    font-size: 14px;
-    font-weight: 600;
-    color: #1F2937;
-    background-color: transparent;
-}
+        /* Стили для QInputDialog и QMessageBox */
+        QInputDialog, QMessageBox {
+            background-color: #FFFFFF;
+            border-radius: 16px;
+        }
 
-QInputDialog QLineEdit {
-    background-color: #F0F4F8;
-    border: 1px solid #E6EEF6;
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 14px;
-    color: #1F2937;
-    min-height: 24px;
-}
+        QInputDialog QLabel, QMessageBox QLabel {
+            font-family: 'Segoe UI', 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1F2937;
+            background-color: transparent;
+        }
 
-QInputDialog QLineEdit:focus {
-    background-color: #FFFFFF;
-    border: 1.5px solid #3B82F6;
-}
+        QInputDialog QLineEdit {
+            background-color: #F0F4F8;
+            border: 1px solid #E6EEF6;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: #1F2937;
+            min-height: 24px;
+        }
 
-QInputDialog QPushButton, QMessageBox QPushButton {
-    background-color: #F0F4F8;
-    color: #1F2937;
-    border: none;
-    border-radius: 8px;
-    padding: 6px 16px;
-    font-size: 13px;
-    font-weight: 500;
-    min-width: 80px;
-    min-height: 28px;
-}
+        QInputDialog QLineEdit:focus {
+            background-color: #FFFFFF;
+            border: 1.5px solid #3B82F6;
+        }
 
-QInputDialog QPushButton:hover, QMessageBox QPushButton:hover {
-    background-color: #E2E8F0;
-}
+        QInputDialog QPushButton, QMessageBox QPushButton {
+            background-color: #F0F4F8;
+            color: #1F2937;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 16px;
+            font-size: 13px;
+            font-weight: 500;
+            min-width: 80px;
+            min-height: 28px;
+        }
 
-QInputDialog QPushButton:default, QMessageBox QPushButton:default {
-    background-color: #3B82F6;
-    color: #FFFFFF;
-}
+        QInputDialog QPushButton:hover, QMessageBox QPushButton:hover {
+            background-color: #E2E8F0;
+        }
 
-QInputDialog QPushButton:default:hover {
-    background-color: #2563EB;
-}
+        QInputDialog QPushButton:default, QMessageBox QPushButton:default {
+            background-color: #3B82F6;
+            color: #FFFFFF;
+        }
 
-QInputDialog QDialogButtonBox {
-    button-layout: 0;
-}
+        QInputDialog QPushButton:default:hover {
+            background-color: #2563EB;
+        }
+
+        QInputDialog QDialogButtonBox {
+            button-layout: 0;
+        }
+
         /* Табы */
         QTabWidget::pane {
             border: 1px solid #e0e0e0;
@@ -230,101 +238,93 @@ QInputDialog QDialogButtonBox {
         QScrollBar::handle:vertical:hover {
             background-color: #a0a0a0;
         }
-/* ========== РАЗДЕЛ ТЕМ (СТРУКТУРА ЗНАНИЙ) ========== */
 
-/* Контейнер дерева тем */
-QTreeWidget {
-    background-color: #FFFFFF;
-    border: 1px solid #E6EEF6;
-    border-radius: 16px;
-    outline: none;
-    padding: 8px 0px;
-}
+        /* ========== РАЗДЕЛ ТЕМ (СТРУКТУРА ЗНАНИЙ) ========== */
 
-/* Элементы дерева - общие настройки */
-QTreeWidget::item {
-    min-height: 38px;
-    padding: 4px 12px;
-    margin: 1px 8px;
-    border-radius: 8px;
-    font-size: 13px;
-}
+        /* Элементы дерева - общие настройки */
+        QTreeWidget::item {
+            min-height: 38px;
+            padding: 4px 12px;
+            margin: 1px 8px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
 
-/* Папки - более плотный шрифт и тёмный цвет */
-QTreeWidget::item:has-children {
-    font-weight: 500;
-    color: #1F2937;
-}
+        /* Папки - более плотный шрифт и тёмный цвет */
+        QTreeWidget::item:has-children {
+            font-weight: 500;
+            color: #1F2937;
+        }
 
-/* Темы - обычный вес и мягкий цвет */
-QTreeWidget::item:!has-children {
-    font-weight: 400;
-    color: #374151;
-}
+        /* Темы - обычный вес и мягкий цвет */
+        QTreeWidget::item:!has-children {
+            font-weight: 400;
+            color: #374151;
+        }
 
-/* Выделенный элемент */
-QTreeWidget::item:selected {
-    background-color: rgba(59, 130, 246, 0.08);
-    color: #3B82F6;
-    font-weight: 500;
-    border: none;
-    border-radius: 8px;
-}
+        /* Выделенный элемент */
+        QTreeWidget::item:selected {
+            background-color: rgba(59, 130, 246, 0.08);
+            color: #3B82F6;
+            font-weight: 500;
+            border: none;
+            border-radius: 8px;
+        }
 
-/* Наведение на элемент */
-QTreeWidget::item:hover:!selected {
-    background-color: #F9FAFB;
-    border-radius: 8px;
-}
+        /* Наведение на элемент */
+        QTreeWidget::item:hover:!selected {
+            background-color: #F9FAFB;
+            border-radius: 8px;
+        }
 
-/* Стрелочки раскрытия (кастомные иконки) */
-QTreeWidget::branch:closed:has-children {
-    image: url(resources/icons/right.png);
-}
+        /* Стрелочки раскрытия (кастомные иконки) */
+        QTreeWidget::branch:closed:has-children {
+            image: url(resources/icons/right.png);
+        }
 
-QTreeWidget::branch:open:has-children {
-    image: url(resources/icons/down.png);
-}
+        QTreeWidget::branch:open:has-children {
+            image: url(resources/icons/down.png);
+        }
 
-QTreeWidget::branch:has-children {
-    min-width: 24px;
-    max-width: 24px;
-}
+        QTreeWidget::branch:has-children {
+            min-width: 24px;
+            max-width: 24px;
+        }
 
-/* ========== КНОПКИ ПАНЕЛИ ИНСТРУМЕНТОВ ========== */
+        /* ========== КНОПКИ ПАНЕЛИ ИНСТРУМЕНТОВ ========== */
 
-/* Базовое состояние кнопок (для кнопок внутри виджета тем) */
-QPushButton {
-    background-color: rgba(240, 244, 248, 0.8);
-    color: #1F2937;
-    border: none;
-    border-radius: 8px;
-    padding: 6px 12px;
-    font-size: 13px;
-    font-weight: 500;
-}
+        /* Базовое состояние кнопок (для кнопок внутри виджета тем) */
+        QPushButton {
+            background-color: rgba(240, 244, 248, 0.8);
+            color: #1F2937;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 500;
+        }
 
-QPushButton:hover {
-    background-color: #FFFFFF;
-    border: 1.5px solid #3B82F6;
-    color: #3B82F6;
-}
+        QPushButton:hover {
+            background-color: #FFFFFF;
+            border: 1.5px solid #3B82F6;
+            color: #3B82F6;
+        }
 
-QPushButton:pressed {
-    background-color: #EBF2FF;
-}
+        QPushButton:pressed {
+            background-color: #EBF2FF;
+        }
 
-QPushButton:disabled {
-    opacity: 0.5;
-    background-color: rgba(240, 244, 248, 0.5);
-    color: #9CA3AF;
-}
+        QPushButton:disabled {
+            opacity: 0.5;
+            background-color: rgba(240, 244, 248, 0.5);
+            color: #9CA3AF;
+        }
 
-QPushButton:disabled:hover {
-    border: none;
-    background-color: rgba(240, 244, 248, 0.5);
-    cursor: not-allowed;
-}
+        QPushButton:disabled:hover {
+            border: none;
+            background-color: rgba(240, 244, 248, 0.5);
+            cursor: not-allowed;
+        }
     """
 
     DARK_STYLE = """
@@ -414,6 +414,20 @@ QPushButton:disabled:hover {
             background-color: #353535;
         }
 
+        /* Стрелочки раскрытия (кастомные иконки) */
+        QTreeWidget::branch:closed:has-children {
+            image: url(resources/icons/right.png);
+        }
+
+        QTreeWidget::branch:open:has-children {
+            image: url(resources/icons/down.png);
+        }
+
+        QTreeWidget::branch:has-children {
+            min-width: 24px;
+            max-width: 24px;
+        }
+
         /* Табы */
         QTabWidget::pane {
             border: 1px solid #444444;
@@ -480,22 +494,62 @@ QPushButton:disabled:hover {
 
     def get_style(self, theme: str) -> str:
         """
-        Возвращает QSS стиль для указанной темы
+        Возвращает QSS стиль для указанной темы с заменой путей к иконкам
 
         Args:
             theme: 'light' или 'dark'
         """
-        if theme == 'dark':
-            return self.DARK_STYLE
-        return self.LIGHT_STYLE
+        try:
+            if theme == 'dark':
+                base_style = self.DARK_STYLE
+            else:
+                base_style = self.LIGHT_STYLE
+
+            # Заменяем относительные пути на абсолютные
+            right_icon = get_resource_path("resources/icons/right.png")
+            down_icon = get_resource_path("resources/icons/down.png")
+
+            # Заменяем пути в QSS
+            base_style = base_style.replace(
+                "url(resources/icons/right.png)",
+                f"url({right_icon})"
+            )
+            base_style = base_style.replace(
+                "url(resources/icons/down.png)",
+                f"url({down_icon})"
+            )
+
+            logger.debug(f"Стиль {theme} загружен, пути к иконкам заменены")
+            return base_style
+
+        except Exception as e:
+            logger.error(f"Ошибка получения стиля {theme}: {e}", exc_info=True)
+            # Возвращаем базовый стиль без замены путей
+            return self.DARK_STYLE if theme == 'dark' else self.LIGHT_STYLE
 
     def load_qss_file(self, file_path: str) -> str:
         """Загружает QSS из файла"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                return f.read()
+                content = f.read()
+
+            # Заменяем относительные пути на абсолютные
+            right_icon = get_resource_path("resources/icons/right.png")
+            down_icon = get_resource_path("resources/icons/down.png")
+
+            content = content.replace(
+                "url(resources/icons/right.png)",
+                f"url({right_icon})"
+            )
+            content = content.replace(
+                "url(resources/icons/down.png)",
+                f"url({down_icon})"
+            )
+
+            logger.debug(f"QSS файл загружен: {file_path}")
+            return content
         except Exception as e:
-            print(f"[ThemeManager] Ошибка загрузки QSS: {e}")
+            logger.error(f"Ошибка загрузки QSS файла {file_path}: {e}")
             return ""
 
     def apply_theme(self, app, theme: str):
@@ -506,12 +560,19 @@ QPushButton:disabled:hover {
             app: QApplication instance
             theme: 'light' или 'dark'
         """
-        style = self.get_style(theme)
+        try:
+            style = self.get_style(theme)
 
-        # Если есть файлы стилей, пробуем загрузить их
-        if self.styles_dir and self.styles_dir.exists():
-            qss_file = self.styles_dir / f"{theme}_style.qss"
-            if qss_file.exists():
-                style = self.load_qss_file(str(qss_file))
+            # Если есть файлы стилей, пробуем загрузить их
+            if self.styles_dir is not None and self.styles_dir.exists():
+                qss_file = self.styles_dir / f"{theme}_style.qss"
+                if qss_file.exists():
+                    file_style = self.load_qss_file(str(qss_file))
+                    if file_style:
+                        style = file_style
 
-        app.setStyleSheet(style)
+            app.setStyleSheet(style)
+            logger.info(f"Тема {theme} применена")
+
+        except Exception as e:
+            logger.error(f"Ошибка применения темы {theme}: {e}", exc_info=True)

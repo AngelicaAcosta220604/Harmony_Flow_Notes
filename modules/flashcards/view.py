@@ -5,10 +5,14 @@ from PySide6.QtWidgets import (
     QDialog
 )
 from PySide6.QtCore import Qt, Signal
+import logging
 
 from modules.flashcards.controller import FlashcardController
 from modules.flashcards.dialogs import CardTypeDialog
 from widgets import SilentMessageBox
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 
 class FlashcardsView(QWidget):
@@ -83,95 +87,118 @@ class FlashcardsView(QWidget):
         self._load_cards()
 
     def _load_cards(self):
-        self.card_list.clear()
-        if not self._current_topic_id:
-            return
+        try:
+            self.card_list.clear()
+            if not self._current_topic_id:
+                return
 
-        cards = self._controller.get_cards_by_topic(self._current_topic_id)
-        if not cards:
-            self.stack.setCurrentIndex(0)
-            return
+            cards = self._controller.get_cards_by_topic(self._current_topic_id)
+            if not cards:
+                self.stack.setCurrentIndex(0)
+                return
 
-        self.stack.setCurrentIndex(1)
-        for card in cards:
-            item = QListWidgetItem()
-            if card.is_free:
-                preview = card.content[:50] + "..." if len(card.content) > 50 else card.content
-                item.setText(f"📝 {preview}")
-            else:
-                preview = card.question[:50] + "..." if len(card.question) > 50 else card.question
-                item.setText(f"❓ {preview}")
-            item.setData(Qt.UserRole, card.id)
-            self.card_list.addItem(item)
+            self.stack.setCurrentIndex(1)
+            for card in cards:
+                item = QListWidgetItem()
+                if card.is_free:
+                    preview = card.content[:50] + "..." if len(card.content) > 50 else card.content
+                    item.setText(f"📝 {preview}")
+                else:
+                    preview = card.question[:50] + "..." if len(card.question) > 50 else card.question
+                    item.setText(f"❓ {preview}")
+                item.setData(Qt.UserRole, card.id)
+                self.card_list.addItem(item)
+        except Exception as e:
+            logger.error(f"Ошибка загрузки карточек для темы {self._current_topic_id}: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось загрузить карточки: {e}")
 
     def _on_new_card(self):
-        if not self._current_topic_id:
-            SilentMessageBox.warning(self, "Ошибка", "Сначала выберите тему")
-            return
+        try:
+            if not self._current_topic_id:
+                SilentMessageBox.warning(self, "Ошибка", "Сначала выберите тему")
+                return
 
-        dialog = CardTypeDialog(self)
-        if dialog.exec() == QDialog.Accepted:
-            data = dialog.get_card_data()
-            if data['type'] == 'free':
-                card_id = self._controller.create_free_card(self._current_topic_id, data['content'])
-            else:
-                card_id = self._controller.create_qa_card(self._current_topic_id, data['question'], data['answer'])
+            dialog = CardTypeDialog(self)
+            if dialog.exec() == QDialog.Accepted:
+                data = dialog.get_card_data()
+                if data['type'] == 'free':
+                    card_id = self._controller.create_free_card(self._current_topic_id, data['content'])
+                else:
+                    card_id = self._controller.create_qa_card(self._current_topic_id, data['question'], data['answer'])
 
-            if card_id:
-                self._load_cards()
-                self.card_created.emit(card_id)
-                SilentMessageBox.information(self, "Успех", "Карточка создана")
+                if card_id:
+                    self._load_cards()
+                    self.card_created.emit(card_id)
+                    SilentMessageBox.information(self, "Успех", "Карточка создана")
+        except Exception as e:
+            logger.error(f"Ошибка создания карточки: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось создать карточку: {e}")
 
     def _on_delete_card(self):
-        current = self.card_list.currentItem()
-        if not current:
-            SilentMessageBox.information(self, "Информация", "Выберите карточку для удаления")
-            return
+        try:
+            current = self.card_list.currentItem()
+            if not current:
+                SilentMessageBox.information(self, "Информация", "Выберите карточку для удаления")
+                return
 
-        card_id = current.data(Qt.UserRole)
-        card = self._controller.get_card(card_id)
-        if not card:
-            return
+            card_id = current.data(Qt.UserRole)
+            card = self._controller.get_card(card_id)
+            if not card:
+                logger.warning(f"Карточка {card_id} не найдена")
+                return
 
-        reply = SilentMessageBox.question(
-            self, "Подтверждение удаления",
-            f"Удалить карточку?\n\n{card.display_front[:100]}"
-        )
+            reply = SilentMessageBox.question(
+                self, "Подтверждение удаления",
+                f"Удалить карточку?\n\n{card.display_front[:100]}"
+            )
 
-        if reply == SilentMessageBox.Yes:
-            if self._controller.delete_card(card_id):
-                self._load_cards()
-                self.card_deleted.emit(card_id)
-                self._current_card = None
-                self.card_display.clear()
+            if reply == SilentMessageBox.Yes:
+                if self._controller.delete_card(card_id):
+                    self._load_cards()
+                    self.card_deleted.emit(card_id)
+                    self._current_card = None
+                    self.card_display.clear()
+        except Exception as e:
+            logger.error(f"Ошибка удаления карточки: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось удалить карточку: {e}")
 
     def _on_edit_card(self):
-        current = self.card_list.currentItem()
-        if not current:
-            SilentMessageBox.information(self, "Информация", "Выберите карточку для редактирования")
-            return
-        SilentMessageBox.information(self, "Информация", "Редактирование карточек будет в следующей версии")
+        try:
+            current = self.card_list.currentItem()
+            if not current:
+                SilentMessageBox.information(self, "Информация", "Выберите карточку для редактирования")
+                return
+            SilentMessageBox.information(self, "Информация", "Редактирование карточек будет в следующей версии")
+        except Exception as e:
+            logger.error(f"Ошибка редактирования карточки: {e}", exc_info=True)
 
     def _on_card_selected(self, item: QListWidgetItem):
-        card_id = item.data(Qt.UserRole)
-        self._current_card = self._controller.get_card(card_id)
-        if not self._current_card:
-            return
+        try:
+            card_id = item.data(Qt.UserRole)
+            self._current_card = self._controller.get_card(card_id)
+            if not self._current_card:
+                logger.warning(f"Карточка {card_id} не найдена при выборе")
+                return
 
-        if self._current_card.is_free:
-            self.card_display.setPlainText(self._current_card.content)
-            self.show_answer_btn.hide()
-        else:
-            self.card_display.setPlainText(f"❓ {self._current_card.question}\n\n[Скрыто]\n\nНажмите «Показать ответ»")
-            self.show_answer_btn.show()
+            if self._current_card.is_free:
+                self.card_display.setPlainText(self._current_card.content)
+                self.show_answer_btn.hide()
+            else:
+                self.card_display.setPlainText(f"❓ {self._current_card.question}\n\n[Скрыто]\n\nНажмите «Показать ответ»")
+                self.show_answer_btn.show()
+        except Exception as e:
+            logger.error(f"Ошибка выбора карточки: {e}", exc_info=True)
 
     def _on_show_answer(self):
-        if self._current_card and self._current_card.is_qa:
-            self.card_display.setPlainText(
-                f"❓ {self._current_card.question}\n\n"
-                f"📝 Ответ:\n{self._current_card.answer}"
-            )
-            self.show_answer_btn.hide()
+        try:
+            if self._current_card and self._current_card.is_qa:
+                self.card_display.setPlainText(
+                    f"❓ {self._current_card.question}\n\n"
+                    f"📝 Ответ:\n{self._current_card.answer}"
+                )
+                self.show_answer_btn.hide()
+        except Exception as e:
+            logger.error(f"Ошибка показа ответа: {e}", exc_info=True)
 
     def refresh(self):
         self._load_cards()

@@ -5,10 +5,15 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QDate, QSize
 from PySide6.QtGui import QIcon, QPixmap
+import logging
 
+from utils.resource_paths import get_resource_path
 from .calendar_controller import CalendarController
 from .widgets import CalendarWidget
 from models.task import Task
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 
 class CalendarView(QWidget):
@@ -58,7 +63,8 @@ class CalendarView(QWidget):
         header_layout.setAlignment(Qt.AlignCenter)
 
         header_icon = QLabel()
-        header_pixmap = QPixmap("resources/icons/calendar1.png")
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        header_pixmap = QPixmap(str(get_resource_path("resources/icons/calendar1.png")))
         if not header_pixmap.isNull():
             header_pixmap = header_pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             header_icon.setPixmap(header_pixmap)
@@ -183,7 +189,8 @@ class CalendarView(QWidget):
 
         # Кнопка новой задачи
         self.new_task_btn = QPushButton("Новая задача")
-        self.new_task_btn.setIcon(QIcon("resources/icons/task1.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.new_task_btn.setIcon(QIcon(str(get_resource_path("resources/icons/task1.png"))))
         self.new_task_btn.setIconSize(QSize(18, 18))
         self.new_task_btn.setStyleSheet("""
             QPushButton {
@@ -229,7 +236,8 @@ class CalendarView(QWidget):
 
         tasks_title_layout = QHBoxLayout()
         tasks_icon = QLabel()
-        tasks_icon_pixmap = QPixmap("resources/icons/task1.png")
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        tasks_icon_pixmap = QPixmap(str(get_resource_path("resources/icons/task1.png")))
         if not tasks_icon_pixmap.isNull():
             tasks_icon_pixmap = tasks_icon_pixmap.scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             tasks_icon.setPixmap(tasks_icon_pixmap)
@@ -277,54 +285,69 @@ class CalendarView(QWidget):
         self._load_month_tasks()
 
     def _on_date_range_changed(self):
-        month = self.month_combo.currentIndex() + 1
-        year = int(self.year_combo.currentText())
-        self.calendar.setCurrentPage(year, month)
-        self._load_month_tasks()
-        new_date = QDate(year, month, 1)
-        self._on_date_selected(new_date)
+        try:
+            month = self.month_combo.currentIndex() + 1
+            year = int(self.year_combo.currentText())
+            self.calendar.setCurrentPage(year, month)
+            self._load_month_tasks()
+            new_date = QDate(year, month, 1)
+            self._on_date_selected(new_date)
+        except Exception as e:
+            logger.error(f"Ошибка изменения диапазона дат: {e}", exc_info=True)
 
     def _load_month_tasks(self):
-        current_date = self.calendar.selectedDate()
-        year = current_date.year()
-        month = current_date.month()
-        task_counts = self._controller.get_task_count_for_month(year, month)
-        self.calendar.set_task_dates(list(task_counts.keys()))
+        try:
+            current_date = self.calendar.selectedDate()
+            year = current_date.year()
+            month = current_date.month()
+            task_counts = self._controller.get_task_count_for_month(year, month)
+            self.calendar.set_task_dates(list(task_counts.keys()))
+            logger.debug(f"Загружено {len(task_counts)} дней с задачами для {year}-{month}")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки задач месяца: {e}", exc_info=True)
 
     def _on_date_selected(self, date: QDate):
         """Обработчик клика по дню в календаре"""
-        self._current_date = date
-        self.selected_date_label.setText(date.toString("dddd, d MMMM yyyy"))
+        try:
+            self._current_date = date
+            self.selected_date_label.setText(date.toString("dddd, d MMMM yyyy"))
 
-        # Получаем задачи на выбранный день
-        tasks = self._controller.get_tasks_for_day(date.toPython())
+            # Получаем задачи на выбранный день
+            tasks = self._controller.get_tasks_for_day(date.toPython())
+            if tasks is None:
+                tasks = []
 
-        # Фильтруем по поиску если есть
-        query = self.search_edit.text()
-        if query:
-            tasks = [t for t in tasks if query.lower() in t.title.lower() or
-                     (t.description and query.lower() in t.description.lower())]
+            # Фильтруем по поиску если есть
+            query = self.search_edit.text()
+            if query:
+                tasks = [t for t in tasks if query.lower() in t.title.lower() or
+                         (t.description and query.lower() in t.description.lower())]
 
-        self._display_tasks(tasks)
+            self._display_tasks(tasks)
+        except Exception as e:
+            logger.error(f"Ошибка выбора даты {date}: {e}", exc_info=True)
 
     def _display_tasks(self, tasks: list):
         """Отображает задачи в правой панели"""
-        # Очищаем старые виджеты
-        while self.tasks_layout_inner.count():
-            child = self.tasks_layout_inner.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+        try:
+            # Очищаем старые виджеты
+            while self.tasks_layout_inner.count():
+                child = self.tasks_layout_inner.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
 
-        if not tasks:
-            empty_label = QLabel("Нет задач на этот день")
-            empty_label.setAlignment(Qt.AlignCenter)
-            empty_label.setStyleSheet("color: #9CA3AF; padding: 20px;")
-            self.tasks_layout_inner.addWidget(empty_label)
-            return
+            if not tasks:
+                empty_label = QLabel("Нет задач на этот день")
+                empty_label.setAlignment(Qt.AlignCenter)
+                empty_label.setStyleSheet("color: #9CA3AF; padding: 20px;")
+                self.tasks_layout_inner.addWidget(empty_label)
+                return
 
-        for task in tasks:
-            task_widget = self._create_task_widget(task)
-            self.tasks_layout_inner.addWidget(task_widget)
+            for task in tasks:
+                task_widget = self._create_task_widget(task)
+                self.tasks_layout_inner.addWidget(task_widget)
+        except Exception as e:
+            logger.error(f"Ошибка отображения задач: {e}", exc_info=True)
 
     def _create_task_widget(self, task: Task) -> QWidget:
         """Создаёт виджет задачи с правильным обработчиком клика"""
@@ -361,11 +384,17 @@ class CalendarView(QWidget):
             layout.addWidget(desc_label)
 
         if task.deadline:
-            from services.time_service import TimeService
-            # ✅ Исправлено: format_datetime_from_iso вместо format_time_from_iso
-            time_label = QLabel(f"⏰ {TimeService.format_datetime_from_iso(task.deadline)}")
-            time_label.setStyleSheet("color: #6B7280; font-size: 10px;")
-            layout.addWidget(time_label)
+            try:
+                from services.time_service import TimeService
+                # ✅ Исправлено: format_datetime_from_iso вместо format_time_from_iso
+                time_label = QLabel(f"⏰ {TimeService.format_datetime_from_iso(task.deadline)}")
+                time_label.setStyleSheet("color: #6B7280; font-size: 10px;")
+                layout.addWidget(time_label)
+            except Exception as e:
+                logger.warning(f"Не удалось отформатировать дедлайн для задачи {task.id}: {e}")
+                time_label = QLabel(f"⏰ {task.deadline}")
+                time_label.setStyleSheet("color: #6B7280; font-size: 10px;")
+                layout.addWidget(time_label)
 
         if task.status == 'completed':
             status_label = QLabel("✓ Выполнена")
@@ -379,5 +408,8 @@ class CalendarView(QWidget):
 
     def refresh(self):
         """Обновляет календарь и список задач"""
-        self._load_month_tasks()
-        self._on_date_selected(self._current_date)
+        try:
+            self._load_month_tasks()
+            self._on_date_selected(self._current_date)
+        except Exception as e:
+            logger.error(f"Ошибка обновления календаря: {e}", exc_info=True)

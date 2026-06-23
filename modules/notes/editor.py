@@ -4,10 +4,14 @@ from PySide6.QtWidgets import (
     QFileDialog, QLabel, QDialog
 )
 from PySide6.QtCore import Qt, Signal, QTimer
+import logging
 
 from .controller import NoteController
 from .widgets import RichTextEditor, EditorToolbar
 from widgets import SilentMessageBox
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 
 class NoteEditorView(QWidget):
@@ -113,122 +117,162 @@ class NoteEditorView(QWidget):
 
     def _auto_save(self):
         """Автосохранение с задержкой"""
-        if self._is_modified:
-            if self._current_note_id:
-                # Существующая заметка - обновляем
-                self.save_note(silent=True)
-            elif self._current_topic_id:
-                # 🆕 Новая заметка - создаём автоматически
-                self._create_note_and_save()
+        try:
+            if self._is_modified:
+                if self._current_note_id:
+                    # Существующая заметка - обновляем
+                    self.save_note(silent=True)
+                elif self._current_topic_id:
+                    # 🆕 Новая заметка - создаём автоматически
+                    self._create_note_and_save()
+        except Exception as e:
+            logger.error(f"Ошибка автосохранения: {e}", exc_info=True)
+            self.status_label.setText(f"❌ Ошибка автосохранения")
 
     def _create_note_and_save(self):
         """Создаёт новую заметку и сохраняет"""
-        title = self.title_edit.text().strip()
-        if not title:
-            title = f"Заметка от {self._get_current_date()}"
+        try:
+            title = self.title_edit.text().strip()
+            if not title:
+                title = f"Заметка от {self._get_current_date()}"
 
-        content = self.editor.get_html()
+            content = self.editor.get_html()
 
-        note_id = self._controller.create_note(
-            topic_id=self._current_topic_id,
-            title=title,
-            content=content
-        )
-
-        if note_id:
-            self._current_note_id = note_id
-            self._is_modified = False
-            self.status_label.setText(f"✅ Создано и сохранено (ID: {note_id})")
-            self.note_saved.emit(note_id)
-            QTimer.singleShot(2000, lambda: self.status_label.setText("Готов к работе"))
-        else:
-            self.status_label.setText("️ Не удалось создать заметку")
-
-    def save_note(self, silent: bool = False):
-        title = self.title_edit.text().strip()
-        if not title:
-            title = f"Заметка от {self._get_current_date()}"
-
-        content = self.editor.get_html()
-
-        if self._current_note_id:
-            success = self._controller.update_note(
-                self._current_note_id,
+            note_id = self._controller.create_note(
+                topic_id=self._current_topic_id,
                 title=title,
                 content=content
             )
-            if success:
+
+            if note_id:
+                self._current_note_id = note_id
                 self._is_modified = False
-                self.status_label.setText("✅ Сохранено")
-                if not silent:
-                    self.note_saved.emit(self._current_note_id)
-                self._auto_save_timer.stop()
+                self.status_label.setText(f"✅ Создано и сохранено (ID: {note_id})")
+                self.note_saved.emit(note_id)
                 QTimer.singleShot(2000, lambda: self.status_label.setText("Готов к работе"))
-        else:
-            self.status_label.setText("⚠️ Выберите тему для сохранения")
+                logger.info(f"Создана новая заметка {note_id} в теме {self._current_topic_id}")
+            else:
+                self.status_label.setText("⚠️ Не удалось создать заметку")
+                logger.warning("Не удалось создать заметку")
+        except Exception as e:
+            logger.error(f"Ошибка создания заметки: {e}", exc_info=True)
+            self.status_label.setText(f"❌ Ошибка создания заметки")
+
+    def save_note(self, silent: bool = False):
+        try:
+            title = self.title_edit.text().strip()
+            if not title:
+                title = f"Заметка от {self._get_current_date()}"
+
+            content = self.editor.get_html()
+
+            if self._current_note_id:
+                success = self._controller.update_note(
+                    self._current_note_id,
+                    title=title,
+                    content=content
+                )
+                if success:
+                    self._is_modified = False
+                    self.status_label.setText("✅ Сохранено")
+                    if not silent:
+                        self.note_saved.emit(self._current_note_id)
+                    self._auto_save_timer.stop()
+                    QTimer.singleShot(2000, lambda: self.status_label.setText("Готов к работе"))
+                    logger.debug(f"Заметка {self._current_note_id} сохранена")
+                else:
+                    self.status_label.setText("⚠️ Не удалось сохранить")
+                    logger.warning(f"Не удалось сохранить заметку {self._current_note_id}")
+            else:
+                self.status_label.setText("⚠️ Выберите тему для сохранения")
+        except Exception as e:
+            logger.error(f"Ошибка сохранения заметки: {e}", exc_info=True)
+            self.status_label.setText(f"❌ Ошибка сохранения")
 
     def create_new_note(self, topic_id: int):
-        self._current_note_id = None
-        self._current_topic_id = topic_id
-        self.title_edit.clear()
-        self.editor.clear_content()
-        self._is_modified = False
-        self.status_label.setText("Новая заметка. Начните писать...")
+        try:
+            self._current_note_id = None
+            self._current_topic_id = topic_id
+            self.title_edit.clear()
+            self.editor.clear_content()
+            self._is_modified = False
+            self.status_label.setText("Новая заметка. Начните писать...")
+            logger.debug(f"Создан редактор для новой заметки в теме {topic_id}")
+        except Exception as e:
+            logger.error(f"Ошибка создания новой заметки: {e}", exc_info=True)
 
     def load_note(self, note_id: int):
-        note = self._controller.get_note(note_id)
-        if not note:
-            SilentMessageBox.warning(self, "Ошибка", "Заметка не найдена")
-            return
+        try:
+            note = self._controller.get_note(note_id)
+            if not note:
+                SilentMessageBox.warning(self, "Ошибка", "Заметка не найдена")
+                logger.warning(f"Заметка {note_id} не найдена")
+                return
 
-        self._current_note_id = note.id
-        self._current_topic_id = note.topic_id
-        self.title_edit.setText(note.title)
-        self.editor.set_html(note.content)
-        self._is_modified = False
-        self.status_label.setText(f"Заметка «{note.title}» загружена")
-        self._auto_save_timer.stop()
+            self._current_note_id = note.id
+            self._current_topic_id = note.topic_id
+            self.title_edit.setText(note.title)
+            self.editor.set_html(note.content)
+            self._is_modified = False
+            self.status_label.setText(f"Заметка «{note.title}» загружена")
+            self._auto_save_timer.stop()
+            logger.debug(f"Загружена заметка {note_id}")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки заметки {note_id}: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось загрузить заметку: {e}")
 
     def delete_note(self):
-        if not self._current_note_id:
-            return
+        try:
+            if not self._current_note_id:
+                return
 
-        reply = SilentMessageBox.question(
-            self, "Подтверждение удаления",
-            f"Удалить заметку «{self.title_edit.text()}»?"
-        )
+            reply = SilentMessageBox.question(
+                self, "Подтверждение удаления",
+                f"Удалить заметку «{self.title_edit.text()}»?"
+            )
 
-        if reply == SilentMessageBox.Yes:
-            success = self._controller.delete_note(self._current_note_id)
-            if success:
-                note_id = self._current_note_id
-                self._current_note_id = None
-                self.title_edit.clear()
-                self.editor.clear_content()
-                self._is_modified = False
-                self.status_label.setText("Заметка удалена")
-                self.note_deleted.emit(note_id)
-            else:
-                SilentMessageBox.warning(self, "Ошибка", "Не удалось удалить заметку")
+            if reply == SilentMessageBox.Yes:
+                success = self._controller.delete_note(self._current_note_id)
+                if success:
+                    note_id = self._current_note_id
+                    self._current_note_id = None
+                    self.title_edit.clear()
+                    self.editor.clear_content()
+                    self._is_modified = False
+                    self.status_label.setText("Заметка удалена")
+                    self.note_deleted.emit(note_id)
+                    logger.info(f"Заметка {note_id} удалена")
+                else:
+                    SilentMessageBox.warning(self, "Ошибка", "Не удалось удалить заметку")
+                    logger.warning(f"Не удалось удалить заметку {self._current_note_id}")
+        except Exception as e:
+            logger.error(f"Ошибка удаления заметки: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось удалить заметку: {e}")
 
     def import_from_file(self):
-        if not self._current_topic_id:
-            SilentMessageBox.warning(self, "Ошибка", "Сначала выберите тему для заметки")
-            return
+        try:
+            if not self._current_topic_id:
+                SilentMessageBox.warning(self, "Ошибка", "Сначала выберите тему для заметки")
+                return
 
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Выберите текстовый файл", "", "Текстовые файлы (*.txt)"
-        )
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "Выберите текстовый файл", "", "Текстовые файлы (*.txt)"
+            )
 
-        if not file_path:
-            return
+            if not file_path:
+                return
 
-        note_id = self._controller.import_from_text(self._current_topic_id, file_path)
-        if note_id:
-            self.load_note(note_id)
-            self.status_label.setText(f"Импортировано из {file_path}")
-        else:
-            SilentMessageBox.warning(self, "Ошибка", "Не удалось импортировать файл")
+            note_id = self._controller.import_from_text(self._current_topic_id, file_path)
+            if note_id:
+                self.load_note(note_id)
+                self.status_label.setText(f"Импортировано из {file_path}")
+                logger.info(f"Импортирована заметка {note_id} из {file_path}")
+            else:
+                SilentMessageBox.warning(self, "Ошибка", "Не удалось импортировать файл")
+                logger.warning(f"Не удалось импортировать файл {file_path}")
+        except Exception as e:
+            logger.error(f"Ошибка импорта файла: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось импортировать файл: {e}")
 
     def get_current_note_id(self) -> int:
         return self._current_note_id
@@ -242,94 +286,71 @@ class NoteEditorView(QWidget):
 
     def _create_task_from_selection(self, selected_text: str):
         """Создаёт задачу из выделенного текста"""
-        if not self._current_topic_id:
-            SilentMessageBox.warning(self, "Ошибка", "Сначала выберите тему для задачи")
-            return
+        try:
+            if not self._current_topic_id:
+                SilentMessageBox.warning(self, "Ошибка", "Сначала выберите тему для задачи")
+                return
 
-        from modules.tasks.dialogs import TaskDialog
-        from core.di.container import container
+            from modules.tasks.dialogs import TaskDialog
+            from core.di.container import container
 
-        dialog = TaskDialog(parent=None, topic_id=self._current_topic_id)
-        dialog.setWindowFlags(Qt.WindowStaysOnTopHint)
-        dialog.title_edit.setText(selected_text[:200])
+            dialog = TaskDialog(parent=None, topic_id=self._current_topic_id)
+            dialog.setWindowFlags(Qt.WindowStaysOnTopHint)
+            dialog.title_edit.setText(selected_text[:200])
 
-        if dialog.exec() == QDialog.Accepted:
-            data = dialog.get_task_data()
-            if data:
-                task_id = container.task_controller.create_task(
-                    title=data['title'],
-                    description=data['description'],
-                    topic_id=self._current_topic_id,
-                    deadline=data['deadline']
-                )
-                if task_id:
-                    SilentMessageBox.information(self, "Успех", "Задача создана из заметки")
+            if dialog.exec() == QDialog.Accepted:
+                data = dialog.get_task_data()
+                if data:
+                    task_id = container.task_controller.create_task(
+                        title=data['title'],
+                        description=data['description'],
+                        topic_id=self._current_topic_id,
+                        deadline=data['deadline']
+                    )
+                    if task_id:
+                        SilentMessageBox.information(self, "Успех", "Задача создана из заметки")
+                        logger.info(f"Создана задача {task_id} из заметки")
+        except Exception as e:
+            logger.error(f"Ошибка создания задачи из заметки: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось создать задачу: {e}")
 
     def _create_card_from_selection(self, selected_text: str):
         """Создаёт карточку из выделенного текста"""
-        if not self._current_topic_id:
-            SilentMessageBox.warning(self, "Ошибка", "Сначала выберите тему для карточки")
-            return
+        try:
+            if not self._current_topic_id:
+                SilentMessageBox.warning(self, "Ошибка", "Сначала выберите тему для карточки")
+                return
 
-        from modules.flashcards.dialogs import CardTypeDialog
-        from core.di.container import container
+            from modules.flashcards.dialogs import CardTypeDialog
+            from core.di.container import container
 
-        dialog = CardTypeDialog(parent=None, selected_text=selected_text)
-        dialog.setWindowFlags(Qt.WindowStaysOnTopHint)
+            dialog = CardTypeDialog(parent=None, selected_text=selected_text)
+            dialog.setWindowFlags(Qt.WindowStaysOnTopHint)
 
-        if dialog.exec() == QDialog.Accepted:
-            data = dialog.get_card_data()
-            if data['type'] == 'free':
-                if data.get('content'):
+            # ✅ ИСПРАВЛЕНО: убран дублирующий код, оставлен только один вызов
+            if dialog.exec() == QDialog.Accepted:
+                data = dialog.get_card_data()
+                if data['type'] == 'free':
+                    if not data.get('content'):
+                        SilentMessageBox.warning(self, "Ошибка", "Введите содержимое карточки")
+                        return
                     container.flashcard_controller.create_free_card(
                         self._current_topic_id, data['content']
                     )
-                    SilentMessageBox.information(self, "Успех", "Карточка создана")
-            else:
-                if data.get('question') and data.get('answer'):
+                    SilentMessageBox.information(self, "Успех", "Карточка создана из заметки")
+                    logger.info(f"Создана свободная карточка из заметки")
+                else:
+                    if not data.get('question') or not data.get('answer'):
+                        SilentMessageBox.warning(self, "Ошибка", "Заполните вопрос и ответ")
+                        return
                     container.flashcard_controller.create_qa_card(
                         self._current_topic_id, data['question'], data['answer']
                     )
-                    SilentMessageBox.information(self, "Успех", "Карточка создана")
-
-        def on_accepted():
-            data = dialog.get_card_data()
-            if data['type'] == 'free':
-                if not data.get('content'):
-                    SilentMessageBox.warning(self, "Ошибка", "Введите содержимое карточки")
-                    return
-                container.flashcard_controller.create_free_card(
-                    self._current_topic_id, data['content']
-                )
-            else:
-                if not data.get('question') or not data.get('answer'):
-                    SilentMessageBox.warning(self, "Ошибка", "Заполните вопрос и ответ")
-                    return
-                container.flashcard_controller.create_qa_card(
-                    self._current_topic_id, data['question'], data['answer']
-                )
-            SilentMessageBox.information(self, "Успех", "Карточка создана из заметки")
-            dialog.close()
-
-        dialog.accepted.connect(on_accepted)
-        dialog.show()
-
-    def _save_task_from_dialog(self, dialog):
-        """Сохраняет задачу из немодального диалога"""
-        try:
-            data = dialog.get_task_data()
-            from core.di.container import container
-            task_id = container.task_controller.create_task(
-                title=data['title'],
-                description=data['description'],
-                topic_id=self._current_topic_id,
-                deadline=data['deadline']
-            )
-            if task_id:
-                dialog.close()
-                SilentMessageBox.information(self, "Успех", "Задача создана из заметки")
-        except ValueError as e:
-            SilentMessageBox.warning(self, "Ошибка", str(e))
+                    SilentMessageBox.information(self, "Успех", "Карточка создана из заметки")
+                    logger.info(f"Создана Q&A карточка из заметки")
+        except Exception as e:
+            logger.error(f"Ошибка создания карточки из заметки: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось создать карточку: {e}")
 
     def _on_back_clicked(self):
         """Обработчик кнопки 'Назад'"""

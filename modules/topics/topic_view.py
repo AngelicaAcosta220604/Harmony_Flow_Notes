@@ -1,3 +1,4 @@
+# modules/topics/topic_view.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel,
     QPushButton, QScrollArea, QFrame, QMessageBox, QTextEdit, QListWidget, QListWidgetItem, QCheckBox,
@@ -5,12 +6,17 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Signal, Qt, QSize
 from PySide6.QtGui import QIcon, QPixmap, QColor
+import logging
 
 from widgets import SilentMessageBox
+from utils.resource_paths import get_resource_path
 from .controller import TopicController
 from .analytics_controller import TopicAnalyticsController
 from services.time_service import TimeService
 import re
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 
 def remove_emojis(text: str) -> str:
@@ -265,21 +271,24 @@ class NoteListItemWidget(QWidget):
         layout.addWidget(self.date_label)
 
         self.open_btn = QPushButton()
-        self.open_btn.setIcon(QIcon("resources/icons/open.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.open_btn.setIcon(QIcon(str(get_resource_path("resources/icons/open.png"))))
         self.open_btn.setIconSize(QSize(16, 16))
         self.open_btn.setFixedSize(30, 30)
         self.open_btn.setToolTip("Открыть запись")
         layout.addWidget(self.open_btn)
 
         self.edit_btn = QPushButton()
-        self.edit_btn.setIcon(QIcon("resources/icons/pen.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.edit_btn.setIcon(QIcon(str(get_resource_path("resources/icons/pen.png"))))
         self.edit_btn.setIconSize(QSize(16, 16))
         self.edit_btn.setFixedSize(30, 30)
         self.edit_btn.setToolTip("Редактировать запись")
         layout.addWidget(self.edit_btn)
 
         self.delete_btn = QPushButton()
-        self.delete_btn.setIcon(QIcon("resources/icons/urna.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.delete_btn.setIcon(QIcon(str(get_resource_path("resources/icons/urna.png"))))
         self.delete_btn.setIconSize(QSize(16, 16))
         self.delete_btn.setFixedSize(30, 30)
         self.delete_btn.setToolTip("Удалить запись")
@@ -341,14 +350,16 @@ class TaskListItemWidget(QWidget):
         layout.addWidget(self.deadline_label)
 
         self.edit_btn = QPushButton()
-        self.edit_btn.setIcon(QIcon("resources/icons/pen.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.edit_btn.setIcon(QIcon(str(get_resource_path("resources/icons/pen.png"))))
         self.edit_btn.setIconSize(QSize(16, 16))
         self.edit_btn.setFixedSize(30, 30)
         self.edit_btn.clicked.connect(lambda: self.edit_clicked.emit(self.task_id))
         layout.addWidget(self.edit_btn)
 
         self.delete_btn = QPushButton()
-        self.delete_btn.setIcon(QIcon("resources/icons/urna.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.delete_btn.setIcon(QIcon(str(get_resource_path("resources/icons/urna.png"))))
         self.delete_btn.setIconSize(QSize(16, 16))
         self.delete_btn.setFixedSize(30, 30)
         self.delete_btn.clicked.connect(lambda: self.delete_clicked.emit(self.task_id))
@@ -413,7 +424,8 @@ class FlashcardListItemWidget(QWidget):
         layout.addWidget(self.date_label)
 
         self.view_btn = QPushButton()
-        self.view_btn.setIcon(QIcon("resources/icons/open.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.view_btn.setIcon(QIcon(str(get_resource_path("resources/icons/open.png"))))
         self.view_btn.setIconSize(QSize(16, 16))
         self.view_btn.setFixedSize(30, 30)
         self.view_btn.setToolTip("Просмотр")
@@ -421,7 +433,8 @@ class FlashcardListItemWidget(QWidget):
         layout.addWidget(self.view_btn)
 
         self.edit_btn = QPushButton()
-        self.edit_btn.setIcon(QIcon("resources/icons/pen.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.edit_btn.setIcon(QIcon(str(get_resource_path("resources/icons/pen.png"))))
         self.edit_btn.setIconSize(QSize(16, 16))
         self.edit_btn.setFixedSize(30, 30)
         self.edit_btn.setToolTip("Редактировать")
@@ -429,7 +442,8 @@ class FlashcardListItemWidget(QWidget):
         layout.addWidget(self.edit_btn)
 
         self.delete_btn = QPushButton()
-        self.delete_btn.setIcon(QIcon("resources/icons/urna.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.delete_btn.setIcon(QIcon(str(get_resource_path("resources/icons/urna.png"))))
         self.delete_btn.setIconSize(QSize(16, 16))
         self.delete_btn.setFixedSize(30, 30)
         self.delete_btn.setToolTip("Удалить")
@@ -560,9 +574,12 @@ class TopicView(QWidget):
 
     def _on_task_changed(self, task_id: int = None):
         """Обновляет список задач при изменении"""
-        if self._current_topic_id:
-            self._load_tasks(self._current_topic_id)
-            self._load_stats(self._current_topic_id)
+        try:
+            if self._current_topic_id:
+                self._load_tasks(self._current_topic_id)
+                self._load_stats(self._current_topic_id)
+        except Exception as e:
+            logger.error(f"Ошибка обновления задач: {e}", exc_info=True)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -607,7 +624,8 @@ class TopicView(QWidget):
         header_layout.addStretch()
 
         topic_icon = QLabel()
-        topic_pixmap = QPixmap("resources/icons/notes.png")
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        topic_pixmap = QPixmap(str(get_resource_path("resources/icons/notes.png")))
         if not topic_pixmap.isNull():
             topic_pixmap = topic_pixmap.scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             topic_icon.setPixmap(topic_pixmap)
@@ -665,7 +683,8 @@ class TopicView(QWidget):
         self.notes_list.setStyleSheet("border: none;")
         notes_layout.addWidget(self.notes_list)
         self.create_note_btn = QPushButton("Новая запись")
-        self.create_note_btn.setIcon(QIcon("resources/icons/notes.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.create_note_btn.setIcon(QIcon(str(get_resource_path("resources/icons/notes.png"))))
         self.create_note_btn.setIconSize(QSize(18, 18))
         self.create_note_btn.setStyleSheet("""
             QPushButton {
@@ -691,7 +710,8 @@ class TopicView(QWidget):
         self.tasks_list.setStyleSheet("border: none;")
         tasks_layout.addWidget(self.tasks_list)
         self.create_task_btn = QPushButton("Новая задача")
-        self.create_task_btn.setIcon(QIcon("resources/icons/tack.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.create_task_btn.setIcon(QIcon(str(get_resource_path("resources/icons/tack.png"))))
         self.create_task_btn.setIconSize(QSize(18, 18))
         self.create_task_btn.setStyleSheet("""
             QPushButton {
@@ -717,7 +737,8 @@ class TopicView(QWidget):
         self.cards_list.setStyleSheet("border: none;")
         cards_layout.addWidget(self.cards_list)
         self.create_card_btn = QPushButton("Новая карточка")
-        self.create_card_btn.setIcon(QIcon("resources/icons/flashcard.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.create_card_btn.setIcon(QIcon(str(get_resource_path("resources/icons/flashcard.png"))))
         self.create_card_btn.setIconSize(QSize(18, 18))
         self.create_card_btn.setStyleSheet("""
             QPushButton {
@@ -781,7 +802,8 @@ class TopicView(QWidget):
         sessions_layout.addWidget(self.sessions_scroll, 1)
 
         self.start_session_btn = QPushButton("Начать сессию")
-        self.start_session_btn.setIcon(QIcon("resources/icons/play.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.start_session_btn.setIcon(QIcon(str(get_resource_path("resources/icons/play.png"))))
         self.start_session_btn.setIconSize(QSize(18, 18))
         self.start_session_btn.setStyleSheet("""
             QPushButton {
@@ -853,10 +875,15 @@ class TopicView(QWidget):
         stats_layout = QHBoxLayout()
         stats_layout.setSpacing(16)
 
-        self.sessions_card = self._create_stat_card("resources/icons/session.png", "Сессии", "0", "#3B82F6")
-        self.time_card = self._create_stat_card("resources/icons/time.png", "Время", "0 ч", "#F59E0B")
-        self.conc_card = self._create_stat_card("resources/icons/brain.png", "Концентрация", "0%", "#10B981")
-        self.energy_card = self._create_stat_card("resources/icons/energy.png", "Энергия", "0%", "#EF4444")
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        self.sessions_card = self._create_stat_card(str(get_resource_path("resources/icons/session.png")), "Сессии",
+                                                    "0", "#3B82F6")
+        self.time_card = self._create_stat_card(str(get_resource_path("resources/icons/time.png")), "Время", "0 ч",
+                                                "#F59E0B")
+        self.conc_card = self._create_stat_card(str(get_resource_path("resources/icons/brain.png")), "Концентрация",
+                                                "0%", "#10B981")
+        self.energy_card = self._create_stat_card(str(get_resource_path("resources/icons/energy.png")), "Энергия", "0%",
+                                                  "#EF4444")
 
         stats_layout.addWidget(self.sessions_card)
         stats_layout.addWidget(self.time_card)
@@ -879,7 +906,8 @@ class TopicView(QWidget):
 
         tasks_title_layout = QHBoxLayout()
         tasks_icon = QLabel()
-        tasks_icon_pixmap = QPixmap("resources/icons/tack.png")
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        tasks_icon_pixmap = QPixmap(str(get_resource_path("resources/icons/tack.png")))
         if not tasks_icon_pixmap.isNull():
             tasks_icon_pixmap = tasks_icon_pixmap.scaled(18, 18, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             tasks_icon.setPixmap(tasks_icon_pixmap)
@@ -928,7 +956,8 @@ class TopicView(QWidget):
         materials_layout.setSpacing(24)
 
         notes_icon = QLabel()
-        notes_icon_pixmap = QPixmap("resources/icons/notes.png")
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        notes_icon_pixmap = QPixmap(str(get_resource_path("resources/icons/notes.png")))
         if not notes_icon_pixmap.isNull():
             notes_icon_pixmap = notes_icon_pixmap.scaled(18, 18, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             notes_icon.setPixmap(notes_icon_pixmap)
@@ -939,7 +968,8 @@ class TopicView(QWidget):
         materials_layout.addWidget(self.notes_count_label)
 
         cards_icon = QLabel()
-        cards_icon_pixmap = QPixmap("resources/icons/flashcard.png")
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        cards_icon_pixmap = QPixmap(str(get_resource_path("resources/icons/flashcard.png")))
         if not cards_icon_pixmap.isNull():
             cards_icon_pixmap = cards_icon_pixmap.scaled(18, 18, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             cards_icon.setPixmap(cards_icon_pixmap)
@@ -956,7 +986,8 @@ class TopicView(QWidget):
         actions_layout.setSpacing(12)
 
         start_btn = QPushButton("Начать сессию")
-        start_btn.setIcon(QIcon("resources/icons/play.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        start_btn.setIcon(QIcon(str(get_resource_path("resources/icons/play.png"))))
         start_btn.setIconSize(QSize(18, 18))
         start_btn.setStyleSheet("""
             QPushButton {
@@ -997,7 +1028,8 @@ class TopicView(QWidget):
         actions_layout.addWidget(note_btn)
 
         task_btn = QPushButton("Новая задача")
-        task_btn.setIcon(QIcon("resources/icons/tack.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        task_btn.setIcon(QIcon(str(get_resource_path("resources/icons/tack.png"))))
         task_btn.setIconSize(QSize(18, 18))
         task_btn.setStyleSheet("""
             QPushButton {
@@ -1018,7 +1050,8 @@ class TopicView(QWidget):
         actions_layout.addWidget(task_btn)
 
         card_btn = QPushButton("Новая карточка")
-        card_btn.setIcon(QIcon("resources/icons/flashcard.png"))
+        # ✅ ИСПРАВЛЕНО: используем get_resource_path
+        card_btn.setIcon(QIcon(str(get_resource_path("resources/icons/flashcard.png"))))
         card_btn.setIconSize(QSize(18, 18))
         card_btn.setStyleSheet("""
             QPushButton {
@@ -1078,10 +1111,17 @@ class TopicView(QWidget):
         """)
 
         icon_label = QLabel()
-        pixmap = QPixmap(icon_path)
-        if not pixmap.isNull():
-            pixmap = pixmap.scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            icon_label.setPixmap(pixmap)
+        # ✅ ИСПРАВЛЕНО: icon_path уже абсолютный, но добавляем проверку
+        try:
+            pixmap = QPixmap(icon_path)
+            if not pixmap.isNull():
+                pixmap = pixmap.scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                icon_label.setPixmap(pixmap)
+            else:
+                logger.warning(f"Не удалось загрузить иконку: {icon_path}")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки иконки {icon_path}: {e}")
+
         icon_label.setAlignment(Qt.AlignCenter)
 
         icon_layout = QVBoxLayout(icon_container)
@@ -1128,243 +1168,274 @@ class TopicView(QWidget):
         self._load_analytics(topic_id)
 
     def _load_notes(self, topic_id: int):
-        notes = self._topic_controller.get_notes_by_topic(topic_id)
-        self.notes_list.clear()
-        self.notes_list.setSpacing(2)
+        try:
+            notes = self._topic_controller.get_notes_by_topic(topic_id)
+            self.notes_list.clear()
+            self.notes_list.setSpacing(2)
 
-        if not notes:
-            item = QListWidgetItem("📭 Нет записей. Создайте первую запись!")
-            item.setForeground(Qt.gray)
-            self.notes_list.addItem(item)
-            return
+            if not notes:
+                item = QListWidgetItem("📭 Нет записей. Создайте первую запись!")
+                item.setForeground(Qt.gray)
+                self.notes_list.addItem(item)
+                return
 
-        for note in notes:
-            title = remove_emojis(getattr(note, 'title', 'Без названия'))
-            updated_at = getattr(note, 'updated_at', '')
-            created_at = getattr(note, 'created_at', '')
-            date_str = updated_at[:16] if updated_at else (created_at[:16] if created_at else "")
+            for note in notes:
+                title = remove_emojis(getattr(note, 'title', 'Без названия'))
+                updated_at = getattr(note, 'updated_at', '')
+                created_at = getattr(note, 'created_at', '')
+                date_str = updated_at[:16] if updated_at else (created_at[:16] if created_at else "")
 
-            item_widget = NoteListItemWidget(note.id, title, date_str)
-            item_widget.open_btn.clicked.connect(lambda checked, nid=note.id: self.show_all_notes_requested.emit(nid))
-            item_widget.edit_btn.clicked.connect(lambda checked, nid=note.id: self.edit_note_requested.emit(nid))
-            item_widget.delete_btn.clicked.connect(lambda checked, nid=note.id: self._delete_note_by_id(nid))
+                item_widget = NoteListItemWidget(note.id, title, date_str)
+                item_widget.open_btn.clicked.connect(
+                    lambda checked, nid=note.id: self.show_all_notes_requested.emit(nid))
+                item_widget.edit_btn.clicked.connect(lambda checked, nid=note.id: self.edit_note_requested.emit(nid))
+                item_widget.delete_btn.clicked.connect(lambda checked, nid=note.id: self._delete_note_by_id(nid))
 
-            item = QListWidgetItem()
-            item.setSizeHint(item_widget.sizeHint())
-            self.notes_list.addItem(item)
-            self.notes_list.setItemWidget(item, item_widget)
+                item = QListWidgetItem()
+                item.setSizeHint(item_widget.sizeHint())
+                self.notes_list.addItem(item)
+                self.notes_list.setItemWidget(item, item_widget)
+        except Exception as e:
+            logger.error(f"Ошибка загрузки заметок для темы {topic_id}: {e}", exc_info=True)
 
     def _load_tasks(self, topic_id: int):
-        tasks = self._topic_controller.get_tasks_by_topic(topic_id)
-        self.tasks_list.clear()
-        self.tasks_list.setSpacing(2)
+        try:
+            tasks = self._topic_controller.get_tasks_by_topic(topic_id)
+            self.tasks_list.clear()
+            self.tasks_list.setSpacing(2)
 
-        if not tasks:
-            item = QListWidgetItem("✅ Нет задач. Создайте первую задачу!")
-            item.setForeground(Qt.gray)
-            self.tasks_list.addItem(item)
-            return
+            if not tasks:
+                item = QListWidgetItem("✅ Нет задач. Создайте первую задачу!")
+                item.setForeground(Qt.gray)
+                self.tasks_list.addItem(item)
+                return
 
-        for task in tasks:
-            item_widget = TaskListItemWidget(
-                task.id, task.title, task.deadline_display, task.status, task.is_overdue()
-            )
-            item_widget.complete_clicked.connect(self.complete_task_requested.emit)
-            item_widget.edit_clicked.connect(self.edit_task_requested.emit)
-            item_widget.delete_clicked.connect(self.delete_task_requested.emit)
+            for task in tasks:
+                item_widget = TaskListItemWidget(
+                    task.id, task.title, task.deadline_display, task.status, task.is_overdue()
+                )
+                item_widget.complete_clicked.connect(self.complete_task_requested.emit)
+                item_widget.edit_clicked.connect(self.edit_task_requested.emit)
+                item_widget.delete_clicked.connect(self.delete_task_requested.emit)
 
-            item = QListWidgetItem()
-            item.setSizeHint(item_widget.sizeHint())
-            self.tasks_list.addItem(item)
-            self.tasks_list.setItemWidget(item, item_widget)
+                item = QListWidgetItem()
+                item.setSizeHint(item_widget.sizeHint())
+                self.tasks_list.addItem(item)
+                self.tasks_list.setItemWidget(item, item_widget)
+        except Exception as e:
+            logger.error(f"Ошибка загрузки задач для темы {topic_id}: {e}", exc_info=True)
 
     def _load_cards(self, topic_id: int):
-        cards = self._topic_controller.get_cards_by_topic(topic_id)
-        self.cards_list.clear()
-        self.cards_list.setSpacing(2)
+        try:
+            cards = self._topic_controller.get_cards_by_topic(topic_id)
+            self.cards_list.clear()
+            self.cards_list.setSpacing(2)
 
-        if not cards:
-            item = QListWidgetItem("🃏 Нет карточек. Создайте первую карточку!")
-            item.setForeground(Qt.gray)
-            self.cards_list.addItem(item)
-            return
+            if not cards:
+                item = QListWidgetItem("🃏 Нет карточек. Создайте первую карточку!")
+                item.setForeground(Qt.gray)
+                self.cards_list.addItem(item)
+                return
 
-        for card in cards:
-            if card.is_free:
-                preview = card.content[:50] + "..." if len(card.content) > 50 else card.content
-                card_type = 'free'
-            else:
-                preview = card.question[:50] + "..." if len(card.question) > 50 else card.question
-                card_type = 'qa'
+            for card in cards:
+                if card.is_free:
+                    preview = card.content[:50] + "..." if len(card.content) > 50 else card.content
+                    card_type = 'free'
+                else:
+                    preview = card.question[:50] + "..." if len(card.question) > 50 else card.question
+                    card_type = 'qa'
 
-            updated_at = getattr(card, 'updated_at', '')
-            created_at = getattr(card, 'created_at', '')
-            date_str = updated_at[:16] if updated_at else (created_at[:16] if created_at else "")
+                updated_at = getattr(card, 'updated_at', '')
+                created_at = getattr(card, 'created_at', '')
+                date_str = updated_at[:16] if updated_at else (created_at[:16] if created_at else "")
 
-            item_widget = FlashcardListItemWidget(card.id, preview, card_type, date_str)
-            item_widget.view_clicked.connect(lambda cid=card.id: self._view_card(cid))
-            item_widget.edit_clicked.connect(lambda cid=card.id: self._edit_card(cid))
-            item_widget.delete_clicked.connect(lambda cid=card.id: self._delete_card(cid))
+                item_widget = FlashcardListItemWidget(card.id, preview, card_type, date_str)
+                item_widget.view_clicked.connect(lambda cid=card.id: self._view_card(cid))
+                item_widget.edit_clicked.connect(lambda cid=card.id: self._edit_card(cid))
+                item_widget.delete_clicked.connect(lambda cid=card.id: self._delete_card(cid))
 
-            item = QListWidgetItem()
-            item.setSizeHint(item_widget.sizeHint())
-            self.cards_list.addItem(item)
-            self.cards_list.setItemWidget(item, item_widget)
+                item = QListWidgetItem()
+                item.setSizeHint(item_widget.sizeHint())
+                self.cards_list.addItem(item)
+                self.cards_list.setItemWidget(item, item_widget)
+        except Exception as e:
+            logger.error(f"Ошибка загрузки карточек для темы {topic_id}: {e}", exc_info=True)
 
     def _view_card(self, card_id: int):
-        from core.di.container import container
-        card = container.flashcard_controller.get_card(card_id)
-        if not card:
-            return
+        try:
+            from core.di.container import container
+            card = container.flashcard_controller.get_card(card_id)
+            if not card:
+                return
 
-        dialog = FlashcardViewDialog(card, is_edit_mode=False)
-        dialog.exec()
+            dialog = FlashcardViewDialog(card, is_edit_mode=False)
+            dialog.exec()
+        except Exception as e:
+            logger.error(f"Ошибка просмотра карточки {card_id}: {e}", exc_info=True)
 
     def _edit_card(self, card_id: int):
-        from core.di.container import container
-        card = container.flashcard_controller.get_card(card_id)
-        if not card:
-            return
+        try:
+            from core.di.container import container
+            card = container.flashcard_controller.get_card(card_id)
+            if not card:
+                return
 
-        dialog = FlashcardViewDialog(card, is_edit_mode=True)
-        if dialog.exec() == QDialog.Accepted:
-            data = dialog.get_card_data()
-            if container.flashcard_controller.update_card(card_id, **data):
-                self._load_cards(self._current_topic_id)
-                SilentMessageBox.information(self, "Успех", "Карточка обновлена")
+            dialog = FlashcardViewDialog(card, is_edit_mode=True)
+            if dialog.exec() == QDialog.Accepted:
+                data = dialog.get_card_data()
+                if container.flashcard_controller.update_card(card_id, **data):
+                    self._load_cards(self._current_topic_id)
+                    SilentMessageBox.information(self, "Успех", "Карточка обновлена")
+        except Exception as e:
+            logger.error(f"Ошибка редактирования карточки {card_id}: {e}", exc_info=True)
 
     def _delete_card(self, card_id: int):
-        from core.di.container import container
-        card = container.flashcard_controller.get_card(card_id)
-        if not card:
-            return
+        try:
+            from core.di.container import container
+            card = container.flashcard_controller.get_card(card_id)
+            if not card:
+                return
 
-        reply = SilentMessageBox.question(
-            self, "Подтверждение удаления",
-            f"Удалить карточку?"
-        )
+            reply = SilentMessageBox.question(
+                self, "Подтверждение удаления",
+                f"Удалить карточку?"
+            )
 
-        if reply == SilentMessageBox.Yes:
-            if container.flashcard_controller.delete_card(card_id):
-                self._load_cards(self._current_topic_id)
-                SilentMessageBox.information(self, "Успех", "Карточка удалена")
+            if reply == SilentMessageBox.Yes:
+                if container.flashcard_controller.delete_card(card_id):
+                    self._load_cards(self._current_topic_id)
+                    SilentMessageBox.information(self, "Успех", "Карточка удалена")
+        except Exception as e:
+            logger.error(f"Ошибка удаления карточки {card_id}: {e}", exc_info=True)
 
     def _load_topic_sessions(self, topic_id: int):
         """Загружает сессии темы в виде карточек"""
-        while self.sessions_cards_layout.count() > 1:
-            item = self.sessions_cards_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        try:
+            while self.sessions_cards_layout.count() > 1:
+                item = self.sessions_cards_layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
 
-        sessions = self._topic_controller.get_sessions_by_topic(topic_id)
+            sessions = self._topic_controller.get_sessions_by_topic(topic_id)
 
-        if not sessions:
-            no_sessions_label = QLabel("📭 Нет сессий. Начните первую сессию!")
-            no_sessions_label.setAlignment(Qt.AlignCenter)
-            no_sessions_label.setStyleSheet("color: #6B7280; font-size: 13px; padding: 30px;")
-            self.sessions_cards_layout.insertWidget(0, no_sessions_label)
-            return
+            if not sessions:
+                no_sessions_label = QLabel("📭 Нет сессий. Начните первую сессию!")
+                no_sessions_label.setAlignment(Qt.AlignCenter)
+                no_sessions_label.setStyleSheet("color: #6B7280; font-size: 13px; padding: 30px;")
+                self.sessions_cards_layout.insertWidget(0, no_sessions_label)
+                return
 
-        def sort_key(s):
-            # Приоритет: active=0, paused=1, остальные=2
-            if s.status == 'active':
-                priority = 0
-            elif s.status == 'paused':
-                priority = 1
-            else:
-                priority = 2
+            def sort_key(s):
+                # Приоритет: active=0, paused=1, остальные=2
+                if s.status == 'active':
+                    priority = 0
+                elif s.status == 'paused':
+                    priority = 1
+                else:
+                    priority = 2
 
-            # Внутри каждой группы сортируем по дате (новые сверху)
-            # Используем отрицание для обратного порядка
-            start_time = s.start_time or ''
-            return (priority, start_time)
+                # Внутри каждой группы сортируем по дате (новые сверху)
+                # Используем отрицание для обратного порядка
+                start_time = s.start_time or ''
+                return (priority, start_time)
 
-        # Сортируем: сначала по приоритету, потом по дате (обратный порядок для новых сверху)
-        sessions.sort(key=lambda s: s.start_time or '', reverse=True)  # Сначала по дате
-        sessions.sort(
-            key=lambda s: 0 if s.status == 'active' else (1 if s.status == 'paused' else 2))  # Потом по статусу
+            # Сортируем: сначала по приоритету, потом по дате (обратный порядок для новых сверху)
+            sessions.sort(key=lambda s: s.start_time or '', reverse=True)  # Сначала по дате
+            sessions.sort(
+                key=lambda s: 0 if s.status == 'active' else (1 if s.status == 'paused' else 2))  # Потом по статусу
 
-        for session in sessions:
-            from core.di.container import container
-            stats = container.session_controller.get_session_stats(session.id)
-            intervals = container.session_controller.get_session_intervals(session.id)
+            for session in sessions:
+                from core.di.container import container
+                stats = container.session_controller.get_session_stats(session.id)
+                intervals = container.session_controller.get_session_intervals(session.id)
 
-            # 🆕 Форматируем время правильно
-            from utils.local_time import format_datetime
-            start_time_formatted = format_datetime(session.start_time) if session.start_time else '—'
-            end_time_formatted = format_datetime(session.end_time) if session.end_time else '—'
+                # 🆕 Форматируем время правильно
+                from utils.local_time import format_datetime
+                start_time_formatted = format_datetime(session.start_time) if session.start_time else '—'
+                end_time_formatted = format_datetime(session.end_time) if session.end_time else '—'
 
-            session_data = {
-                'id': session.id,
-                'status': session.status or 'completed',
-                'duration_display': TimeService.format_duration(
-                    session.duration_minutes) if session.duration_minutes else '—',
-                'start_time': start_time_formatted,  # 🆕 Уже отформатировано
-                'end_time': end_time_formatted,  # 🆕 Уже отформатировано
-                'avg_focus': stats.get('avg_focus', 0),
-                'avg_energy': stats.get('avg_energy', 0),
-                'avg_interest': stats.get('avg_interest', 0),
-                'intervals_count': len(intervals),
-                'intervals': intervals
-            }
+                session_data = {
+                    'id': session.id,
+                    'status': session.status or 'completed',
+                    'duration_display': TimeService.format_duration(
+                        session.duration_minutes) if session.duration_minutes else '—',
+                    'start_time': start_time_formatted,  # 🆕 Уже отформатировано
+                    'end_time': end_time_formatted,  # 🆕 Уже отформатировано
+                    'avg_focus': stats.get('avg_focus', 0),
+                    'avg_energy': stats.get('avg_energy', 0),
+                    'avg_interest': stats.get('avg_interest', 0),
+                    'intervals_count': len(intervals),
+                    'intervals': intervals
+                }
 
-            card = TopicSessionCard(session_data)
-            card.resume_clicked.connect(self._on_session_resume_clicked)
-            card.delete_clicked.connect(self._on_session_delete_clicked)
-            card.analytics_clicked.connect(self._on_session_analytics_clicked)
+                card = TopicSessionCard(session_data)
+                card.resume_clicked.connect(self._on_session_resume_clicked)
+                card.delete_clicked.connect(self._on_session_delete_clicked)
+                card.analytics_clicked.connect(self._on_session_analytics_clicked)
 
-            self.sessions_cards_layout.insertWidget(self.sessions_cards_layout.count() - 1, card)
+                self.sessions_cards_layout.insertWidget(self.sessions_cards_layout.count() - 1, card)
+        except Exception as e:
+            logger.error(f"Ошибка загрузки сессий для темы {topic_id}: {e}", exc_info=True)
 
     def _on_session_resume_clicked(self, session_id: int):
         self.session_resumed_in_topic.emit(session_id)
 
     def _on_session_delete_clicked(self, session_id: int):
-        from core.di.container import container
-        container.session_controller.delete_session(session_id)
-        if self._current_topic_id:
-            self._load_topic_sessions(self._current_topic_id)
-        self.session_deleted_in_topic.emit()
+        try:
+            from core.di.container import container
+            container.session_controller.delete_session(session_id)
+            if self._current_topic_id:
+                self._load_topic_sessions(self._current_topic_id)
+            self.session_deleted_in_topic.emit()
+        except Exception as e:
+            logger.error(f"Ошибка удаления сессии {session_id}: {e}", exc_info=True)
 
     def _on_session_analytics_clicked(self, session_id: int):
         self.session_analytics_requested.emit(session_id)
 
     def _load_analytics(self, topic_id: int):
-        stats = self._analytics_controller.get_topic_stats(topic_id)
-        text = f"""
-        <style>
-            p {{ color: #1F2937; font-size: 13px; line-height: 1.6; }}
-            h3 {{ color: #1F2937; font-size: 16px; font-weight: 600; margin-bottom: 12px; }}
-        </style>
-        <h3>📊 Аналитика темы</h3>
-        <p>📅 <b>Сессии:</b> {stats['session_count']}</p>
-        <p>⏰ <b>Общее время:</b> {stats['total_hours']} ч</p>
-        <p>🧠 <b>Средняя концентрация:</b> {stats['avg_concentration']}/100</p>
-        <p>⚡ <b>Средняя энергия:</b> {stats['avg_energy']}/100</p>
-        <p>❤️ <b>Средний интерес:</b> {stats['avg_interest']}/5</p>
-        <p>✅ <b>Задачи:</b> {stats['completed_tasks']}/{stats['task_count']} выполнено</p>
-        <p>📝 <b>Заметки:</b> {stats['note_count']}</p>
-        <p>🃏 <b>Карточки:</b> {stats['flashcard_count']}</p>
-        """
-        self.analytics_text.setHtml(text)
+        try:
+            stats = self._analytics_controller.get_topic_stats(topic_id)
+            text = f"""
+            <style>
+                p {{ color: #1F2937; font-size: 13px; line-height: 1.6; }}
+                h3 {{ color: #1F2937; font-size: 16px; font-weight: 600; margin-bottom: 12px; }}
+            </style>
+            <h3>📊 Аналитика темы</h3>
+            <p>📅 <b>Сессии:</b> {stats['session_count']}</p>
+            <p>⏰ <b>Общее время:</b> {stats['total_hours']} ч</p>
+            <p>🧠 <b>Средняя концентрация:</b> {stats['avg_concentration']}/100</p>
+            <p>⚡ <b>Средняя энергия:</b> {stats['avg_energy']}/100</p>
+            <p>❤️ <b>Средний интерес:</b> {stats['avg_interest']}/5</p>
+            <p>✅ <b>Задачи:</b> {stats['completed_tasks']}/{stats['task_count']} выполнено</p>
+            <p>📝 <b>Заметки:</b> {stats['note_count']}</p>
+            <p>🃏 <b>Карточки:</b> {stats['flashcard_count']}</p>
+            """
+            self.analytics_text.setHtml(text)
+        except Exception as e:
+            logger.error(f"Ошибка загрузки аналитики для темы {topic_id}: {e}", exc_info=True)
 
     def _load_stats(self, topic_id: int):
-        stats = self._analytics_controller.get_topic_stats(topic_id)
+        try:
+            stats = self._analytics_controller.get_topic_stats(topic_id)
 
-        self._update_stat_card_value("Сессии", str(stats['session_count']))
-        self._update_stat_card_value("Время", f"{stats['total_hours']} ч")
-        self._update_stat_card_value("Концентрация", f"{stats['avg_concentration']}/100")
-        self._update_stat_card_value("Энергия", f"{stats['avg_energy']}/100")
+            self._update_stat_card_value("Сессии", str(stats['session_count']))
+            self._update_stat_card_value("Время", f"{stats['total_hours']} ч")
+            self._update_stat_card_value("Концентрация", f"{stats['avg_concentration']}/100")
+            self._update_stat_card_value("Энергия", f"{stats['avg_energy']}/100")
 
-        completed = stats.get('completed_tasks', 0)
-        total = stats.get('task_count', 1)
-        if total == 0:
-            total = 1
-        percent = int((completed / total) * 100)
-        self.tasks_progress_bar.setValue(percent)
-        self.tasks_progress_label.setText(f"{completed} / {stats['task_count']} выполнено ({percent}%)")
+            completed = stats.get('completed_tasks', 0)
+            total = stats.get('task_count', 1)
+            if total == 0:
+                total = 1
+            percent = int((completed / total) * 100)
+            self.tasks_progress_bar.setValue(percent)
+            self.tasks_progress_label.setText(f"{completed} / {stats['task_count']} выполнено ({percent}%)")
 
-        self.notes_count_label.setText(f"Заметок: {stats['note_count']}")
-        self.cards_count_label.setText(f"Карточек: {stats['flashcard_count']}")
+            self.notes_count_label.setText(f"Заметок: {stats['note_count']}")
+            self.cards_count_label.setText(f"Карточек: {stats['flashcard_count']}")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки статистики для темы {topic_id}: {e}", exc_info=True)
 
     def refresh(self):
         if self._current_topic_id:
@@ -1390,17 +1461,20 @@ class TopicView(QWidget):
             self._view_card(card_id)
 
     def _delete_note_by_id(self, note_id: int):
-        note = self._topic_controller.get_note_by_id(note_id)
-        if not note:
-            return
+        try:
+            note = self._topic_controller.get_note_by_id(note_id)
+            if not note:
+                return
 
-        reply = SilentMessageBox.question(
-            self, "Подтверждение удаления",
-            f"Удалить запись «{note.title}»?"
-        )
+            reply = SilentMessageBox.question(
+                self, "Подтверждение удаления",
+                f"Удалить запись «{note.title}»?"
+            )
 
-        if reply == SilentMessageBox.Yes:
-            from core.di.container import container
-            if container.note_controller.delete_note(note_id):
-                self._load_notes(self._current_topic_id)
-                SilentMessageBox.information(self, "Успех", "Запись удалена")
+            if reply == SilentMessageBox.Yes:
+                from core.di.container import container
+                if container.note_controller.delete_note(note_id):
+                    self._load_notes(self._current_topic_id)
+                    SilentMessageBox.information(self, "Успех", "Запись удалена")
+        except Exception as e:
+            logger.error(f"Ошибка удаления заметки {note_id}: {e}", exc_info=True)

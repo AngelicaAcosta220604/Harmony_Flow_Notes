@@ -1,13 +1,17 @@
+# modules/dashboard/widgets.py
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QFrame, QGraphicsDropShadowEffect, QSizePolicy
 )
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QFont, QPixmap, QIcon, QColor
+import logging
 
+from utils.resource_paths import get_resource_path
 from .controller import DashboardController
 
-
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 
 class KpiCard(QFrame):
@@ -94,12 +98,25 @@ class KpiCard(QFrame):
         self.title_label.setText(title)
         self.value_label.setText(value)
 
-        # Загружаем иконку
-        pixmap = QPixmap(icon_path)
-        if not pixmap.isNull():
-            pixmap = pixmap.scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.icon_label.setPixmap(pixmap)
-            self.icon_label.setStyleSheet("background-color: transparent;")
+        # ✅ ИСПРАВЛЕНО: проверяем путь и конвертируем если нужно
+        try:
+            # Если путь относительный, конвертируем в абсолютный
+            if not icon_path.startswith(('http://', 'https://', 'file://')):
+                from pathlib import Path
+                if not Path(icon_path).is_absolute():
+                    icon_path = str(get_resource_path(icon_path))
+
+            # Загружаем иконку
+            pixmap = QPixmap(icon_path)
+            if not pixmap.isNull():
+                pixmap = pixmap.scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.icon_label.setPixmap(pixmap)
+                self.icon_label.setStyleSheet("background-color: transparent;")
+                logger.debug(f"Иконка загружена: {icon_path}")
+            else:
+                logger.warning(f"Не удалось загрузить иконку: {icon_path}")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки иконки {icon_path}: {e}", exc_info=True)
 
         self._update_icon_style()
 
@@ -128,6 +145,7 @@ class KpiRow(QWidget):
 
         self.cards = []
         self._cards_per_row = 6  # По умолчанию 6 в ряд
+        self._cards_in_current_row = 0
 
     def _start_new_row(self):
         """Создаёт новую строку для карточек"""
@@ -140,25 +158,54 @@ class KpiRow(QWidget):
         self._cards_in_current_row = 0
 
     def add_card(self, title: str, value: str, icon_path: str):
-        for card in self.cards:
-            if card.title_label.text() == "":
-                # 🆕 Если в текущей строке уже максимум карточек — создаём новую строку
-                if not hasattr(self, '_cards_in_current_row'):
-                    self._cards_in_current_row = 0
+        """Добавляет карточку в ряд"""
+        try:
+            # ✅ ИСПРАВЛЕНО: Ищем свободную карточку или создаём новую
+            used_card = False
+
+            for card in self.cards:
+                if card.title_label.text() == "":
+                    # Нашли свободную карточку
+                    # Проверяем, нужно ли создать новую строку
+                    if self._cards_in_current_row >= self._cards_per_row:
+                        self._start_new_row()
+
+                    card.set_data(title, value, icon_path)
+                    card.show()
+                    self._current_row_layout.addWidget(card, 1)
+                    self._cards_in_current_row += 1
+                    used_card = True
+                    break
+
+            # ✅ ИСПРАВЛЕНО: Если нет свободных карточек, создаём новую
+            if not used_card:
+                new_card = KpiCard()
+                self.cards.append(new_card)
+
+                # Проверяем, нужно ли создать новую строку
                 if self._cards_in_current_row >= self._cards_per_row:
                     self._start_new_row()
 
-                card.set_data(title, value, icon_path)
-                card.show()
-                self._current_row_layout.addWidget(card, 1)
+                new_card.set_data(title, value, icon_path)
+                new_card.show()
+                self._current_row_layout.addWidget(new_card, 1)
                 self._cards_in_current_row += 1
-                return
+
+                logger.debug(f"Создана новая KPI карточка: {title}")
+
+        except Exception as e:
+            logger.error(f"Ошибка добавления KPI карточки: {e}", exc_info=True)
 
     def clear(self):
-        for card in self.cards:
-            card.hide()
-            card.title_label.setText("")
-            card.value_label.setText("")
+        """Скрывает все карточки и очищает текст"""
+        try:
+            for card in self.cards:
+                card.hide()
+                card.title_label.setText("")
+                card.value_label.setText("")
 
-        # 🆕 Сбрасываем счётчик строк
-        self._cards_in_current_row = 0
+            # 🆕 Сбрасываем счётчик строк
+            self._cards_in_current_row = 0
+            logger.debug("KPI карточки очищены")
+        except Exception as e:
+            logger.error(f"Ошибка очистки KPI карточек: {e}", exc_info=True)

@@ -5,9 +5,13 @@ from PySide6.QtWidgets import (
 )
 from widgets import SilentMessageBox
 from PySide6.QtCore import Qt, Signal
+import logging
 
 from .controller import SearchController
 from .widgets import SearchBarWidget, SearchResultItemWidget
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 
 class SearchView(QWidget):
@@ -123,7 +127,8 @@ class SearchView(QWidget):
         return {
             'widget': widget,
             'list': list_widget,
-            'title_label': title_label
+            'title_label': title_label,
+            'base_title': title  # ✅ Сохраняем базовый заголовок
         }
 
     def _connect_signals(self):
@@ -140,103 +145,144 @@ class SearchView(QWidget):
 
     def _load_history(self):
         """Загружает историю поиска"""
-        history = self._controller.get_search_history(10)
-        self.search_bar.set_history(history)
-        self.clear_history_btn.setVisible(len(history) > 0)
+        try:
+            history = self._controller.get_search_history(10)
+            self.search_bar.set_history(history)
+            self.clear_history_btn.setVisible(len(history) > 0)
+            logger.debug(f"Загружена история поиска: {len(history)} записей")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки истории поиска: {e}", exc_info=True)
 
     def _on_search(self, query: str):
         """Обработчик поиска"""
-        if len(query) < 2:
-            self.empty_label.setText("Введите минимум 2 символа для поиска")
+        try:
+            if len(query) < 2:
+                self.empty_label.setText("Введите минимум 2 символа для поиска")
+                self.empty_label.show()
+                self._hide_all_sections()
+                return
+
+            # Сохраняем запрос в историю
+            self._controller.save_search_query(query)
+            self._load_history()
+
+            # Выполняем поиск
+            results = self._controller.search_all(query)
+            total_count = self._controller.get_result_count(results)
+
+            if total_count == 0:
+                self.empty_label.setText(f"Ничего не найдено по запросу «{query}»")
+                self.empty_label.show()
+                self._hide_all_sections()
+                logger.debug(f"Поиск '{query}': ничего не найдено")
+                return
+
+            self.empty_label.hide()
+
+            # Отображаем результаты по категориям
+            self._display_results('topics', results['topics'], self.topics_section)
+            self._display_results('notes', results['notes'], self.notes_section)
+            self._display_results('tasks', results['tasks'], self.tasks_section)
+            self._display_results('flashcards', results['flashcards'], self.cards_section)
+
+            logger.info(f"Поиск '{query}': найдено {total_count} результатов")
+        except Exception as e:
+            logger.error(f"Ошибка поиска '{query}': {e}", exc_info=True)
+            self.empty_label.setText(f"Ошибка поиска: {e}")
             self.empty_label.show()
             self._hide_all_sections()
-            return
-
-        # Сохраняем запрос в историю
-        self._controller.save_search_query(query)
-        self._load_history()
-
-        # Выполняем поиск
-        results = self._controller.search_all(query)
-        total_count = self._controller.get_result_count(results)
-
-        if total_count == 0:
-            self.empty_label.setText(f"Ничего не найдено по запросу «{query}»")
-            self.empty_label.show()
-            self._hide_all_sections()
-            return
-
-        self.empty_label.hide()
-
-        # Отображаем результаты по категориям
-        self._display_results('topics', results['topics'], self.topics_section)
-        self._display_results('notes', results['notes'], self.notes_section)
-        self._display_results('tasks', results['tasks'], self.tasks_section)
-        self._display_results('flashcards', results['flashcards'], self.cards_section)
 
     def _display_results(self, result_type: str, results: list, section: dict):
         """Отображает результаты в секции"""
-        section['list'].clear()
+        try:
+            section['list'].clear()
 
-        if not results:
-            section['widget'].hide()
-            return
+            # ✅ ИСПРАВЛЕНО: восстанавливаем базовый заголовок
+            base_title = section.get('base_title', section['title_label'].text().split(' (')[0])
 
-        for result in results:
-            item = QListWidgetItem()
-            item.setSizeHint(item.sizeHint())
+            if not results:
+                section['widget'].hide()
+                section['title_label'].setText(base_title)
+                return
 
-            widget = SearchResultItemWidget(result)
+            for result in results:
+                item = QListWidgetItem()
 
-            # Подключаем сигнал клика
-            widget.mousePressEvent = lambda e, r=result: self._on_result_clicked(r)
+                # ✅ ИСПРАВЛЕНО: сначала создаём виджет, потом устанавливаем sizeHint
+                widget = SearchResultItemWidget(result)
+                item.setSizeHint(widget.sizeHint())
 
-            section['list'].addItem(item)
-            section['list'].setItemWidget(item, widget)
+                # Подключаем сигнал клика
+                widget.mousePressEvent = lambda e, r=result: self._on_result_clicked(r)
 
-        # Обновляем заголовок с количеством
-        section['title_label'].setText(f"{section['title_label'].text().split(' (')[0]} ({len(results)})")
-        section['widget'].show()
+                section['list'].addItem(item)
+                section['list'].setItemWidget(item, widget)
+
+            # Обновляем заголовок с количеством
+            section['title_label'].setText(f"{base_title} ({len(results)})")
+            section['widget'].show()
+        except Exception as e:
+            logger.error(f"Ошибка отображения результатов {result_type}: {e}", exc_info=True)
 
     def _on_result_clicked(self, result: dict):
         """Обработчик клика по результату"""
-        result_type = result.get('type')
+        try:
+            result_type = result.get('type')
+            result_id = result.get('id')
 
-        if result_type == 'topic':
-            self.topic_selected.emit(result['id'])
+            if not result_id:
+                logger.warning(f"Результат без ID: {result}")
+                return
 
-        elif result_type == 'note':
-            self.note_selected.emit(result['id'])
+            if result_type == 'topic':
+                self.topic_selected.emit(result_id)
+            elif result_type == 'note':
+                self.note_selected.emit(result_id)
+            elif result_type == 'task':
+                self.task_selected.emit(result_id)
+            elif result_type == 'flashcard':
+                self.flashcard_selected.emit(result_id)
+            else:
+                logger.warning(f"Неизвестный тип результата: {result_type}")
 
-        elif result_type == 'task':
-            self.task_selected.emit(result['id'])
-
-        elif result_type == 'flashcard':
-            self.flashcard_selected.emit(result['id'])
+            logger.debug(f"Клик по результату: тип={result_type}, id={result_id}")
+        except Exception as e:
+            logger.error(f"Ошибка обработки клика по результату: {e}", exc_info=True)
 
     def _on_clear_history(self):
         """Очищает историю поиска"""
-        reply = SilentMessageBox.question(
-            self, "Очистить историю",
-            "Вы действительно хотите очистить историю поиска?",
-            SilentMessageBox.Yes | SilentMessageBox.No, SilentMessageBox.No
-        )
+        try:
+            reply = SilentMessageBox.question(
+                self, "Очистить историю",
+                "Вы действительно хотите очистить историю поиска?",
+                SilentMessageBox.Yes | SilentMessageBox.No, SilentMessageBox.No
+            )
 
-        if reply == SilentMessageBox.Yes:
-            self._controller.clear_search_history()
-            self._load_history()
-            self.search_bar.set_history([])
-            SilentMessageBox.information(self, "Готово", "История поиска очищена")
+            if reply == SilentMessageBox.Yes:
+                self._controller.clear_search_history()
+                self._load_history()
+                self.search_bar.set_history([])
+                SilentMessageBox.information(self, "Готово", "История поиска очищена")
+                logger.info("История поиска очищена")
+        except Exception as e:
+            logger.error(f"Ошибка очистки истории: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось очистить историю: {e}")
 
     def perform_search(self, query: str):
         """
         Внешний вызов поиска (например, из главного окна по глобальному хоткею)
         """
-        self.search_bar.set_query(query)
-        self._on_search(query)
+        try:
+            self.search_bar.set_query(query)
+            self._on_search(query)
+        except Exception as e:
+            logger.error(f"Ошибка внешнего вызова поиска: {e}", exc_info=True)
 
     def refresh(self):
         """Обновляет результаты поиска"""
-        # Если есть активный поисковый запрос - переделываем поиск
-        if hasattr(self, 'search_bar') and self.search_bar.text():
-            self._perform_search(self.search_bar.text())
+        try:
+            # ✅ ИСПРАВЛЕНО: _perform_search → _on_search
+            if hasattr(self, 'search_bar') and self.search_bar.text():
+                self._on_search(self.search_bar.text())
+        except Exception as e:
+            logger.error(f"Ошибка обновления поиска: {e}", exc_info=True)

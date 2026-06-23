@@ -6,6 +6,10 @@ from PySide6.QtWidgets import (
 from widgets import SilentMessageBox
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
+import logging
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 
 class WelcomeStep(QWidget):
@@ -21,48 +25,51 @@ class WelcomeStep(QWidget):
 
     def _setup_ui(self):
         """Настраивает интерфейс"""
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignCenter)
-        layout.setSpacing(20)
+        try:
+            layout = QVBoxLayout(self)
+            layout.setAlignment(Qt.AlignCenter)
+            layout.setSpacing(20)
 
-        # Логотип
-        logo_label = QLabel("🎵 HFLOW")
-        logo_label.setStyleSheet("font-size: 32px; font-weight: bold; color: #1976d2;")
-        logo_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(logo_label)
+            # Логотип
+            logo_label = QLabel("🎵 HFLOW")
+            logo_label.setStyleSheet("font-size: 32px; font-weight: bold; color: #1976d2;")
+            logo_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(logo_label)
 
-        # Заголовок
-        title_label = QLabel("Добро пожаловать!")
-        title_label.setStyleSheet("font-size: 24px; font-weight: bold; margin-top: 20px;")
-        title_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title_label)
+            # Заголовок
+            title_label = QLabel("Добро пожаловать!")
+            title_label.setStyleSheet("font-size: 24px; font-weight: bold; margin-top: 20px;")
+            title_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(title_label)
 
-        # Описание
-        desc_label = QLabel(
-            "HFlow помогает планировать задачи,\n"
-            "вести заметки и понимать свою продуктивность.\n\n"
-            "Все данные хранятся локально — ваш приватность под защитой."
-        )
-        desc_label.setAlignment(Qt.AlignCenter)
-        desc_label.setStyleSheet("color: #666666; font-size: 14px;")
-        desc_label.setWordWrap(True)
-        layout.addWidget(desc_label)
+            # Описание
+            desc_label = QLabel(
+                "HFlow помогает планировать задачи,\n"
+                "вести заметки и понимать свою продуктивность.\n\n"
+                "Все данные хранятся локально — ваш приватность под защитой."
+            )
+            desc_label.setAlignment(Qt.AlignCenter)
+            desc_label.setStyleSheet("color: #666666; font-size: 14px;")
+            desc_label.setWordWrap(True)
+            layout.addWidget(desc_label)
 
-        layout.addStretch()
+            layout.addStretch()
 
-        # Кнопка "Начать работу"
-        start_btn = QPushButton("🚀 Начать работу")
-        start_btn.setFixedHeight(50)
-        start_btn.setFixedWidth(250)
-        start_btn.setStyleSheet("font-size: 16px; font-weight: bold; background-color: #4caf50;")
-        start_btn.clicked.connect(self.next_requested.emit)
+            # Кнопка "Начать работу"
+            start_btn = QPushButton("🚀 Начать работу")
+            start_btn.setFixedHeight(50)
+            start_btn.setFixedWidth(250)
+            start_btn.setStyleSheet("font-size: 16px; font-weight: bold; background-color: #4caf50;")
+            start_btn.clicked.connect(self.next_requested.emit)
 
-        btn_layout = QHBoxLayout()
-        btn_layout.setAlignment(Qt.AlignCenter)
-        btn_layout.addWidget(start_btn)
-        layout.addLayout(btn_layout)
+            btn_layout = QHBoxLayout()
+            btn_layout.setAlignment(Qt.AlignCenter)
+            btn_layout.addWidget(start_btn)
+            layout.addLayout(btn_layout)
 
-        layout.addSpacing(50)
+            layout.addSpacing(50)
+        except Exception as e:
+            logger.error(f"Ошибка настройки WelcomeStep: {e}", exc_info=True)
 
 
 class NameStep(QWidget):
@@ -79,54 +86,57 @@ class NameStep(QWidget):
 
     def _setup_ui(self):
         """Настраивает интерфейс"""
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignCenter)
-        layout.setSpacing(20)
+        try:
+            layout = QVBoxLayout(self)
+            layout.setAlignment(Qt.AlignCenter)
+            layout.setSpacing(20)
 
-        # Иконка
-        icon_label = QLabel("👋")
-        icon_label.setStyleSheet("font-size: 48px;")
-        icon_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(icon_label)
+            # Иконка
+            icon_label = QLabel("👋")
+            icon_label.setStyleSheet("font-size: 48px;")
+            icon_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(icon_label)
 
-        # Заголовок
-        title_label = QLabel("Как к вам обращаться?")
-        title_label.setStyleSheet("font-size: 20px; font-weight: bold;")
-        title_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title_label)
+            # Заголовок
+            title_label = QLabel("Как к вам обращаться?")
+            title_label.setStyleSheet("font-size: 20px; font-weight: bold;")
+            title_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(title_label)
 
-        # Поле ввода имени
-        self.name_edit = QLineEdit()
-        self.name_edit.setPlaceholderText("Введите ваше имя...")
-        self.name_edit.setFixedWidth(300)
-        self.name_edit.setFixedHeight(40)
-        self.name_edit.setStyleSheet("font-size: 14px; padding: 5px;")
+            # Поле ввода имени
+            self.name_edit = QLineEdit()
+            self.name_edit.setPlaceholderText("Введите ваше имя...")
+            self.name_edit.setFixedWidth(300)
+            self.name_edit.setFixedHeight(40)
+            self.name_edit.setStyleSheet("font-size: 14px; padding: 5px;")
 
-        name_layout = QHBoxLayout()
-        name_layout.setAlignment(Qt.AlignCenter)
-        name_layout.addWidget(self.name_edit)
-        layout.addLayout(name_layout)
+            name_layout = QHBoxLayout()
+            name_layout.setAlignment(Qt.AlignCenter)
+            name_layout.addWidget(self.name_edit)
+            layout.addLayout(name_layout)
 
-        # Пояснение
-        hint_label = QLabel("(можно изменить позже в настройках)")
-        hint_label.setStyleSheet("color: #888888; font-size: 11px;")
-        hint_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(hint_label)
+            # Пояснение
+            hint_label = QLabel("(можно изменить позже в настройках)")
+            hint_label.setStyleSheet("color: #888888; font-size: 11px;")
+            hint_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(hint_label)
 
-        layout.addStretch()
+            layout.addStretch()
 
-        # Кнопка "Продолжить"
-        self.next_btn = QPushButton("➡️ Продолжить")
-        self.next_btn.setFixedHeight(45)
-        self.next_btn.setFixedWidth(200)
-        self.next_btn.setStyleSheet("font-size: 14px; font-weight: bold;")
+            # Кнопка "Продолжить"
+            self.next_btn = QPushButton("➡️ Продолжить")
+            self.next_btn.setFixedHeight(45)
+            self.next_btn.setFixedWidth(200)
+            self.next_btn.setStyleSheet("font-size: 14px; font-weight: bold;")
 
-        btn_layout = QHBoxLayout()
-        btn_layout.setAlignment(Qt.AlignCenter)
-        btn_layout.addWidget(self.next_btn)
-        layout.addLayout(btn_layout)
+            btn_layout = QHBoxLayout()
+            btn_layout.setAlignment(Qt.AlignCenter)
+            btn_layout.addWidget(self.next_btn)
+            layout.addLayout(btn_layout)
 
-        layout.addSpacing(50)
+            layout.addSpacing(50)
+        except Exception as e:
+            logger.error(f"Ошибка настройки NameStep: {e}", exc_info=True)
 
     def _connect_signals(self):
         """Подключает сигналы"""
@@ -135,16 +145,23 @@ class NameStep(QWidget):
 
     def _on_next(self):
         """Обработчик нажатия кнопки Продолжить"""
-        user_name = self.name_edit.text().strip()
+        try:
+            user_name = self.name_edit.text().strip()
 
-        if not user_name:
-            user_name = "Пользователь"
+            if not user_name:
+                user_name = "Пользователь"
 
-        self.next_requested.emit(user_name)
+            self.next_requested.emit(user_name)
+            logger.debug(f"Пользователь ввел имя: {user_name}")
+        except Exception as e:
+            logger.error(f"Ошибка обработки имени: {e}", exc_info=True)
 
     def set_focus(self):
         """Устанавливает фокус на поле ввода"""
-        self.name_edit.setFocus()
+        try:
+            self.name_edit.setFocus()
+        except Exception as e:
+            logger.error(f"Ошибка установки фокуса: {e}", exc_info=True)
 
 
 class TopicStep(QWidget):
@@ -159,92 +176,96 @@ class TopicStep(QWidget):
         super().__init__(parent)
         self._topic_controller = topic_controller
         self._created_topic_id = None
+        self._status_label = None  # ✅ Инициализируем None
         self._setup_ui()
         self._connect_signals()
 
     def _setup_ui(self):
         """Настраивает интерфейс"""
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignCenter)
-        layout.setSpacing(20)
+        try:
+            layout = QVBoxLayout(self)
+            layout.setAlignment(Qt.AlignCenter)
+            layout.setSpacing(20)
 
-        # Иконка
-        icon_label = QLabel("📚")
-        icon_label.setStyleSheet("font-size: 48px;")
-        icon_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(icon_label)
+            # Иконка
+            icon_label = QLabel("📚")
+            icon_label.setStyleSheet("font-size: 48px;")
+            icon_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(icon_label)
 
-        # Заголовок
-        title_label = QLabel("Создайте первую тему")
-        title_label.setStyleSheet("font-size: 20px; font-weight: bold;")
-        title_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title_label)
+            # Заголовок
+            title_label = QLabel("Создайте первую тему")
+            title_label.setStyleSheet("font-size: 20px; font-weight: bold;")
+            title_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(title_label)
 
-        # Быстрые варианты
-        quick_label = QLabel("Быстрый выбор:")
-        quick_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(quick_label)
+            # Быстрые варианты
+            quick_label = QLabel("Быстрый выбор:")
+            quick_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(quick_label)
 
-        quick_buttons_layout = QHBoxLayout()
-        quick_buttons_layout.setAlignment(Qt.AlignCenter)
-        quick_buttons_layout.setSpacing(15)
+            quick_buttons_layout = QHBoxLayout()
+            quick_buttons_layout.setAlignment(Qt.AlignCenter)
+            quick_buttons_layout.setSpacing(15)
 
-        self.study_btn = QPushButton("📖 Учёба")
-        self.work_btn = QPushButton("💼 Работа")
-        self.personal_btn = QPushButton("❤️ Личное")
+            self.study_btn = QPushButton("📖 Учёба")
+            self.work_btn = QPushButton("💼 Работа")
+            self.personal_btn = QPushButton("❤️ Личное")
 
-        for btn in [self.study_btn, self.work_btn, self.personal_btn]:
-            btn.setFixedSize(120, 50)
-            btn.setStyleSheet("font-size: 14px;")
-            quick_buttons_layout.addWidget(btn)
+            for btn in [self.study_btn, self.work_btn, self.personal_btn]:
+                btn.setFixedSize(120, 50)
+                btn.setStyleSheet("font-size: 14px;")
+                quick_buttons_layout.addWidget(btn)
 
-        layout.addLayout(quick_buttons_layout)
+            layout.addLayout(quick_buttons_layout)
 
-        # Или введите своё
-        custom_label = QLabel("Или введите своё название:")
-        custom_label.setAlignment(Qt.AlignCenter)
-        custom_label.setStyleSheet("margin-top: 15px;")
-        layout.addWidget(custom_label)
+            # Или введите своё
+            custom_label = QLabel("Или введите своё название:")
+            custom_label.setAlignment(Qt.AlignCenter)
+            custom_label.setStyleSheet("margin-top: 15px;")
+            layout.addWidget(custom_label)
 
-        self.custom_edit = QLineEdit()
-        self.custom_edit.setPlaceholderText("Название темы...")
-        self.custom_edit.setFixedWidth(300)
-        self.custom_edit.setFixedHeight(35)
+            self.custom_edit = QLineEdit()
+            self.custom_edit.setPlaceholderText("Название темы...")
+            self.custom_edit.setFixedWidth(300)
+            self.custom_edit.setFixedHeight(35)
 
-        custom_layout = QHBoxLayout()
-        custom_layout.setAlignment(Qt.AlignCenter)
-        custom_layout.addWidget(self.custom_edit)
-        layout.addLayout(custom_layout)
+            custom_layout = QHBoxLayout()
+            custom_layout.setAlignment(Qt.AlignCenter)
+            custom_layout.addWidget(self.custom_edit)
+            layout.addLayout(custom_layout)
 
-        self.create_custom_btn = QPushButton("✨ Создать")
-        self.create_custom_btn.setFixedWidth(150)
+            self.create_custom_btn = QPushButton("✨ Создать")
+            self.create_custom_btn.setFixedWidth(150)
 
-        create_layout = QHBoxLayout()
-        create_layout.setAlignment(Qt.AlignCenter)
-        create_layout.addWidget(self.create_custom_btn)
-        layout.addLayout(create_layout)
+            create_layout = QHBoxLayout()
+            create_layout.setAlignment(Qt.AlignCenter)
+            create_layout.addWidget(self.create_custom_btn)
+            layout.addLayout(create_layout)
 
-        layout.addStretch()
+            layout.addStretch()
 
-        # Кнопки навигации
-        nav_layout = QHBoxLayout()
-        nav_layout.setSpacing(20)
+            # Кнопки навигации
+            nav_layout = QHBoxLayout()
+            nav_layout.setSpacing(20)
 
-        self.skip_btn = QPushButton("Пропустить")
-        self.skip_btn.setFlat(True)
-        self.skip_btn.setStyleSheet("color: #888888;")
+            self.skip_btn = QPushButton("Пропустить")
+            self.skip_btn.setFlat(True)
+            self.skip_btn.setStyleSheet("color: #888888;")
 
-        nav_layout.addWidget(self.skip_btn)
-        nav_layout.addStretch()
+            nav_layout.addWidget(self.skip_btn)
+            nav_layout.addStretch()
 
-        self.next_btn = QPushButton("➡️ Продолжить")
-        self.next_btn.setFixedWidth(150)
-        self.next_btn.setEnabled(False)
+            self.next_btn = QPushButton("➡️ Продолжить")
+            self.next_btn.setFixedWidth(150)
+            self.next_btn.setEnabled(False)
 
-        nav_layout.addWidget(self.next_btn)
+            nav_layout.addWidget(self.next_btn)
 
-        layout.addLayout(nav_layout)
-        layout.addSpacing(30)
+            layout.addLayout(nav_layout)
+            layout.addSpacing(30)
+        except Exception as e:
+            logger.error(f"Ошибка настройки TopicStep: {e}", exc_info=True)
 
     def _connect_signals(self):
         """Подключает сигналы"""
@@ -258,45 +279,77 @@ class TopicStep(QWidget):
 
     def _create_topic(self, name: str):
         """Создаёт тему с заданным именем"""
-        topic_id = self._topic_controller.create_topic(name)
-        if topic_id:
-            self._created_topic_id = topic_id
-            self.next_btn.setEnabled(True)
-            self._show_success(name)
+        try:
+            topic_id = self._topic_controller.create_topic(name)
+            if topic_id:
+                self._created_topic_id = topic_id
+                self.next_btn.setEnabled(True)
+                self._show_success(name)
+                logger.info(f"Создана тема в онбординге: '{name}' (id={topic_id})")
+            else:
+                logger.warning(f"Не удалось создать тему '{name}'")
+                SilentMessageBox.warning(self, "Ошибка", f"Не удалось создать тему «{name}»")
+        except Exception as e:
+            logger.error(f"Ошибка создания темы '{name}': {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось создать тему: {e}")
 
     def _create_custom_topic(self):
         """Создаёт тему из пользовательского ввода"""
-        name = self.custom_edit.text().strip()
-        if not name:
-            SilentMessageBox.warning(self, "Ошибка", "Введите название темы")
-            return
+        try:
+            name = self.custom_edit.text().strip()
+            if not name:
+                SilentMessageBox.warning(self, "Ошибка", "Введите название темы")
+                return
 
-        self._create_topic(name)
+            self._create_topic(name)
+        except Exception as e:
+            logger.error(f"Ошибка создания пользовательской темы: {e}", exc_info=True)
 
     def _show_success(self, name: str):
         """Показывает сообщение об успехе"""
-        self.status_label = QLabel(f"✅ Тема «{name}» создана!")
-        self.status_label.setStyleSheet("color: #4caf50;")
-        self.status_label.setAlignment(Qt.AlignCenter)
+        try:
+            # ✅ ИСПРАВЛЕНО: удаляем старый status_label если есть
+            if self._status_label is not None:
+                self._status_label.deleteLater()
+                self._status_label = None
 
-        # Добавляем в layout если ещё нет
-        parent_layout = self.layout()
-        if hasattr(self, 'status_label') and self.status_label.parent() != self:
-            # Находим место перед кнопками
-            parent_layout.insertWidget(parent_layout.count() - 1, self.status_label)
+            self._status_label = QLabel(f"✅ Тема «{name}» создана!")
+            self._status_label.setStyleSheet("color: #4caf50;")
+            self._status_label.setAlignment(Qt.AlignCenter)
+
+            # Находим место перед кнопками навигации (предпоследний элемент)
+            parent_layout = self.layout()
+            if parent_layout:
+                # Вставляем перед последним stretch/spacer
+                insert_index = max(0, parent_layout.count() - 2)
+                parent_layout.insertWidget(insert_index, self._status_label)
+        except Exception as e:
+            logger.error(f"Ошибка показа сообщения об успехе: {e}", exc_info=True)
 
     def _on_next(self):
         """Переход к следующему шагу"""
-        if self._created_topic_id:
-            self.next_requested.emit(self._created_topic_id)
+        try:
+            if self._created_topic_id:
+                self.next_requested.emit(self._created_topic_id)
+        except Exception as e:
+            logger.error(f"Ошибка перехода к следующему шагу: {e}", exc_info=True)
 
     def reset(self):
         """Сбрасывает состояние шага"""
-        self._created_topic_id = None
-        self.next_btn.setEnabled(False)
-        self.custom_edit.clear()
-        if hasattr(self, 'status_label'):
-            self.status_label.deleteLater()
+        try:
+            self._created_topic_id = None
+            self.next_btn.setEnabled(False)
+            self.custom_edit.clear()
+
+            # ✅ ИСПРАВЛЕНО: безопасное удаление status_label
+            if self._status_label is not None:
+                try:
+                    self._status_label.deleteLater()
+                except Exception as e:
+                    logger.warning(f"Не удалось удалить status_label: {e}")
+                self._status_label = None
+        except Exception as e:
+            logger.error(f"Ошибка сброса TopicStep: {e}", exc_info=True)
 
 
 class NoteStep(QWidget):
@@ -317,71 +370,82 @@ class NoteStep(QWidget):
 
     def set_topic(self, topic_id: int):
         """Устанавливает тему для заметки"""
-        self._current_topic_id = topic_id
-        topic = self._topic_controller.get_topic(topic_id)
-        if topic:
-            self.topic_label.setText(f"Тема: {topic.name}")
+        try:
+            self._current_topic_id = topic_id
+            topic = self._topic_controller.get_topic(topic_id)
+            if topic:
+                self.topic_label.setText(f"Тема: {topic.name}")
+                logger.debug(f"Установлена тема для заметки: {topic.name}")
+            else:
+                self.topic_label.setText("Тема: —")
+                logger.warning(f"Тема {topic_id} не найдена")
+        except Exception as e:
+            logger.error(f"Ошибка установки темы: {e}", exc_info=True)
+            self.topic_label.setText("Тема: —")
 
     def _setup_ui(self):
         """Настраивает интерфейс"""
-        layout = QVBoxLayout(self)
-        layout.setSpacing(15)
+        try:
+            layout = QVBoxLayout(self)
+            layout.setSpacing(15)
 
-        # Иконка
-        icon_label = QLabel("📝")
-        icon_label.setStyleSheet("font-size: 48px;")
-        icon_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(icon_label)
+            # Иконка
+            icon_label = QLabel("📝")
+            icon_label.setStyleSheet("font-size: 48px;")
+            icon_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(icon_label)
 
-        # Заголовок
-        title_label = QLabel("Создайте первую заметку")
-        title_label.setStyleSheet("font-size: 20px; font-weight: bold;")
-        title_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title_label)
+            # Заголовок
+            title_label = QLabel("Создайте первую заметку")
+            title_label.setStyleSheet("font-size: 20px; font-weight: bold;")
+            title_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(title_label)
 
-        # Тема
-        self.topic_label = QLabel("Тема: —")
-        self.topic_label.setAlignment(Qt.AlignCenter)
-        self.topic_label.setStyleSheet("color: #1976d2;")
-        layout.addWidget(self.topic_label)
+            # Тема
+            self.topic_label = QLabel("Тема: —")
+            self.topic_label.setAlignment(Qt.AlignCenter)
+            self.topic_label.setStyleSheet("color: #1976d2;")
+            layout.addWidget(self.topic_label)
 
-        # Заголовок заметки
-        header_label = QLabel("Заголовок:")
-        layout.addWidget(header_label)
+            # Заголовок заметки
+            header_label = QLabel("Заголовок:")
+            layout.addWidget(header_label)
 
-        self.title_edit = QLineEdit()
-        self.title_edit.setPlaceholderText("Заголовок заметки...")
-        layout.addWidget(self.title_edit)
+            self.title_edit = QLineEdit()
+            self.title_edit.setPlaceholderText("Заголовок заметки...")
+            layout.addWidget(self.title_edit)
 
-        # Содержимое заметки
-        content_label = QLabel("Текст:")
-        layout.addWidget(content_label)
+            # Содержимое заметки
+            content_label = QLabel("Текст:")
+            layout.addWidget(content_label)
 
-        self.content_edit = QTextEdit()
-        self.content_edit.setPlaceholderText("Введите текст заметки...")
-        self.content_edit.setMaximumHeight(150)
-        layout.addWidget(self.content_edit)
+            self.content_edit = QTextEdit()
+            self.content_edit.setPlaceholderText("Введите текст заметки...")
+            self.content_edit.setMaximumHeight(150)
+            layout.addWidget(self.content_edit)
 
-        layout.addStretch()
+            layout.addStretch()
 
-        # Кнопки
-        btn_layout = QHBoxLayout()
-        btn_layout.setSpacing(15)
+            # Кнопки
+            btn_layout = QHBoxLayout()
+            btn_layout.setSpacing(15)
 
-        self.skip_btn = QPushButton("Пропустить")
-        self.skip_btn.setFlat(True)
-        self.skip_btn.setStyleSheet("color: #888888;")
-        btn_layout.addWidget(self.skip_btn)
+            self.skip_btn = QPushButton("Пропустить")
+            self.skip_btn.setFlat(True)
+            self.skip_btn.setStyleSheet("color: #888888;")
+            btn_layout.addWidget(self.skip_btn)
 
-        btn_layout.addStretch()
+            btn_layout.addStretch()
 
-        self.save_btn = QPushButton("💾 Сохранить заметку")
-        self.save_btn.setFixedWidth(180)
-        btn_layout.addWidget(self.save_btn)
+            self.save_btn = QPushButton("💾 Сохранить заметку")
+            self.save_btn.setFixedWidth(180)
+            btn_layout.addWidget(self.save_btn)
 
-        layout.addLayout(btn_layout)
+            layout.addLayout(btn_layout)
 
-        layout.addSpacing(20)
+            layout.addSpacing(20)
+        except Exception as e:
+            logger.error(f"Ошибка настройки NoteStep: {e}", exc_info=True)
 
     def _connect_signals(self):
         """Подключает сигналы"""
@@ -390,26 +454,36 @@ class NoteStep(QWidget):
 
     def _on_save(self):
         """Сохраняет заметку"""
-        title = self.title_edit.text().strip()
-        if not title:
-            title = "Моя первая заметка"
+        try:
+            title = self.title_edit.text().strip()
+            if not title:
+                title = "Моя первая заметка"
 
-        content = self.content_edit.toPlainText()
+            content = self.content_edit.toPlainText()
 
-        if self._current_topic_id:
-            note_id = self._note_controller.create_note(
-                self._current_topic_id, title, content
-            )
-            if note_id:
-                self._created_note_id = note_id
-                self.next_requested.emit(note_id)
+            if self._current_topic_id:
+                note_id = self._note_controller.create_note(
+                    self._current_topic_id, title, content
+                )
+                if note_id:
+                    self._created_note_id = note_id
+                    self.next_requested.emit(note_id)
+                    logger.info(f"Создана заметка в онбординге: '{title}' (id={note_id})")
+                else:
+                    logger.warning("Не удалось создать заметку")
+                    SilentMessageBox.warning(self, "Ошибка", "Не удалось создать заметку")
             else:
-                SilentMessageBox.warning(self, "Ошибка", "Не удалось создать заметку")
-        else:
-            SilentMessageBox.warning(self, "Ошибка", "Не выбрана тема для заметки")
+                logger.warning("Попытка сохранить заметку без выбранной темы")
+                SilentMessageBox.warning(self, "Ошибка", "Не выбрана тема для заметки")
+        except Exception as e:
+            logger.error(f"Ошибка сохранения заметки: {e}", exc_info=True)
+            SilentMessageBox.warning(self, "Ошибка", f"Не удалось сохранить заметку: {e}")
 
     def reset(self):
         """Сбрасывает состояние шага"""
-        self.title_edit.clear()
-        self.content_edit.clear()
-        self._created_note_id = None
+        try:
+            self.title_edit.clear()
+            self.content_edit.clear()
+            self._created_note_id = None
+        except Exception as e:
+            logger.error(f"Ошибка сброса NoteStep: {e}", exc_info=True)
