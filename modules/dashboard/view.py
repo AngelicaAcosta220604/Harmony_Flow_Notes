@@ -856,6 +856,24 @@ class DashboardView(QWidget):
     def _update_progress_bars(self, conc_percent: int, energy_percent: int, interest_percent: int):
         """Обновляет ширину прогресс-баров"""
         try:
+            # ✅ ДОБАВИТЬ: Проверки
+            if not hasattr(self, 'conc_fill') or self.conc_fill is None:
+                return
+            if not hasattr(self, 'energy_fill') or self.energy_fill is None:
+                return
+            if not hasattr(self, 'interest_fill') or self.interest_fill is None:
+                return
+
+            # Ограничиваем 0-100
+            conc_percent = max(0, min(100, int(conc_percent or 0)))
+            energy_percent = max(0, min(100, int(energy_percent or 0)))
+            interest_percent = max(0, min(100, int(interest_percent or 0)))
+
+            # ✅ ПРОВЕРКА: родитель существует
+            if self.conc_fill.parent() is not None:
+                parent_width = self.conc_fill.parent().width()
+                self.conc_fill.setFixedWidth(max(0, int(parent_width * conc_percent / 100)))
+
             # Ограничиваем 0-100
             conc_percent = max(0, min(100, conc_percent))
             energy_percent = max(0, min(100, energy_percent))
@@ -875,7 +893,9 @@ class DashboardView(QWidget):
                 parent_width = self.interest_fill.parent().width()
                 self.interest_fill.setFixedWidth(max(0, int(parent_width * interest_percent / 100)))
 
+
         except Exception as e:
+
             logger.error(f"Ошибка обновления прогресс-баров: {e}", exc_info=True)
 
     def resizeEvent(self, event):
@@ -983,6 +1003,18 @@ class DashboardView(QWidget):
     def _update_urgent_tasks(self, tasks: list):
         """Обновляет список срочных задач"""
         try:
+            # ✅ ДОБАВИТЬ: Проверка на валидность виджета
+            if not self.tasks_layout or not hasattr(self, 'urgent_tasks_widget'):
+                return
+
+            # Очистка старых кнопок
+            for btn in list(self._urgent_task_buttons.values()):
+                try:
+                    if btn is not None and btn.parent() is not None:
+                        btn.deleteLater()
+                except RuntimeError:
+                    pass  # Кнопка уже удалена
+            self._urgent_task_buttons.clear()
             for btn in self._urgent_task_buttons.values():
                 btn.deleteLater()
             self._urgent_task_buttons.clear()
@@ -1009,6 +1041,7 @@ class DashboardView(QWidget):
                 self.tasks_layout.addWidget(task_widget)
         except RuntimeError as e:
             logger.warning(f"RuntimeError в _update_urgent_tasks: {e}")
+            return  # ✅ ВАЖНО: выход из функции
         except Exception as e:
             logger.error(f"Ошибка обновления срочных задач: {e}", exc_info=True)
 

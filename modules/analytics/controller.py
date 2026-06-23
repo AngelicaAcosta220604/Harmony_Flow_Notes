@@ -182,7 +182,7 @@ class AnalyticsController:
 
             logs = self._get_session_logs(session.id)
             for log in logs:
-                if log['metric'] == "concentration":
+                if log['metric'] == "focus":
                     hour_stats[hour]["concentration"].append(log['value'])
                 elif log['metric'] == "energy":
                     hour_stats[hour]["energy"].append(log['value'])

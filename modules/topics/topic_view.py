@@ -1356,6 +1356,10 @@ class TopicView(QWidget):
     def _load_topic_sessions(self, topic_id: int):
         """Загружает сессии темы в виде карточек"""
         try:
+            # ✅ ДОБАВИТЬ: Проверка topic_id
+            if topic_id is None:
+                logger.warning("_load_topic_sessions вызван с None topic_id")
+                return
             while self.sessions_cards_layout.count() > 1:
                 item = self.sessions_cards_layout.takeAt(0)
                 if item.widget():
