@@ -930,10 +930,13 @@ class TopicView(QWidget):
             self.energy_card = self._create_stat_card(str(get_resource_path("resources/icons/energy.png")), "Энергия",
                                                       "0%", "#EF4444")
 
+            self.interest_card = self._create_stat_card(str(get_resource_path("resources/icons/heart.png")), "Интерес", "0/100", "#EC4899")
+
             stats_layout.addWidget(self.sessions_card)
             stats_layout.addWidget(self.time_card)
             stats_layout.addWidget(self.conc_card)
             stats_layout.addWidget(self.energy_card)
+            stats_layout.addWidget(self.interest_card)
             content_layout.addLayout(stats_layout)
 
             tasks_progress_widget = QFrame()
@@ -1428,6 +1431,16 @@ class TopicView(QWidget):
     def _load_analytics(self, topic_id: int):
         try:
             stats = self._analytics_controller.get_topic_stats(topic_id)
+
+            # ✅ ИСПРАВЛЕНО: используем total_hours_display вместо total_hours
+            total_minutes = stats.get('total_minutes', 0)
+            hours = total_minutes // 60
+            mins = total_minutes % 60
+            if hours > 0:
+                time_display = f"{hours}ч {mins}м"
+            else:
+                time_display = f"{mins}м"
+
             text = f"""
             <style>
                 p {{ color: #1F2937; font-size: 13px; line-height: 1.6; }}
@@ -1435,7 +1448,7 @@ class TopicView(QWidget):
             </style>
             <h3>📊 Аналитика темы</h3>
             <p>📅 <b>Сессии:</b> {stats['session_count']}</p>
-            <p>⏰ <b>Общее время:</b> {stats['total_hours']} ч</p>
+            <p>⏰ <b>Общее время:</b> {time_display}</p>
             <p>🧠 <b>Средняя концентрация:</b> {stats['avg_concentration']}/100</p>
             <p>⚡ <b>Средняя энергия:</b> {stats['avg_energy']}/100</p>
             <p>❤️ <b>Средний интерес:</b> {stats['avg_interest']}/100</p>
@@ -1452,9 +1465,21 @@ class TopicView(QWidget):
             stats = self._analytics_controller.get_topic_stats(topic_id)
 
             self._update_stat_card_value("Сессии", str(stats['session_count']))
-            self._update_stat_card_value("Время", f"{stats['total_hours']} ч")
+
+            # ✅ ИСПРАВЛЕНО: используем total_hours_display
+            total_minutes = stats.get('total_minutes', 0)
+            hours = total_minutes // 60
+            mins = total_minutes % 60
+            if hours > 0:
+                time_display = f"{hours}ч {mins}м"
+            else:
+                time_display = f"{mins}м"
+            self._update_stat_card_value("Время", time_display)
+
             self._update_stat_card_value("Концентрация", f"{stats['avg_concentration']}/100")
             self._update_stat_card_value("Энергия", f"{stats['avg_energy']}/100")
+            # ✅ ИСПРАВЛЕНО: добавляем интерес
+            self._update_stat_card_value("Интерес", f"{stats['avg_interest']}/100")
 
             completed = stats.get('completed_tasks', 0)
             total = stats.get('task_count', 1)
@@ -1477,6 +1502,7 @@ class TopicView(QWidget):
                 self._load_notes(self._current_topic_id)
                 self._load_tasks(self._current_topic_id)
                 self._load_cards(self._current_topic_id)
+                self._load_analytics(self._current_topic_id)  # ✅ ДОБАВЛЕНО
         except Exception as e:
             logger.error(f"Ошибка обновления TopicView: {e}", exc_info=True)
 

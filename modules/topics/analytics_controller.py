@@ -35,10 +35,9 @@ class TopicAnalyticsController:
 
         # Логи состояния
         session_ids = [s['id'] for s in sessions]
-
         avg_concentration = 0
         avg_energy = 0
-        avg_interest = 0  # <-- Убедись, что есть
+        avg_interest = 0
 
         if session_ids:
             placeholders = ','.join('?' * len(session_ids))
@@ -47,9 +46,10 @@ class TopicAnalyticsController:
                 tuple(session_ids)
             )
 
-            conc_vals = [log['value'] for log in logs if log['metric'] == 'concentration']
+            # ✅ ИСПРАВЛЕНО: 'focus' вместо 'concentration'
+            conc_vals = [log['value'] for log in logs if log['metric'] == 'focus']
             energy_vals = [log['value'] for log in logs if log['metric'] == 'energy']
-            interest_vals = [log['value'] for log in logs if log['metric'] == 'interest']  # <-- ДОБАВИТЬ
+            interest_vals = [log['value'] for log in logs if log['metric'] == 'interest']
 
             avg_concentration = round(sum(conc_vals) / len(conc_vals), 1) if conc_vals else 0
             avg_energy = round(sum(energy_vals) / len(energy_vals), 1) if energy_vals else 0
@@ -70,7 +70,7 @@ class TopicAnalyticsController:
 
         return {
             'session_count': session_count,
-            'total_minutes': total_minutes,
+            'total_minutes': total_minutes,  # ✅ ДОБАВЛЕНО
             'total_hours': round(total_minutes / 60, 1),
             'avg_concentration': avg_concentration,
             'avg_energy': avg_energy,
@@ -83,24 +83,21 @@ class TopicAnalyticsController:
         }
 
     def get_session_history(self, topic_id: int, limit: int = 10) -> List[Dict[str, Any]]:
-        """
-        Возвращает историю сессий по теме с краткой статистикой.
-        """
+        """Возвращает историю сессий по теме с краткой статистикой."""
         sessions = self._session_repo.get_by_topic(topic_id)
-
         result = []
 
-
-
         for session in sessions[:limit]:
-            # Получаем логи
             logs = db.fetchall(
                 "SELECT metric, value FROM session_state_logs WHERE session_id = ?",
                 (session['id'],)
             )
 
-            conc_vals = [log['value'] for log in logs if log['metric'] == 'concentration']
+            # ✅ ИСПРАВЛЕНО: 'focus' вместо 'concentration'
+            conc_vals = [log['value'] for log in logs if log['metric'] == 'focus']
             energy_vals = [log['value'] for log in logs if log['metric'] == 'energy']
+            # ✅ ДОБАВЛЕНО: интерес
+            interest_vals = [log['value'] for log in logs if log['metric'] == 'interest']
 
             result.append({
                 'id': session['id'],
@@ -108,7 +105,8 @@ class TopicAnalyticsController:
                 'duration_minutes': session.get('duration_minutes', 0),
                 'duration_display': TimeService.format_duration(session.get('duration_minutes', 0)),
                 'avg_concentration': round(sum(conc_vals) / len(conc_vals), 1) if conc_vals else 0,
-                'avg_energy': round(sum(energy_vals) / len(energy_vals), 1) if energy_vals else 0
+                'avg_energy': round(sum(energy_vals) / len(energy_vals), 1) if energy_vals else 0,
+                'avg_interest': round(sum(interest_vals) / len(interest_vals), 1) if interest_vals else 0  # ✅ ДОБАВЛЕНО
             })
 
         return result

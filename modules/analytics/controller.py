@@ -3,6 +3,8 @@ from typing import List, Dict, Any, Tuple
 from datetime import datetime
 from collections import defaultdict
 
+import logging
+
 from datebase.repositories import (
 SessionRepository,
 TaskRepository,
@@ -17,6 +19,8 @@ from models.note import Note
 from models.flashcard import Flashcard
 from services.time_service import TimeService
 
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
 class AnalyticsController:
     """
@@ -94,17 +98,28 @@ class AnalyticsController:
 
         for session in sessions:
             logs = self._get_session_logs(session.id)
+
+            # 🆕 ЛОГИРОВАНИЕ ДЛЯ ОТЛАДКИ
+            logger.debug(f"Сессия {session.id}: получено {len(logs)} логов")
+
             for log in logs:
-                if log['metric'] == 'focus':  # ✅ ИСПРАВЛЕНО: было 'concentration'
+                if log['metric'] == 'focus':
                     all_focus.append(log['value'])
                 elif log['metric'] == 'energy':
                     all_energy.append(log['value'])
                 elif log['metric'] == 'interest':
                     all_interest.append(log['value'])
 
-        avg_focus = sum(all_focus) / len(all_focus) if all_focus else 0  # ✅ ИСПРАВЛЕНО
+        # 🆕 ЛОГИРОВАНИЕ ДЛЯ ОТЛАДКИ
+        logger.debug(f"Собрано метрик: focus={len(all_focus)}, energy={len(all_energy)}, interest={len(all_interest)}")
+        logger.debug(f"Значения focus: {all_focus}")
+
+        avg_focus = sum(all_focus) / len(all_focus) if all_focus else 0
         avg_energy = sum(all_energy) / len(all_energy) if all_energy else 0
         avg_interest = sum(all_interest) / len(all_interest) if all_interest else 0
+
+        # 🆕 ЛОГИРОВАНИЕ ДЛЯ ОТЛАДКИ
+        logger.debug(f"Средние значения: focus={avg_focus}, energy={avg_energy}, interest={avg_interest}")
 
         # Первая и последняя сессия
         dates = [datetime.fromisoformat(s.start_time) for s in sessions if s.start_time]
@@ -117,7 +132,7 @@ class AnalyticsController:
             "total_minutes": total_minutes,
             "total_hours": total_hours,
             "total_minutes_remain": total_remain_minutes,
-            "total_hours_display": f"{total_hours}ч {total_remain_minutes}м",  # <--- ДОБАВЛЯЕМ ЭТУ СТРОКУ
+            "total_hours_display": f"{total_hours}ч {total_remain_minutes}м",
             "avg_duration": round(avg_duration, 1),
             "avg_concentration": round(avg_focus, 2),
             "avg_energy": round(avg_energy, 2),

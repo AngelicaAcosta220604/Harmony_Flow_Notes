@@ -131,7 +131,8 @@ class DashboardController:
             (last_session['id'],)
         )
 
-        conc_values = [log['value'] for log in logs if log['metric'] == 'concentration']
+        # ✅ ИСПРАВЛЕНО: 'focus' вместо 'concentration'
+        conc_values = [log['value'] for log in logs if log['metric'] == 'focus']
         energy_values = [log['value'] for log in logs if log['metric'] == 'energy']
         interest_values = [log['value'] for log in logs if log['metric'] == 'interest']
 
@@ -223,11 +224,14 @@ class DashboardController:
         - средний интерес
         """
         today = date.today().isoformat()
-        today_start = f"{today}T00:00:00"
-        today_end = f"{today}T23:59:59"
+
+        # ✅ ИСПРАВЛЕНО: используем ПРОБЕЛ вместо T (как в БД)
+        today_start = f"{today} 00:00:00"
+        today_end = f"{today} 23:59:59"
 
         # Сессии за сегодня
-        sessions = db.fetchall("SELECT id, duration_minutes FROM sessions WHERE start_time >= ? AND start_time <= ?",
+        sessions = db.fetchall(
+            "SELECT id, duration_minutes FROM sessions WHERE start_time >= ? AND start_time <= ?",
             (today_start, today_end)
         )
 
@@ -249,7 +253,7 @@ class DashboardController:
             tuple(session_ids)
         )
 
-        conc_values = [log['value'] for log in logs if log['metric'] == 'concentration']
+        conc_values = [log['value'] for log in logs if log['metric'] == 'focus']
         energy_values = [log['value'] for log in logs if log['metric'] == 'energy']
         interest_values = [log['value'] for log in logs if log['metric'] == 'interest']
 
@@ -276,6 +280,14 @@ class DashboardController:
         completed_tasks = sum(1 for t in tasks if t.get('status') == 'completed')
         total_minutes = sum(s.get('duration_minutes') or 0 for s in sessions)
 
+        # ✅ ИСПРАВЛЕНО: добавляем total_hours_display
+        hours = total_minutes // 60
+        mins = total_minutes % 60
+        if hours > 0:
+            time_display = f"{hours}ч {mins}м"
+        else:
+            time_display = f"{mins}м"
+
         return {
             'total_topics': len(topics),
             'total_notes': len(notes),
@@ -283,7 +295,9 @@ class DashboardController:
             'total_tasks': len(tasks),
             'completed_tasks': completed_tasks,
             'total_sessions': len(sessions),
+            'total_minutes': total_minutes,  # ✅ ДОБАВЛЕНО
             'total_hours': round(total_minutes / 60, 1),
+            'total_hours_display': time_display,  # ✅ ДОБАВЛЕНО
             'completion_rate': round(completed_tasks / len(tasks) * 100, 1) if tasks else 0
         }
 

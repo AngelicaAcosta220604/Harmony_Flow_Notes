@@ -642,7 +642,7 @@ class DashboardView(QWidget):
 
         layout.addLayout(header_layout)
 
-        # Три карточки: Время, Концентрация, Энергия
+        # ✅ ИСПРАВЛЕНО: Четыре карточки: Время, Концентрация, Энергия, Интерес
         stats_layout = QHBoxLayout()
         stats_layout.setSpacing(16)
 
@@ -659,7 +659,7 @@ class DashboardView(QWidget):
         time_layout.setContentsMargins(12, 10, 12, 10)
         time_layout.setSpacing(4)
 
-        self.today_time_label = QLabel("0.0 ч")
+        self.today_time_label = QLabel("0ч 0м")  # ✅ ИСПРАВЛЕНО: формат "Xч Yм"
         self.today_time_label.setStyleSheet(
             "font-size: 22px; font-weight: bold; color: #1F2937; background-color: transparent;")
         time_layout.addWidget(self.today_time_label)
@@ -856,7 +856,7 @@ class DashboardView(QWidget):
     def _update_progress_bars(self, conc_percent: int, energy_percent: int, interest_percent: int):
         """Обновляет ширину прогресс-баров"""
         try:
-            # ✅ ДОБАВИТЬ: Проверки
+            # ✅ ИСПРАВЛЕНО: Убрано дублирование кода
             if not hasattr(self, 'conc_fill') or self.conc_fill is None:
                 return
             if not hasattr(self, 'energy_fill') or self.energy_fill is None:
@@ -869,33 +869,20 @@ class DashboardView(QWidget):
             energy_percent = max(0, min(100, int(energy_percent or 0)))
             interest_percent = max(0, min(100, int(interest_percent or 0)))
 
-            # ✅ ПРОВЕРКА: родитель существует
+            # Обновляем прогресс-бары
             if self.conc_fill.parent() is not None:
                 parent_width = self.conc_fill.parent().width()
                 self.conc_fill.setFixedWidth(max(0, int(parent_width * conc_percent / 100)))
 
-            # Ограничиваем 0-100
-            conc_percent = max(0, min(100, conc_percent))
-            energy_percent = max(0, min(100, energy_percent))
-            interest_percent = max(0, min(100, interest_percent))
-
-            # ✅ ИСПРАВЛЕНО: правильная вложенность
-            if hasattr(self, 'conc_fill') and self.conc_fill.parent():
-                parent_width = self.conc_fill.parent().width()
-                self.conc_fill.setFixedWidth(max(0, int(parent_width * conc_percent / 100)))
-
-            if hasattr(self, 'energy_fill') and self.energy_fill.parent():
+            if self.energy_fill.parent() is not None:
                 parent_width = self.energy_fill.parent().width()
                 self.energy_fill.setFixedWidth(max(0, int(parent_width * energy_percent / 100)))
 
-            # ✅ ИСПРАВЛЕНО: вынесено из блока energy_fill
-            if hasattr(self, 'interest_fill') and self.interest_fill.parent():
+            if self.interest_fill.parent() is not None:
                 parent_width = self.interest_fill.parent().width()
                 self.interest_fill.setFixedWidth(max(0, int(parent_width * interest_percent / 100)))
 
-
         except Exception as e:
-
             logger.error(f"Ошибка обновления прогресс-баров: {e}", exc_info=True)
 
     def resizeEvent(self, event):
@@ -913,11 +900,21 @@ class DashboardView(QWidget):
         except Exception as e:
             logger.error(f"Ошибка в resizeEvent: {e}", exc_info=True)
 
+    def _format_time_display(self, total_minutes: int) -> str:
+        """Форматирует время в формат 'Xч Yм'"""
+        if total_minutes is None or total_minutes == 0:
+            return "0ч 0м"
+        hours = total_minutes // 60
+        mins = total_minutes % 60
+        if hours > 0:
+            return f"{hours}ч {mins}м"
+        else:
+            return f"{mins}м"
+
     def refresh(self):
         """Обновляет все данные на дашборде"""
         try:
             has_data = self._controller.has_data()
-
             self.empty_widget.setVisible(not has_data)
 
             if not has_data:
@@ -934,11 +931,19 @@ class DashboardView(QWidget):
 
             today_stats = self._controller.get_today_stats()
             self.completed_label.setText(f"Выполнено задач сегодня: {today_stats['completed_tasks_today']}")
-            self.worked_label.setText(f"Отработано: {today_stats['worked_hours_today']} ч")
+
+            # ✅ ИСПРАВЛЕНО: используем worked_minutes_today для форматирования
+            worked_minutes = today_stats.get('worked_minutes_today', 0)
+            hours = worked_minutes // 60
+            mins = worked_minutes % 60
+            if hours > 0:
+                worked_display = f"{hours}ч {mins}м"
+            else:
+                worked_display = f"{mins}м"
+            self.worked_label.setText(f"Отработано: {worked_display}")
 
             total_stats = self._controller.get_total_stats()
             self.kpi_row.clear()
-            # ✅ ИСПРАВЛЕНО: все пути используют get_resource_path
             self.kpi_row.add_card("Темы", str(total_stats['total_topics']),
                                   str(get_resource_path("resources/icons/tema1.png")))
             self.kpi_row.add_card("Заметки", str(total_stats['total_notes']),
@@ -949,7 +954,7 @@ class DashboardView(QWidget):
                                   str(get_resource_path("resources/icons/task1.png")))
             self.kpi_row.add_card("Сессии", str(total_stats['total_sessions']),
                                   str(get_resource_path("resources/icons/session1.png")))
-            self.kpi_row.add_card("Время", f"{total_stats['total_hours']} ч",
+            self.kpi_row.add_card("Время", total_stats.get('total_hours_display', '0м'),
                                   str(get_resource_path("resources/icons/time1.png")))
 
             active_topic = self._controller.get_active_topic()
@@ -957,7 +962,6 @@ class DashboardView(QWidget):
                 self.active_topic_widget.show()
                 self.active_topic_name.setText(active_topic['name'])
                 self._active_topic_id = active_topic['id']
-
                 last_activity = active_topic.get('last_activity', '')
                 if last_activity:
                     date_str = last_activity[:10]
@@ -969,8 +973,6 @@ class DashboardView(QWidget):
             if last_session is not None:
                 self.last_session_widget.show()
                 self.last_session_topic.setText(last_session['topic_name'])
-
-                #  Просто обновляем текст QLabel
                 self.last_session_duration.setText(f"⏱️ {last_session['duration_display']}")
                 self.last_session_conc.setText(f"🧠 {last_session['avg_concentration']}/100")
                 self.last_session_interest.setText(f"❤️ {last_session['avg_interest']}/100")
@@ -984,15 +986,27 @@ class DashboardView(QWidget):
 
             # 🆕 Обновляем прогресс-бары сегодня
             try:
+                # ✅ ИСПРАВЛЕНО: все метрики из today_analytics
                 today_analytics = self._controller.get_today_analytics()
 
-                conc_val = int(today_stats.get('avg_concentration', 0))
-                energy_val = int(today_stats.get('avg_energy', 0))
+                conc_val = int(today_analytics.get('avg_concentration', 0))
+                energy_val = int(today_analytics.get('avg_energy', 0))
                 interest_val = int(today_analytics.get('avg_interest', 0))
+
                 self.today_conc_label.setText(str(conc_val))
                 self.today_energy_label.setText(str(energy_val))
                 self.today_interest_label.setText(str(interest_val))
-                self.today_time_label.setText(f"{today_stats.get('worked_hours_today', 0)} ч")
+
+                # ✅ ИСПРАВЛЕНО: используем total_minutes для форматирования
+                today_minutes = today_analytics.get('total_minutes', 0)
+                hours = today_minutes // 60
+                mins = today_minutes % 60
+                if hours > 0:
+                    time_display = f"{hours}ч {mins}м"
+                else:
+                    time_display = f"{mins}м"
+                self.today_time_label.setText(time_display)
+
                 self._update_progress_bars(conc_val, energy_val, interest_val)
             except Exception as e:
                 logger.error(f"Ошибка обновления аналитики за сегодня: {e}", exc_info=True)
@@ -1003,7 +1017,7 @@ class DashboardView(QWidget):
     def _update_urgent_tasks(self, tasks: list):
         """Обновляет список срочных задач"""
         try:
-            # ✅ ДОБАВИТЬ: Проверка на валидность виджета
+            # ✅ ИСПРАВЛЕНО: Убрано дублирование кода
             if not self.tasks_layout or not hasattr(self, 'urgent_tasks_widget'):
                 return
 
@@ -1014,9 +1028,6 @@ class DashboardView(QWidget):
                         btn.deleteLater()
                 except RuntimeError:
                     pass  # Кнопка уже удалена
-            self._urgent_task_buttons.clear()
-            for btn in self._urgent_task_buttons.values():
-                btn.deleteLater()
             self._urgent_task_buttons.clear()
 
             while self.tasks_layout.count():
