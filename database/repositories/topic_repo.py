@@ -1,6 +1,6 @@
 # database/repositories/topic_repo.py
 from typing import List, Optional, Dict, Any
-from datebase.db_manager import db
+from database.db_manager import db
 
 
 class TopicRepository:

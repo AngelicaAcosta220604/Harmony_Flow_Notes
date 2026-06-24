@@ -3,11 +3,11 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 
-from datebase.db_manager import db
-from datebase.repositories.topic_repo import TopicRepository
-from datebase.repositories.note_repo import NoteRepository
-from datebase.repositories.flashcard_repo import FlashcardRepository
-from datebase.repositories.task_repo import TaskRepository
+from database.db_manager import db
+from database.repositories.topic_repo import TopicRepository
+from database.repositories.note_repo import NoteRepository
+from database.repositories.flashcard_repo import FlashcardRepository
+from database.repositories.task_repo import TaskRepository
 
 class SearchController:
     """

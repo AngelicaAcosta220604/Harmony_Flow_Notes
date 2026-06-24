@@ -3,8 +3,8 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 import logging
 
-from datebase.repositories.review_repo import ReviewRepository
-from datebase.repositories.flashcard_repo import FlashcardRepository
+from database.repositories.review_repo import ReviewRepository
+from database.repositories.flashcard_repo import FlashcardRepository
 from models.review_session import ReviewSession
 from models.review_answer import ReviewAnswer
 from models.flashcard import Flashcard
@@ -259,7 +259,7 @@ class ReviewController:
     def record_answer(self, flashcard_id: int, correct: bool):
         """Записывает ответ и обновляет прогресс карточки"""
         try:
-            from datebase.db_manager import db
+            from database.db_manager import db
 
             # Проверяем, есть ли запись о прогрессе
             progress = db.fetchone(

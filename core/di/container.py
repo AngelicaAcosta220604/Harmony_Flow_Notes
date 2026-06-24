@@ -25,16 +25,16 @@ except Exception as e:
 
 # Теперь импорты должны работать
 try:
-    from datebase.db_manager import db
-    from datebase.repositories.topic_repo import TopicRepository
-    from datebase.repositories.note_repo import NoteRepository
-    from datebase.repositories.task_repo import TaskRepository
-    from datebase.repositories.flashcard_repo import FlashcardRepository
-    from datebase.repositories.session_repo import SessionRepository
-    from datebase.repositories.session_state_log_repo import SessionStateLogRepository
-    from datebase.repositories.quick_note_repo import QuickNoteRepository
-    from datebase.repositories.review_repo import ReviewRepository
-    from datebase.repositories.settings_repo import SettingsRepository
+    from database.db_manager import db
+    from database.repositories.topic_repo import TopicRepository
+    from database.repositories.note_repo import NoteRepository
+    from database.repositories.task_repo import TaskRepository
+    from database.repositories.flashcard_repo import FlashcardRepository
+    from database.repositories.session_repo import SessionRepository
+    from database.repositories.session_state_log_repo import SessionStateLogRepository
+    from database.repositories.quick_note_repo import QuickNoteRepository
+    from database.repositories.review_repo import ReviewRepository
+    from database.repositories.settings_repo import SettingsRepository
 
     from services.time_service import TimeService
     from services.notification_service import NotificationService

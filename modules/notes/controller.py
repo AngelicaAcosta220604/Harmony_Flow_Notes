@@ -3,7 +3,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 import logging
 
-from datebase.repositories.note_repo import NoteRepository
+from database.repositories.note_repo import NoteRepository
 from models.note import Note
 from core.event_bus import event_bus
 

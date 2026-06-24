@@ -5,14 +5,14 @@ from collections import defaultdict
 
 import logging
 
-from datebase.repositories import (
+from database.repositories import (
 SessionRepository,
 TaskRepository,
 NoteRepository,
 FlashcardRepository,
 )
 
-from datebase.db_manager import db
+from database.db_manager import db
 from models.session import Session
 from models.task import Task
 from models.note import Note

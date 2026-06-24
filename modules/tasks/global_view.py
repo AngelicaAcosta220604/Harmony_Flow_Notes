@@ -13,7 +13,7 @@ from utils.resource_paths import get_resource_path
 from modules.tasks.controller import TaskController
 from modules.tasks.filters import TaskFilters
 from modules.tasks.dialogs import TaskDialog
-from datebase.repositories.topic_repo import TopicRepository
+from database.repositories.topic_repo import TopicRepository
 from widgets import SilentMessageBox
 
 # Настройка логирования

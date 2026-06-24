@@ -3,7 +3,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 import logging
 
-from datebase.repositories.flashcard_repo import FlashcardRepository
+from database.repositories.flashcard_repo import FlashcardRepository
 from models.flashcard import Flashcard
 from core.event_bus import event_bus
 
@@ -239,7 +239,7 @@ class FlashcardController:
     def get_card_progress(self, card_id: int) -> dict:
         """Возвращает прогресс карточки"""
         try:
-            from datebase.db_manager import db
+            from database.db_manager import db
 
             progress = db.fetchone(
                 "SELECT * FROM flashcard_progress WHERE flashcard_id = ?",

@@ -11,7 +11,7 @@ import logging
 
 from utils.resource_paths import get_resource_path
 from .controller import FlashcardController
-from datebase.db_manager import db
+from database.db_manager import db
 
 # Настройка логирования
 logger = logging.getLogger(__name__)

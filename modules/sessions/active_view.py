@@ -469,7 +469,7 @@ class FocusActiveView(QWidget):
             if session_id and self.timer:
                 current_seconds = self._session_controller.get_elapsed_seconds()
                 if current_seconds > 0:
-                    from datebase.db_manager import db
+                    from database.db_manager import db
                     db.execute(
                         "UPDATE sessions SET duration_minutes = ? WHERE id = ?",
                         (current_seconds // 60, session_id)

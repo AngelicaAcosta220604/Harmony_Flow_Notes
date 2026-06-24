@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from datebase.repositories.topic_repo import TopicRepository
+from database.repositories.topic_repo import TopicRepository
 
 
 class AnalyticsSelectorDialog(QDialog):

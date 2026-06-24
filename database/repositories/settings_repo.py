@@ -1,6 +1,6 @@
 # database/repositories/settings_repo.py
 from typing import Optional, Dict, Any
-from datebase.db_manager import db
+from database.db_manager import db
 
 
 class SettingsRepository:

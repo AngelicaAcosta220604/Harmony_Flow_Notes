@@ -1,7 +1,7 @@
 # database/repositories/session_repo.py
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from datebase.db_manager import db
+from database.db_manager import db
 
 
 class SessionRepository:

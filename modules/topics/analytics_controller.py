@@ -1,13 +1,13 @@
 # modules/topics/analytics_controller.py
 from typing import List, Dict, Any, Optional
-from datebase.repositories import (
+from database.repositories import (
 SessionRepository,
 TaskRepository,
 NoteRepository,
 FlashcardRepository
 )
 
-from datebase.db_manager import db
+from database.db_manager import db
 from services.time_service import TimeService
 
 

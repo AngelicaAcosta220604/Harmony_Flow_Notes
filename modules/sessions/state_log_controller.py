@@ -1,6 +1,6 @@
 # modules/sessions/state_log_controller.py
 from typing import List, Dict, Any
-from datebase.repositories.session_state_log_repo import SessionStateLogRepository
+from database.repositories.session_state_log_repo import SessionStateLogRepository
 
 
 class SessionStateLogController:

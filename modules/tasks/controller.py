@@ -3,8 +3,8 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, date, timedelta
 import logging
 
-from datebase.repositories.task_repo import TaskRepository
-from datebase.repositories.topic_repo import TopicRepository
+from database.repositories.task_repo import TaskRepository
+from database.repositories.topic_repo import TopicRepository
 from models.task import Task
 from services.notification_service import NotificationService
 from services.time_service import TimeService

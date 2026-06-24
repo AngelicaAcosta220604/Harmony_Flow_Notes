@@ -1,6 +1,6 @@
 # database/repositories/session_state_log_repo.py
 from typing import List, Dict, Any
-from datebase.db_manager import db
+from database.db_manager import db
 
 
 class SessionStateLogRepository:

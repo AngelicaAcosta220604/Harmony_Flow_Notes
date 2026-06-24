@@ -2,11 +2,11 @@
 from typing import List, Optional, Dict, Any
 import logging
 
-from datebase.repositories.topic_repo import TopicRepository
-from datebase.repositories.note_repo import NoteRepository
-from datebase.repositories.task_repo import TaskRepository
-from datebase.repositories.flashcard_repo import FlashcardRepository
-from datebase.repositories.session_repo import SessionRepository
+from database.repositories.topic_repo import TopicRepository
+from database.repositories.note_repo import NoteRepository
+from database.repositories.task_repo import TaskRepository
+from database.repositories.flashcard_repo import FlashcardRepository
+from database.repositories.session_repo import SessionRepository
 from models.topic import Topic
 from models.note import Note
 from models.task import Task

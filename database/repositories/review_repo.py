@@ -1,6 +1,6 @@
 # database/repositories/review_repo.py
 from typing import List, Optional, Dict, Any
-from datebase.db_manager import db
+from database.db_manager import db
 
 class ReviewRepository:
     """Репозиторий для работы с сессиями повторения карточек"""

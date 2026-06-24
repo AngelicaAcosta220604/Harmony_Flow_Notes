@@ -1,6 +1,6 @@
 # modules/settings/controller.py
 from typing import Optional, Dict, Any
-from datebase.repositories.settings_repo import SettingsRepository
+from database.repositories.settings_repo import SettingsRepository
 from models.settings import Settings
 
 

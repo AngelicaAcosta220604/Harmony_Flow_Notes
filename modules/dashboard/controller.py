@@ -2,7 +2,7 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime, date
 
-from datebase.repositories import (
+from database.repositories import (
 TopicRepository,
 TaskRepository,
 SessionRepository,
@@ -11,7 +11,7 @@ FlashcardRepository,
 SettingsRepository
 )
 
-from datebase.db_manager import db
+from database.db_manager import db
 
 from models.task import Task
 from models.session import Session

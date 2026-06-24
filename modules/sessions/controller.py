@@ -4,11 +4,11 @@ from datetime import datetime
 from PySide6.QtCore import QTimer, QObject, Signal
 import logging
 
-from datebase.db_manager import db
-from datebase.repositories.session_repo import SessionRepository
-from datebase.repositories.session_state_log_repo import SessionStateLogRepository
-from datebase.repositories.quick_note_repo import QuickNoteRepository
-from datebase.repositories.topic_repo import TopicRepository
+from database.db_manager import db
+from database.repositories.session_repo import SessionRepository
+from database.repositories.session_state_log_repo import SessionStateLogRepository
+from database.repositories.quick_note_repo import QuickNoteRepository
+from database.repositories.topic_repo import TopicRepository
 from models.session import Session
 from models.quick_note import QuickNote
 from services.time_service import TimeService
